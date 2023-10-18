@@ -1,0 +1,62 @@
+; FizzBuzz
+; Program writes the numbers 1 through N (user input)
+; except that multiples of 3 are replaced with Fizz
+; multiples of 5 are replaced with Buzz
+; and multiples of 15 are replaced with FizzBuzz
+;
+; Of course, we don't have strings in A-Mi, so I will use
+; Fizz = 5122
+; Buzz = 8422
+
+    read %N
+    %Fizz = 5122
+    %Buzz = 8422
+    %FizzBuzz = 51228422
+    %n = 0
+
+@count:
+    %n = %n + 1
+    %cmp = %N < %n
+    branch %cmp ? @exit : @div
+
+@div:
+    %n.mod.3 = %n
+    %n.mod.5 = %n
+
+@mod.3:
+    %cmp = %n.mod.3 < 3
+    branch %cmp ? @mod.5 : @reduce.3
+@reduce.3:
+    %n.mod.3 = %n.mod.3 - 3
+    goto @mod.3
+
+@mod.5:
+    %cmp = %n.mod.5 < 5
+    branch %cmp ? @print : @reduce.5
+@reduce.5:
+    %n.mod.5 = %n.mod.5 - 5
+    goto @mod.5
+
+@print:
+    branch %n.mod.3 ? @noFizz : @mayFizz
+
+@mayFizz:
+    branch %n.mod.5 ? @Fizz : @FizzBuzz
+
+@noFizz:
+    branch %n.mod.5 ? @n : @Buzz
+
+@Fizz:
+    write %Fizz
+    goto @count
+@Buzz:
+    write %Buzz
+    goto @count
+@FizzBuzz:
+    write %FizzBuzz
+    goto @count
+@n:
+    write %n
+    goto @count
+    
+@exit:
