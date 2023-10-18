@@ -80,6 +80,8 @@ except amp.BadFlowError as fe:
     perror(f"""A build error has occurred:
 [{fname}] {fe.message}""")
 
+
+qhist = dict() # remember past queries to note changes
 while not cfg.exited:
     if args.step == "never":
         cfg.run(verbose=output)
@@ -107,11 +109,24 @@ while not cfg.exited:
         queries = q.split()
         if len(queries) == 0:
             break
-        queries = list(filter(lambda s: s.startswith('%') or s.startswith('@') or s.startswith('#'), queries))
+        queries = list(filter(lambda s: s.startswith('%') or s.startswith('@'), queries))
+        if len(queries) == 0:
+            continue
         padding = 2 + max(map(lambda q: len(q), queries))
         for query in queries:
             if query in cfg.vars:
-                rhs = cfg[query]
+                val = cfg[query]
+                if query.startswith('%'):
+                    rhs = str(val)
+                else:
+                    rhs = f"0x{val:04x}"
+
+                if query not in qhist:
+                    rhs += "  (new)"
+                    qhist[query] = val
+                elif val != qhist[query]:
+                    rhs += f"  (changed from {qhist[query]})"
+                    qhist[query] = val
             else:
                 rhs = "<undef>"
             pprompt(f"{query: >{padding}} = {rhs}")
