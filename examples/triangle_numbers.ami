@@ -1,0 +1,23 @@
+; takes a single input and outputs the sum
+; from the input to zero
+; I'm not bothering with SSA
+
+    read %N
+    %sum = 0
+
+@loop:
+    %done = %N == 0
+    branch %done ? @print : @add
+@add:
+    %sum = %sum + %N
+    %positive = 0 < %N
+    branch %positive ? @decrement : @increment
+@increment:
+    %N = %N + 1
+    goto @loop
+@decrement:
+    %N = %N - 1
+    goto @loop
+
+@print:
+    write %sum

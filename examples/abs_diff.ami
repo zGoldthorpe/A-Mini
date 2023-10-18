@@ -1,0 +1,12 @@
+; takes two inputs and outputs their absolute difference
+@0:
+    read %input.1
+    read %input.2
+    %diff.0 = %input.1 - %input.2
+    %comp = %diff.0 < 0
+    branch %comp ? @fix : @print
+@fix:
+    %diff.1 = -1 * %diff.0
+@print:
+    %diff = phi [ %diff.0, @0 ], [ %diff.1, @fix ]
+    write %diff
