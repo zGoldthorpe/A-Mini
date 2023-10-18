@@ -319,6 +319,7 @@ class CFGBuilder:
                 # possible fallthrough
                 self._commit_block(cfg, fallthrough=True)
                 self._block_label, instruction_str = instruction_str.split(':', 1)
+                self._current_block = []
 
             instruction_str = instruction_str.strip()
             if len(instruction_str) == 0:
