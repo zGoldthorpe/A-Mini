@@ -1,6 +1,6 @@
 import re
 
-def clean(instr):
+def _clean_whitespace(instr):
     """
     Cleans up instruction whitespace
     """
@@ -126,7 +126,7 @@ class Operation:
         return f"Op({self.repr})"
 
     def read(self, instruction):
-        m = self.syntax.fullmatch(clean(instruction))
+        m = self.syntax.fullmatch(_clean_whitespace(instruction))
         if m is None:
             return None
         return self.cls(*m.groups())
