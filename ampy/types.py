@@ -90,6 +90,10 @@ class BranchInstruction(BranchInstructionClass):
         self.iftrue = iftrue
         self.iffalse = iffalse
 
+class ExitInstruction(BranchInstructionClass):
+    def __init__(self):
+        super().__init__("exit")
+
 class ReadInstruction(InstructionClass):
     def __init__(self, lhs):
         super().__init__(f"read {lhs}", "I/O")
@@ -132,13 +136,15 @@ class BranchTargets(BranchTargets):
                 and self._iffalse == other._iffalse)
 
     def __len__(self):
-        return 2 if self._cond else 1 if self._target else 0
+        return (2 if self._cond is not None
+                else 1 if self._target is not None
+                else 0)
 
     def __iter__(self):
-        if self._cond:
+        if self._cond is not None:
             yield self._iftrue
             yield self._iffalse
-        elif self._target:
+        elif self._target is not None:
             yield self._target
         # empty yield otherwise
 
@@ -151,9 +157,9 @@ class BranchTargets(BranchTargets):
         return self.tuple[idx]
     
     def __repr__(self):
-        if self._cond:
+        if self._cond is not None:
             return f"BranchTargets({self._iftrue.name} if {self._cond} else {self._iffalse.name})"
-        if self._target:
+        if self._target is not None:
             return f"BranchTargets({self._target.name})"
         return "BranchTargets()"
     
@@ -169,23 +175,32 @@ class BranchTargets(BranchTargets):
     def branch_condition(self):
         return self._cond
 
+    @property
+    def instruction(self):
+        if self._cond:
+            return BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
+        if self._target:
+            return GotoInstruction(target=self._target.label)
+        return ExitInstruction()
+
 class BasicBlock(BasicBlock):
 
-    def __init__(self, label:str, instructions:list=[], branch_targets=BranchTargets(), parents=set()):
+    def __init__(self, label:str, instructions:list=[]):
         """
         label: string @label indicating block's "name"
-        instructions: list of Instruction objects
-        parents: set of BasicBlock objects pointing to parents
+        instructions: list of Instruction objects, EXCLUDING the branch at the end
+        (children / parents determined after initialisation)
         """
         self._label = label
         self._instructions = list(instructions)
-        self._branch_targets = branch_targets
-        self._parents = set(parents)
+        self._branch_targets = BranchTargets()
+        self._parents = set()
 
     def __repr__(self):
         return (f"{self.name}\n{'':->{len(self.name)}}\n"
                 + "parents: " + ", ".join(parent.label for parent in sorted(self._parents, key=lambda p: p.label))
-                + '\n' + '\n'.join(repr(I) for I in self))
+                + '\n' + '\n'.join(repr(I) for I in self)
+                + '\n' + repr(self.branch_instruction))
 
     def __len__(self):
         return len(self._instructions)
@@ -218,6 +233,10 @@ class BasicBlock(BasicBlock):
     def parents(self):
         return set(self._parents)
 
+    @property
+    def branch_instruction(self):
+        return self._branch_targets.instruction
+
     ### Block modification ###
 
     def add_parent(self, parent:BasicBlock):
@@ -238,7 +257,6 @@ class BasicBlock(BasicBlock):
                 raise BranchError(self.label, f"Added branch condition {cond} to unconditional branch out of {self.name}")
             self._branch_targets = BranchTargets(target=child)
             child.add_parent(self)
-            self._instructions.append(GotoInstruction(child.label))
             return
         if num_children == 1:
             if cond is None:
@@ -248,12 +266,10 @@ class BasicBlock(BasicBlock):
                 self._branch_targets = BranchTargets(cond=cond,
                         iftrue=child,
                         iffalse=first)
-                self._instructions[-1] = BranchInstruction(cond, child.label, first.label)
             else:
                 self._branch_targets = BranchTargets(cond=cond,
                         iftrue=first,
                         iffalse=child)
-                self._instructions[-1] = BranchInstruction(cond, first.label, child.label)
             child.add_parent(self)
             return
         # num_children == 2
@@ -266,12 +282,10 @@ class BasicBlock(BasicBlock):
             raise KeyError(f"{self.name} does not have {child.label} as child")
         child.remove_parent(self, ignore_keyerror=True)
         if len(self.children) == 1:
-            self._instructions.pop() # remove goto statement
             self._branch_targets = BranchTargets()
             return
         # branch has two children at this point
         kept = self.children[0] if child == self.children[1] else self.children[1]
-        self._instructions[-1] = GotoInstruction(kept.label)
         self._branch_targets = BranchTargets(target=kept)
 
 ### Control flow ###
@@ -318,6 +332,8 @@ class CFG:
             if isinstance(I, BranchInstructionClass):
                 if i + 1 < len(instructions):
                     raise BranchInBlockException(f"Intermediate instruction {i+1} of block {label} is a branch ({repr(I)})")
+                if isinstance(I, ExitInstruction):
+                    return
                 if isinstance(I, GotoInstruction):
                     block.add_child(self._fetch_or_create_block(I.target))
                     return

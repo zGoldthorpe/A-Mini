@@ -35,6 +35,8 @@ read    %in
 write   %out
 ; debugging
 brkpt   !name
+; exiting
+exit
 ```
 
 There is a `phi` instruction, but code does not need to be in SSA form.
