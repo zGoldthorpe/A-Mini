@@ -21,3 +21,34 @@ ts.exec("A = BasicBlock('@A')",
         state=dict(BasicBlock=amt.BasicBlock,
             BranchTargets=amt.BranchTargets))
 
+ts.exec("A = BasicBlock('@A')",
+        "B = BasicBlock('@B')",
+        "C = BasicBlock('@C')",
+        "A.add_child(B)",
+        "A.add_child(C, cond='%c')",
+        "A.remove_child(B)",
+        "assert(A.children == BranchTargets(target=C))",
+        "assert(B.parents == set())",
+        "assert(C.parents == {A})",
+        state=dict(BasicBlock=amt.BasicBlock,
+            BranchTargets=amt.BranchTargets))
+
+ts.exec("A = BasicBlock('@A')",
+        "B = BasicBlock('@B')",
+        "A.add_child(B)",
+        "A.add_child(B, cond='%c')",
+        "A.remove_child(B)",
+        "assert(A.children == BranchTargets())",
+        "assert(B.parents == set())",
+        state=dict(BasicBlock=amt.BasicBlock,
+            BranchTargets=amt.BranchTargets))
+
+ts.exec("A = BasicBlock('@A')",
+        "B = BasicBlock('@B')",
+        "A.add_child(B)",
+        "A.add_child(B, cond='%c')",
+        "A.remove_child(B, keep_duplicate=True)",
+        "assert(A.children == BranchTargets(target=B))",
+        "assert(B.parents == {A})",
+        state=dict(BasicBlock=amt.BasicBlock,
+            BranchTargets=amt.BranchTargets))

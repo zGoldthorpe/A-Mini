@@ -79,9 +79,9 @@ class LeqInstruction(CompInstructionClass):
         super().__init__(f"{dest} = {op1} <= {op2}", dest, op1, op2, func=lambda x, y: int(x <= y))
 
 class GotoInstruction(BranchInstructionClass):
-    def __init__(self, tgt:str):
-        super().__init__(f"goto {tgt}")
-        self.target = tgt
+    def __init__(self, target:str):
+        super().__init__(f"goto {target}")
+        self.target = target
 
 class BranchInstruction(BranchInstructionClass):
     def __init__(self, cond:str, iftrue:str, iffalse:str):
@@ -177,9 +177,9 @@ class BranchTargets(BranchTargets):
 
     @property
     def instruction(self):
-        if self._cond:
+        if self._cond is not None:
             return BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
-        if self._target:
+        if self._target is not None:
             return GotoInstruction(target=self._target.label)
         return ExitInstruction()
 
@@ -215,6 +215,8 @@ class BasicBlock(BasicBlock):
     @ensure_types(object, (BasicBlock, type(None)))
     def __eq__(self, other:BasicBlock):
         # Basic blocks should be uniquely determined by their label
+        if other is None:
+            return False
         return self.label == other.label
 
     @property
@@ -242,13 +244,14 @@ class BasicBlock(BasicBlock):
     def add_parent(self, parent:BasicBlock):
         self._parents.add(parent)
 
-    def remove_parent(self, parent:BasicBlock, ignore_keyerror=False):
+    def remove_parent(self, parent:BasicBlock, ignore_keyerror=False, propagate=True):
         if parent not in self._parents:
             if ignore_keyerror:
                 return
             raise KeyError(f"{self.name} does not have a parent at {parent}")
         self._parents.remove(parent)
-        parent.remove_child(self, ignore_keyerror=True)
+        if propagate:
+            parent.remove_child(self, ignore_keyerror=True, propagate=False)
 
     def add_child(self, child:BasicBlock, cond=None, new_child_if_cond=True):
         num_children = len(self.children)
@@ -275,17 +278,29 @@ class BasicBlock(BasicBlock):
         # num_children == 2
         raise BranchError(self.label, f"Cannot have three branch targets out of {self.name}")
     
-    def remove_child(self, child:BasicBlock, ignore_keyerror=False):
+    def remove_child(self, child:BasicBlock, ignore_keyerror=False, propagate=True, keep_duplicate=False):
+        """
+        Removes child as branch target for current block.
+        """
         if child not in self.children:
             if ignore_keyerror:
                 return
             raise KeyError(f"{self.name} does not have {child.label} as child")
-        child.remove_parent(self, ignore_keyerror=True)
+        if propagate:
+            child.remove_parent(self, ignore_keyerror=True, propagate=False)
         if len(self.children) == 1:
             self._branch_targets = BranchTargets()
             return
         # branch has two children at this point
         kept = self.children[0] if child == self.children[1] else self.children[1]
+        if kept == child:
+            if keep_duplicate:
+                kept.add_parent(self)
+                # since kept == child, its parent was deleted already
+            else:
+                self._branch_targets = BranchTargets()
+                # remove both child and duplicate
+                return
         self._branch_targets = BranchTargets(target=kept)
 
 ### Control flow ###
