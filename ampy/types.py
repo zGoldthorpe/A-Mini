@@ -106,10 +106,12 @@ class BrkInstruction(InstructionClass):
         self.id = name
 
 ### Basic blocks ###
-
 class BasicBlock:
-
     class _BranchTargets:
+        pass
+
+class BasicBlock(BasicBlock):
+    class _BranchTargets(BasicBlock._BranchTargets):
         @ensure_multi(
                 Syntax(BasicBlock._BranchTargets), # exit node; no children
                 Syntax(BasicBlock._BranchTargets, target=BasicBlock), # goto
@@ -139,7 +141,9 @@ class BasicBlock:
         def branch_condition(self):
             return self._cond
 
-    def __init__(self, label:str, instructions:list=[], branch_targets=BasicBlock._BranchTargets, parents=set()):
+class BasicBlock(BasicBlock):
+
+    def __init__(self, label:str, instructions:list=[], branch_targets=BasicBlock._BranchTargets(), parents=set()):
         """
         label: string @label indicating block's "name"
         instructions: list of Instruction objects
@@ -152,7 +156,7 @@ class BasicBlock:
 
     def __repr__(self):
         return (f"{self.name}\n{'':->{len(self.name)}}\n"
-                + "parents: " + ", ".join(self._parents)
+                + "parents: " + ", ".join(parent.label for parent in self._parents)
                 + '\n' + '\n'.join(repr(I) for I in self))
 
     def __len__(self):
@@ -161,6 +165,9 @@ class BasicBlock:
     def __iter__(self):
         for I in self._instructions:
             yield I
+
+    def __hash__(self):
+        return hash(self.label)
 
     def __eq__(self, other:BasicBlock):
         # Basic blocks should be uniquely determined by their label
@@ -199,14 +206,14 @@ class BasicBlock:
         self._parents.remove(parent)
         parent.remove_child(self.label, ignore_keyerror=True)
 
-    def add_child(self, child:BasicBlock, cond=None, new_child_if_cond=False):
+    def add_child(self, child:BasicBlock, cond=None, new_child_if_cond=True):
         num_children = len(self.children)
         if num_children == 0:
             if cond is not None:
                 raise BranchError(self.label, f"Added branch condition {cond} to unconditional branch out of {self.name}")
             self._branch_targets = BasicBlock._BranchTargets(target=child)
             child.add_parent(self)
-            self._instructions.append(GotoInstruction(child))
+            self._instructions.append(GotoInstruction(child.label))
             return
         if num_children == 1:
             if cond is None:
@@ -216,12 +223,12 @@ class BasicBlock:
                 self._branch_targets = BasicBlock._BranchTargets(cond=cond,
                         iftrue=child,
                         iffalse=first)
-                self._instructions[-1] = BranchInstruction(cond, child, first)
+                self._instructions[-1] = BranchInstruction(cond, child.label, first.label)
             else:
                 self._branch_targets = BasicBlock._BranchTargets(cond=cond,
                         iftrue=first,
                         iffalse=child)
-                self._instructions[-1] = BranchInstruction(cond, first, child)
+                self._instructions[-1] = BranchInstruction(cond, first.label, child.label)
             child.add_parent(self)
             return
         # num_children == 2
@@ -239,7 +246,7 @@ class BasicBlock:
             return
         # branch has two children at this point
         kept = self.children[0] if child == self.children[1] else self.children[1]
-        self._instructions[-1] = GotoInstruction(kept)
+        self._instructions[-1] = GotoInstruction(kept.label)
         self._branch_targets = BasicBlock._BranchTargets(target=kept)
 
 ### Control flow ###
