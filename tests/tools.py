@@ -35,7 +35,7 @@ class TestSuite:
 
     @property
     def all_tests_passed(self):
-        return all(res is None for res in self._results)
+        return all(self._passes)
     
     def print_results(self):
         num_passed = len(filter(None, self._passed))
@@ -54,6 +54,8 @@ class TestSuite:
 
     def _success(self, *args, **kwargs):
         psuccess(f"[{self.name}] Test #{self._test_counter:02d}", *args, **kwargs)
+
+class PythonExecutionTestSuite(TestSuite):
 
     def exec(self, *lines, state=None, expected=None):
         self._init_test()
@@ -93,6 +95,18 @@ Exception: {e}""")
                 lines=lines,
                 exec_state=state)
         return True
+    
+    def get_exec_state(self, test):
+        return self.get_state(test)["exec_state"]
+    
+    def inherit_exec_state(self, test, extern_state):
+        """
+        Passes state from execution #test to extern_state
+        E.g., pass extern_state=locals() to instantiate all variables in local scope.
+        """
+        state = self.get_exec_state(test)
+        for kw in state:
+            extern_state[kw] = state[kw]
 
 
 
