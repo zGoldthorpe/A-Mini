@@ -248,7 +248,7 @@ class BasicBlock(BasicBlock):
                 return
             raise KeyError(f"{self.name} does not have a parent at {parent}")
         self._parents.remove(parent)
-        parent.remove_child(self.label, ignore_keyerror=True)
+        parent.remove_child(self, ignore_keyerror=True)
 
     def add_child(self, child:BasicBlock, cond=None, new_child_if_cond=True):
         num_children = len(self.children)
