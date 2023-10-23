@@ -311,6 +311,13 @@ class CFG:
         self._blocks = dict() # str(label) : BasicBlock dictionary
         self._entrypoint = None
 
+    def __repr__(self):
+        return ("Control Flow Graph:\nEntry point: "
+                + (self.entrypoint.label
+                    if self.entrypoint is not None
+                    else "<not set>")
+                + "\n\n".join(repr(block) for block in self))
+
     def __len__(self):
         return len(self._blocks)
 
@@ -318,30 +325,34 @@ class CFG:
         for label in self._blocks:
             yield self._blocks[label]
 
-    def __in__(self, label:str):
-        return label in self._blocks
-
     def __getitem__(self, label:str):
-        if label not in self:
+        if label not in self.labels:
             raise KeyError(f"{label} does not label an existing block")
+        return self._blocks[label]
 
-    def _create_block(self, label:str, entrypoint=False):
+    @property
+    def labels(self):
+        return set(self._blocks.keys())
+
+    @property
+    def blocks(self):
+        for label in self._blocks:
+            yield self._blocks[label]
+
+    def _create_block(self, label:str):
         if not label.startswith('@'):
             raise ValueError(f"Invalid label {label}: labels must begin with '@'")
-        if label in self:
+        if label in self.labels:
             raise LabelConflictError(f"{label} cannot be assigned to multiple blocks")
         self._blocks[label] = BasicBlock(label)
-        if entrypoint:
-            if self._entrypoint is not None:
-                raise MultipleEntrypointsError
         # all basic blocks are exit nodes by default
 
     def _fetch_or_create_block(self, label:str):
-        if label not in self:
+        if label not in self.labels:
             self._create_block(label)
         return self[label]
 
-    def _populate_block(self, label:str, instructions:list):
+    def _populate_block(self, label:str, *instructions):
         block = self[label]
         for (i, I) in enumerate(instructions):
             if isinstance(I, BranchInstructionClass):
@@ -358,10 +369,17 @@ class CFG:
                             cond=I.cond, new_child_if_cond=False)
                     return
             self[label]._instructions.append(I)
-      
-    def add_block(self, label:str, instructions:list, entrypoint=False):
-        self._create_block(self, label, entrypoint=entrypoint)
-        self._populate_block(self, label, instructions)
+
+    def set_entrypoint(self, label:str):
+        self._entrypoint = self._fetch_or_create_block(label)
+
+    @property
+    def entrypoint(self):
+        return self._entrypoint
+
+    def add_block(self, label:str, *instructions):
+        self._create_block(label)
+        self._populate_block(label, instructions)
 
     def remove_block(self, label:str, ignore_keyerror=False):
         if label not in self:
@@ -373,6 +391,9 @@ class CFG:
             parent.remove_child(block)
         for child in block.children:
             child.remove_parent(child)
+
+        if self._entrypoint == block:
+            self._entrypoint = None
 
         del self._blocks[label]
 
