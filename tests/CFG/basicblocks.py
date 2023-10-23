@@ -1,8 +1,9 @@
-import ampy.types as amt
+import sys
 
+import ampy.types as amt
 from tests.tools import PythonExecutionTestSuite
 
-ts = PythonExecutionTestSuite("abstract-build")
+ts = PythonExecutionTestSuite("basic-blocks")
 
 ts.exec("A = BasicBlock('@A')",
         "B = BasicBlock('@B')",
@@ -52,3 +53,8 @@ ts.exec("A = BasicBlock('@A')",
         "assert(B.parents == {A})",
         state=dict(BasicBlock=amt.BasicBlock,
             BranchTargets=amt.BranchTargets))
+
+if __name__ == "__main__":
+    ts.print_results()
+    if not sys.flags.interactive:
+        sys.exit(0 if ts.all_tests_passed else -1)

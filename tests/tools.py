@@ -23,6 +23,9 @@ class TestSuite:
         self._test_counter = -1
         self.name = name
 
+    def __repr__(self):
+        return f"TestSuite({self.name})"
+
     def _init_test(self):
         self._test_counter += 1
         self._passes.append(False)
@@ -38,8 +41,8 @@ class TestSuite:
         return all(self._passes)
     
     def print_results(self):
-        num_passed = len(filter(None, self._passed))
-        num_total = len(self._passed)
+        num_passed = sum(self._passes)
+        num_total = len(self._passes)
         if num_passed == num_total:
             psuccess(f"[{self.name}] Passed")
         else:
@@ -56,6 +59,9 @@ class TestSuite:
         psuccess(f"[{self.name}] Test #{self._test_counter:02d}", *args, **kwargs)
 
 class PythonExecutionTestSuite(TestSuite):
+
+    def __repr__(self):
+        return f"PythonExecutionTestSuite({self.name})"
 
     def exec(self, *lines, state=None, expected=None):
         self._init_test()
