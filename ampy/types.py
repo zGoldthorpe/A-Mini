@@ -6,6 +6,7 @@ class InstructionClass:
     """
     Parent instruction type
     """
+    @ensure_types(object, str, str)
     def __init__(self, rep, typ):
         self.type = typ
         self.repr = rep
@@ -16,93 +17,110 @@ class InstructionClass:
 ### General instruction classes ###
 
 class ArithInstructionClass(InstructionClass):
-    def __init__(self, rep, res, op1, op2, func):
+    @ensure_types(object, str, str, str, str)
+    def __init__(self, rep, res, op1, op2):
         super().__init__(rep, "arith")
         self.target = res
         self.operands = (op1, op2)
 
 class CompInstructionClass(InstructionClass):
-    def __init__(self, rep, res, op1, op2, func):
+    @ensure_types(object, str, str, str, str)
+    def __init__(self, rep, res, op1, op2):
         super().__init__(rep, "comp")
         self.target = res
         self.operands = (op1, op2)
 
 class BranchInstructionClass(InstructionClass):
+    @ensure_types(object, str)
     def __init__(self, rep):
         super().__init__(rep, "branch")
 
 ### Instruction types ###
 
 class MovInstruction(InstructionClass):
+    @ensure_types(object, str, str)
     def __init__(self, lhs, rhs):
         super().__init__(f"{lhs} = {rhs}", "move")
         self.target = lhs
         self.operand = rhs
 
 class PhiInstruction(InstructionClass):
+    @ensure_types(object, str, [[str, 2], ...], ...)
     def __init__(self, lhs, *conds):
         self.target = lhs
         self.conds = conds
         super().__init__(f"{lhs} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds), "move")
 
 class AddInstruction(ArithInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} + {op2}", dest, op1, op2, func=lambda x, y: x + y)
+        super().__init__(f"{dest} = {op1} + {op2}", dest, op1, op2)
 
 class SubInstruction(ArithInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} - {op2}", dest, op1, op2, func=lambda x, y: x - y)
+        super().__init__(f"{dest} = {op1} - {op2}", dest, op1, op2)
 
 class MulInstruction(ArithInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} * {op2}", dest, op1, op2, func=lambda x, y: x * y)
+        super().__init__(f"{dest} = {op1} * {op2}", dest, op1, op2)
 
 class EqInstruction(CompInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} == {op2}", dest, op1, op2, func=lambda x, y: int(x == y))
+        super().__init__(f"{dest} = {op1} == {op2}", dest, op1, op2)
 
 class NeqInstruction(CompInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} != {op2}", dest, op1, op2, func=lambda x, y: int(x != y))
+        super().__init__(f"{dest} = {op1} != {op2}", dest, op1, op2)
 
 class LtInstruction(CompInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} < {op2}", dest, op1, op2, func=lambda x, y: int(x < y))
+        super().__init__(f"{dest} = {op1} < {op2}", dest, op1, op2)
 
 class LeqInstruction(CompInstructionClass):
+    @ensure_types(object, str, str, str)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} <= {op2}", dest, op1, op2, func=lambda x, y: int(x <= y))
+        super().__init__(f"{dest} = {op1} <= {op2}", dest, op1, op2)
 
 class GotoInstruction(BranchInstructionClass):
-    def __init__(self, target:str):
-        super().__init__(f"goto {target}")
-        self.target = target
+    @ensure_types(object, str)
+    def __init__(self, tgt):
+        self.target = tgt
+        super().__init__(f"goto {tgt}")
 
 class BranchInstruction(BranchInstructionClass):
-    def __init__(self, cond:str, iftrue:str, iffalse:str):
-        super().__init__(f"if ({cond}) goto {iftrue} else goto {iffalse}")
+    @ensure_types(object, str, str, str)
+    def __init__(self, cond, iftrue, iffalse):
         self.cond = cond
         self.iftrue = iftrue
         self.iffalse = iffalse
+        super().__init__(f"if ({cond}) goto {iftrue} else goto {iffalse}")
 
 class ExitInstruction(BranchInstructionClass):
     def __init__(self):
         super().__init__("exit")
 
 class ReadInstruction(InstructionClass):
+    @ensure_types(object, str)
     def __init__(self, lhs):
-        super().__init__(f"read {lhs}", "I/O")
         self.target = lhs
+        super().__init__(f"read {lhs}", "I/O")
 
 class WriteInstruction(InstructionClass):
+    @ensure_types(object, str)
     def __init__(self, lhs):
-        super().__init__(f"write {lhs}", "I/O")
         self.target = lhs
+        super().__init__(f"write {lhs}", "I/O")
 
 class BrkInstruction(InstructionClass):
+    @ensure_types(object, str)
     def __init__(self, name):
-        super().__init__(f"{name} [breakpoint]", "debug", lambda vd: _dbgmsg(name, vd))
         self.id = name
+        super().__init__(f"{name} [breakpoint]", "debug")
 
 ### Basic blocks ###
 
@@ -115,7 +133,8 @@ class BranchTargets:
 class BranchTargets(BranchTargets):
     @ensure_multi(
             Syntax(object), # exit node; no children
-            Syntax(object, target=BasicBlock), # goto
+            Syntax(object, BasicBlock), # goto
+            Syntax(object, target=BasicBlock), # goto with kwarg
             Syntax(object, cond=str, iftrue=BasicBlock, iffalse=BasicBlock)) # branch
     def __init__(self, target=None, cond=None, iftrue=None, iffalse=None):
         self._target = target
@@ -180,7 +199,8 @@ class BranchTargets(BranchTargets):
 
 class BasicBlock(BasicBlock):
 
-    def __init__(self, label:str, instructions:list=[]):
+    @ensure_types(object, str, InstructionClass, ...)
+    def __init__(self, label:str, *instructions):
         """
         label: string @label indicating block's "name"
         instructions: list of Instruction objects, EXCLUDING the branch at the end
@@ -236,10 +256,12 @@ class BasicBlock(BasicBlock):
 
     ### Block modification ###
 
-    def add_parent(self, parent:BasicBlock):
+    @ensure_types(object, BasicBlock)
+    def add_parent(self, parent):
         self._parents.add(parent)
 
-    def remove_parent(self, parent:BasicBlock, ignore_keyerror=False, propagate=True):
+    @ensure_types(object, BasicBlock, ignore_keyerror=bool, propagate=bool)
+    def remove_parent(self, parent, ignore_keyerror=False, propagate=True):
         if parent not in self._parents:
             if ignore_keyerror:
                 return
@@ -248,7 +270,12 @@ class BasicBlock(BasicBlock):
         if propagate:
             parent.remove_child(self, ignore_keyerror=True, propagate=False)
 
-    def add_child(self, child:BasicBlock, cond=None, new_child_if_cond=True):
+    @ensure_multi(
+            Syntax(object, BasicBlock), # if no existing children
+            Syntax(object, BasicBlock, cond=str), # if new child is true target
+            Syntax(object, BasicBlock, cond=str, new_child_if_cond=bool),
+            )
+    def add_child(self, child, cond=None, new_child_if_cond=True):
         num_children = len(self.children)
         if num_children == 0:
             if cond is not None:
@@ -273,7 +300,8 @@ class BasicBlock(BasicBlock):
         # num_children == 2
         raise BranchError(self.label, f"Cannot have three branch targets out of {self.name}")
     
-    def remove_child(self, child:BasicBlock, ignore_keyerror=False, propagate=True, keep_duplicate=False):
+    @ensure_types(object, BasicBlock, ignore_keyerror=bool, propagate=bool, keep_duplicate=bool)
+    def remove_child(self, child, ignore_keyerror=False, propagate=True, keep_duplicate=False):
         """
         Removes child as branch target for current block.
         """
@@ -322,7 +350,8 @@ class CFG:
         for label in self._blocks:
             yield self._blocks[label]
 
-    def __getitem__(self, label:str):
+    @ensure_types(object, str)
+    def __getitem__(self, label):
         if label not in self.labels:
             raise KeyError(f"{label} does not label an existing block")
         return self._blocks[label]
@@ -341,7 +370,8 @@ class CFG:
         for label in self._undef_blocks:
             yield self._blocks[label]
 
-    def _create_block(self, label:str):
+    @ensure_types(object, str)
+    def _create_block(self, label):
         if not label.startswith('@'):
             raise ValueError(f"Invalid label {label}: labels must begin with '@'")
         if label in self.labels:
@@ -353,14 +383,16 @@ class CFG:
         self._blocks[label] = BasicBlock(label)
         # all basic blocks are exit nodes by default
 
-    def _fetch_or_create_block(self, label:str):
+    @ensure_types(object, str)
+    def _fetch_or_create_block(self, label):
         if label not in self.labels:
             self._create_block(label)
             self._undef_blocks[label] = self[label]
             # block does not exist, so buffer a new one as "undefined"
         return self[label]
 
-    def _populate_block(self, label:str, *instructions):
+    @ensure_types(object, str, InstructionClass, ...)
+    def _populate_block(self, label, *instructions):
         block = self[label]
         for (i, I) in enumerate(instructions):
             if isinstance(I, BranchInstructionClass):
@@ -378,18 +410,21 @@ class CFG:
                     return
             self[label]._instructions.append(I)
 
-    def set_entrypoint(self, label:str):
+    @ensure_types(object, str)
+    def set_entrypoint(self, label):
         self._entrypoint = self._fetch_or_create_block(label)
 
     @property
     def entrypoint(self):
         return self._entrypoint
 
-    def add_block(self, label:str, *instructions):
+    @ensure_types(object, str, InstructionClass, ...)
+    def add_block(self, label, *instructions):
         self._create_block(label)
         self._populate_block(label, *instructions)
 
-    def remove_block(self, label:str, ignore_keyerror=False):
+    @ensure_types(object, str, ignore_keyerror=bool)
+    def remove_block(self, label, ignore_keyerror=False):
         if label not in self:
             if ignore_keyerror:
                 return
@@ -405,6 +440,7 @@ class CFG:
 
         del self._blocks[label]
 
+    @ensure_types(object, fix_lost_parents=bool)
     def assert_completeness(self, fix_lost_parents=False):
         """
         Assert that all children know their parents and vice versa
