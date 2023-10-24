@@ -1,6 +1,10 @@
 from functools import wraps
 
 class Syntax:
+    # forward declaration
+    pass
+
+class Syntax(Syntax):
     """
     Syntax object
 
@@ -15,6 +19,16 @@ class Syntax:
 
     Put ellipses after an optional positional argument to make
     previous argument optional (i.e., ellipses act as a Kleene star).
+
+    .set_allow_undef_kwargs(flag):
+        toggle if function calls with missing kwargs are permissible
+        (default True)
+    
+    .set_allow_extra_kwargs(flag):
+        toggle if function calls with unanticipated kwargs are permissible
+        (default False)
+
+    use pipe "|" to match using one of several Syntax objects
     """
     
     def _verify_input(ty):
@@ -38,6 +52,7 @@ class Syntax:
         self._types = tuple(filter(lambda t: t is not Ellipsis, types))
         # verify Syntax
         pretypes = []
+        self._parent = None # parent syntax, in case of chaining
         self._ellipsis = -1
         for i, ty in enumerate(types):
             if ty is Ellipsis:
@@ -84,6 +99,17 @@ class Syntax:
         self._allow_extra_kwargs = flag
         return self
 
+    def __or__(self, other:Syntax):
+        other._parent = self
+        return other
+
+    @property
+    def _syntaxes(self):
+        if self._parent is not None:
+            for syntax in self._parent._syntaxes:
+                yield syntax
+        yield repr(self)
+
     def _check_one(arg, ty):
         if isinstance(ty, type):
             return isinstance(arg, ty)
@@ -126,6 +152,19 @@ class Syntax:
                 if kw not in kwargs:
                     raise TypeError(f"{func_name} missing expected keyword {kw}.")
 
+    def check_iter(self, func_name, syntax_list, *args, **kwargs):
+        syntax_list.append(repr(self))
+        try:
+            self.check(func_name, *args, **kwargs)
+        except Exception as e:
+            if self._parent is None:
+                raise TypeError(f"""{func_name} received unrecognised argument pattern
+\t{repr(Syntax.extract_syntax(*args, **kwargs))}
+Valid syntaxes are:
+\t{(chr(10)+chr(9)).join(syntax for syntax in reversed(syntax_list))}""")
+
+            self._parent.check_iter(func_name, syntax_list, *args, **kwargs)
+
     def __repr__(self):
         positional = ", ".join(ty.__name__ for ty in self._types)
         keyword = ", ".join(f"{kw}:{Syntax._type_name(self._kwtypes[kw])}" for kw in self._kwtypes)
@@ -137,51 +176,15 @@ class Syntax:
             return f"Syntax({positional})"
         return f"Syntax({positional}; {keyword})"
 
-def ensure_types(*types, **kwtypes):
-    """
-    Wrapper to ensure inputs are of valid types
-    """
-    def outer(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            Syntax(*types, **kwtypes).check(func.__name__, *args, **kwargs)
+    def __call__(self, func):
+        """
+        Wrapper for type assertions
+        """
+        def wrap(*args, **kwargs):
+            if self._parent is None:
+                self.check(func.__name__, *args, **kwargs)
+            else:
+                self.check_iter(func.__name__, [], *args, **kwargs)
             return func(*args, **kwargs)
-        return inner
-    return outer
+        return wrap
 
-def ensure_multi(*syntaxes):
-    """
-    Wrapper to ensure inputs to a function with multiple instantiations
-    commits to a single set of types
-    Syntaxes may be given by a single Syntax object, or as a (clue, total) pair.
-    If the "clue" makes a partial match, then "total" must match completely.
-    """
-    syntaxes = list(syntaxes)
-    for i, syntax_p in enumerate(syntaxes):
-        if isinstance(syntax_p, Syntax):
-            syntaxes[i] = (syntax_p, syntax_p)
-            continue
-        assert(isinstance(syntax_p, tuple) and len(syntax_p) == 2)
-        clue, total = syntax_p
-        assert(isinstance(clue, Syntax) and isinstance(total, Syntax))
-
-    def outer(func):
-        @wraps(func)
-        def inner(*args, **kwargs):
-            for clue, syntax in syntaxes:
-                commit = True
-                clue.set_allow_extra_kwargs(True)
-                try:
-                    clue.check(func.__name__, *args, **kwargs)
-                except TypeError:
-                    commit = False
-                if commit:
-                    syntax.check(func.__name__, *args, **kwargs)
-                    return func(*args, **kwargs)
-            # if this line is reached, then none of the clues matched
-            raise TypeError(f"""{Syntax._type_name(func)} received unrecognised argument pattern
-\t{repr(Syntax.extract_syntax(*args, **kwargs))}
-Valid syntaxes are:
-\t{(chr(10)+chr(9)).join(repr(syntax) for _, syntax in syntaxes)}""")
-        return inner
-    return outer
