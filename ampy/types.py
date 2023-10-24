@@ -40,15 +40,10 @@ class MovInstruction(InstructionClass):
         self.operand = rhs
 
 class PhiInstruction(InstructionClass):
-    def __init__(self, lhs, phiargs):
-        conds = re.compile(rf"\[\s*{_op}\s*,\s*{_lbl}\s*\]")
+    def __init__(self, lhs, *conds):
         self.target = lhs
-        self.phiops = []
-        phirepr = f"{lhs} = phi"
-        for cond in conds.finditer(phiargs):
-            self.phiops.append((cond.group(1),cond.group(2)))
-            phirepr += f" [ {cond.group(1)}, {cond.group(2)} ]"
-        super().__init__(phirepr, "move")
+        self.conds = conds
+        super().__init__(f"{lhs} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds), "move")
 
 class AddInstruction(ArithInstructionClass):
     def __init__(self, dest, op1, op2):
@@ -309,14 +304,16 @@ class CFG:
 
     def __init__(self):
         self._blocks = dict() # str(label) : BasicBlock dictionary
+        self._undef_blocks = dict()
         self._entrypoint = None
 
     def __repr__(self):
         return ("Control Flow Graph:\nEntry point: "
                 + (self.entrypoint.label
                     if self.entrypoint is not None
-                    else "<not set>")
-                + "\n\n".join(repr(block) for block in self))
+                    else "<not set>") + '\n'
+                + "\n\n".join(("(?)" if block.label in self._undef_blocks
+                                else "") + repr(block) for block in self))
 
     def __len__(self):
         return len(self._blocks)
@@ -339,10 +336,19 @@ class CFG:
         for label in self._blocks:
             yield self._blocks[label]
 
+    @property
+    def undefined_blocks(self):
+        for label in self._undef_blocks:
+            yield self._blocks[label]
+
     def _create_block(self, label:str):
         if not label.startswith('@'):
             raise ValueError(f"Invalid label {label}: labels must begin with '@'")
         if label in self.labels:
+            if label in self._undef_blocks:
+                # block has been instantiated for a jump, but is undefined
+                del self._undef_blocks[label]
+                return
             raise LabelConflictError(f"{label} cannot be assigned to multiple blocks")
         self._blocks[label] = BasicBlock(label)
         # all basic blocks are exit nodes by default
@@ -350,6 +356,8 @@ class CFG:
     def _fetch_or_create_block(self, label:str):
         if label not in self.labels:
             self._create_block(label)
+            self._undef_blocks[label] = self[label]
+            # block does not exist, so buffer a new one as "undefined"
         return self[label]
 
     def _populate_block(self, label:str, *instructions):
@@ -379,7 +387,7 @@ class CFG:
 
     def add_block(self, label:str, *instructions):
         self._create_block(label)
-        self._populate_block(label, instructions)
+        self._populate_block(label, *instructions)
 
     def remove_block(self, label:str, ignore_keyerror=False):
         if label not in self:

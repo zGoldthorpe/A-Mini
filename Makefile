@@ -1,7 +1,8 @@
 PY=PYTHONPATH=. python3
 PYI=$(PY) -i
 
-PYTESTS=CFG/basicblocks
+PYTESTS=CFG/basicblocks \
+		CFG/cfg
 
 TESTS=$(PYTESTS)
 
