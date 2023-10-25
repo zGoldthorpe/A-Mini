@@ -19,7 +19,7 @@ class Syntax(Syntax):
     use a pair (type, cons) inside the list, where type is primitive
     (for matching) and cons is a more specific constructor.
     E.g., Syntax((int, (list, [int, 5]), (dict, {str:str}))) expects one
-    argument whose type is one of:
+    argument, whose type is one of:
     - int
     - list (after which is asserted to be a list of 5 integers)
     - dict (after which is asserted to be a map from strings to strings)
@@ -65,20 +65,36 @@ class Syntax(Syntax):
     """
     
     def _verify_input(ty):
-        # does not consider ellipsis type; handle externally
+        """
+        Ensures that type arguments of Syntax initialisation are
+        comprehensible, making adjustments to the more elaborate
+        types
+
+        Returns True or throws a SyntaxError
+
+        Does not handle ellipses; handle these externally
+        """
         if isinstance(ty, type):
+            # primitive type
             return True
+
         if isinstance(ty, tuple):
+            # union
             for t in ty:
                 if isinstance(t, type):
                     continue # primitive type
                 if not isinstance(t, tuple) or len(t) != 2 or not isinstance(t[0], type):
                     raise SyntaxError("Union type must consist of primitive types or (primitive, cons) pairs")
+                # (hint, type) pair
                 Syntax._verify_input(t[1])
             return True
+
         if isinstance(ty, list):
+            # iterable of fixed element type
             errmsg = "Iterable type must be of the form [container, type, count]"
             containers = (list, set, tuple, str)
+
+            # unpack shorthands
             match len(ty):
                 case 1: # [type] = [list, type, ...]
                     ty.insert(0, list)
@@ -94,6 +110,7 @@ class Syntax(Syntax):
                     pass
                 case _: # invalid
                     raise SyntaxError(errmsg)
+
             # now, ty = [container, type, counter]
             if not ty[0] in containers:
                 raise SyntaxError(errmsg + " where the container is one of: " + ", ".join(t.__name__ for t in containers))
@@ -102,27 +119,34 @@ class Syntax(Syntax):
                     raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
                 # [*,*, N] = [*,*, [N, N]]
                 ty[2] = [ty[2], ty[2]]
+
             # now, counter is a list
             if len(ty[2]) != 2 or not all(isinstance(t, (int, type(Ellipsis))) for t in ty[2]):
                 raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
+
             # now, ty = [container, type, [lo, hi]]
             return Syntax._verify_input(ty[1])
 
         if isinstance(ty, set):
+            # iterator of fixed type
             if len(ty) != 1:
-                raise SyntaxError("Generator type must be of the form {type}")
+                raise SyntaxError("Iterator type must be of the form {type}")
             gty = list(ty)[0]
             return Syntax._verify_input(gty)
+
         if isinstance(ty, dict):
+            # dictionary of fixed key-value type pairing
             if len(ty) != 1:
                 raise SyntaxError("Dict type must be of the form {ktype : vtype}")
             kty = list(ty)[0]
             return Syntax._verify_input(kty) and Syntax._verify_input(ty[kty])
+
+        # input type does not match any of the above syntax
         raise SyntaxError(f"Unrecognised type {repr(ty)}")
 
     def __init__(self, *types, **kwtypes):
         self._types = tuple(filter(lambda t: t is not Ellipsis, types))
-        # verify Syntax
+        # verify syntax arguments
         pretypes = []
         self._parent = None # parent syntax, in case of chaining
         self._ellipsis = -1
@@ -143,16 +167,21 @@ class Syntax(Syntax):
             if Syntax._verify_input(kwtypes[kw]):
                 self._kwtypes[kw] = kwtypes[kw]
 
-        # other flags / etc.
+        # other flags / etc. set to default
         self._allow_undef_kwargs = True
         self._allow_extra_kwargs = False
         self._return_type = object
 
     def _type_name(ty):
+        """
+        Presents abstract Syntax types in a readable fashion
+        """
         if ty is Ellipsis:
             return "..."
+
         if isinstance(ty, type):
             return ty.__name__
+
         if isinstance(ty, tuple):
             union = ", ".join(t.__name__ if isinstance(t, type)
                     else f"( {t[0].__name__} , {Syntax._type_name(t[1])} )"
@@ -168,23 +197,41 @@ class Syntax(Syntax):
         if isinstance(ty, set):
             gty = list(ty)[0]
             return f"{{ {Syntax._type_name(gty)} }}"
+
         if isinstance(ty, dict):
             kty = list(ty)[0]
             vty = ty[kty]
             return f"{{ {Syntax._type_name(kty)} : {Syntax._type_name(vty)} }}"
 
     def extract_syntax(*args, **kwargs):
+        """
+        Infers simplest Syntax object that would accept the
+        given *args, **kwargs pair for a function call
+        """
         return Syntax(*[type(arg) for arg in args], **{kw:type(kwargs[kw]) for kw in kwargs})
 
     def set_allow_undef_kwargs(self, flag):
+        """
+        Toggle whether Syntax permits (if True) missing kwargs in
+        function call that have a type assertion provided to the
+        Syntax instance
+        """
         self._allow_undef_kwargs = flag
         return self # allow for chaining modifiers after constructor
     
     def set_allow_extra_kwargs(self, flag):
+        """
+        Toggle whether Syntax permits (if True) arguments passed
+        to the function that do not have a type assertion provided
+        to the Syntax instance
+        """
         self._allow_extra_kwargs = flag
         return self
 
     def __rshift__(self, ty):
+        """
+        Set return type of Syntax
+        """
         Syntax._verify_input(ty)
         self._return_type = ty
         if self._parent is not None:
@@ -192,13 +239,23 @@ class Syntax(Syntax):
         return self
 
     def returns(self, ty):
+        """
+        Equivalent to self >> ty
+        """
         return self.__rshift__(ty)
 
     def __or__(self, other:Syntax):
+        """
+        Union current Syntax with another.
+        Type-checking must satisfy one of these.
+        """
         other._parent = self
         return other
 
     def union(self, *args, **kwargs):
+        """
+        Equivalent to self | Syntax(*args, **kwargs)
+        """
         return self.__or__(Syntax(*args, **kwargs))
 
     @property
@@ -216,6 +273,7 @@ class Syntax(Syntax):
         if isinstance(ty, type):
             if isinstance(arg, ty):
                 return arg
+
         if isinstance(ty, tuple):
             for t in ty:
                 if isinstance(t, type):
@@ -256,30 +314,15 @@ class Syntax(Syntax):
         # at this point, arg failed typecheck
         raise TypeError(errmsg)
 
-    def _check_one(arg, ty):
-        """
-        Checks if arg is of the type ty, given the conventions of the
-        Syntax class
-        """
-        if isinstance(ty, type):
-            return isinstance(arg, ty)
-        if isinstance(ty, tuple):
-            return any(Syntax._check_one(arg, t) for t in ty)
-        if isinstance(ty, list):
-            if not hasattr(arg, "__iter__"):
-                return False
-            if ty[1] is Ellipsis or len(arg) == ty[1]:
-                return all(Syntax._check_one(a, ty[0]) for a in arg)
-            return False
-        if isinstance(ty, dict):
-            kty = list(ty)[0]
-            vty = ty[kty]
-            if not hasattr(arg, "__iter__") or not hasattr(arg, "__getitem__"):
-                return False
-            return all(Syntax._check_one(kw, kty)
-                    and Syntax._check_one(arg[kw], vty) for kw in arg)
-
     def check(self, func_name, *args, **kwargs):
+        """
+        Assert correctness of args and kwargs passed to function,
+        or at least lazily propagate these assertions for when the
+        argument gets used.
+
+        Returns modified versions of the args and kwargs to
+        actually get passed to the function
+        """
         arg_diff = len(args) - len(self._types) + 1
         if self._ellipsis > -1:
             types = (self._types[:self._ellipsis]
@@ -313,6 +356,14 @@ class Syntax(Syntax):
         return wrapped_args, wrapped_kwargs
 
     def check_iter(self, func_name, syntax_list, *args, **kwargs):
+        """
+        If Syntax is part of a union, recursively check all instances
+        in the union and find the first match (in reverse order of
+        instantiation).
+
+        Returns args and kwargs modified according to the first ancestor
+        to (lazily) accept the arguments.
+        """
         syntax_list.append(repr(self))
         try:
             args, kwargs = self.check(func_name, *args, **kwargs)
@@ -327,12 +378,6 @@ Valid syntaxes are:
             args, kwargs = self._parent.check_iter(func_name, syntax_list, *args, **kwargs)
         return args, kwargs
 
-
-    def check_return(self, func_name, retval):
-        if not Syntax._check_one(retval, self._return_type):
-            raise TypeError(f"{func_name} expected to return {Syntax._type_name(self._return_type)}; returned unexpected {type(retval).__name__}")
-        return retval
-
     def __repr__(self):
         positional = ", ".join(Syntax._type_name(ty) for ty in self._types)
         keyword = ", ".join(f"{kw}:{Syntax._type_name(self._kwtypes[kw])}" for kw in self._kwtypes)
@@ -343,11 +388,6 @@ Valid syntaxes are:
         if not keyword:
             return f"Syntax({positional}) >> {Syntax._type_name(self._return_type)}"
         return f"Syntax({positional}; {keyword}) >> {Syntax._type_name(self._return_type)}"
-
-    def caller(self, func, *args, **kwargs):
-        retval = func(*args, **kwargs)
-        self.check_return(func.__name__, retval)
-        return retval
 
     def __call__(self, func):
         """
@@ -543,7 +583,7 @@ def LazySyntaxDict(dict):
 
 class LazySyntaxIterator:
     """
-    Very lazy iterator type, for iterators
+    Very lazy iterator type to wrap around iterators
     """
     def __init__(self, iterator, ty, errmsg=""):
         self._it = iterator
