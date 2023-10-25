@@ -13,6 +13,16 @@ class Syntax(Syntax):
     Checks positional and keyword argument types.
 
     Put types in a tuple to "union" them.
+    NB: a union can tell primitive types apart, but cannot perform more
+    elaborate checks such as "list of ints vs list of strings".
+    To assert element types after matching with an iterable (list, dict, etc.)
+    use a pair [type, cons] inside the list, where type is primitive
+    (for matching) and cons is a more specific constructor.
+    E.g., Syntax([int, [list, (int, 5)], [dict, {str:str}]]) expects one
+    argument whose type is one of:
+    - int
+    - list (after which is asserted to be a list of 5 integers)
+    - dict (after which is asserted to be a map from strings to strings)
 
     Put [type, N] to indicate type must be an iterable of N items whose
     keys specified type (use ellipses for N if arbitrary length is okay)
@@ -21,8 +31,8 @@ class Syntax(Syntax):
 
     Put {type} to indicate type comes from a generator of indicated type
 
-    Put ellipses after an optional positional argument to make
-    previous argument optional (i.e., ellipses act as a Kleene star).
+    Put ellipses after a positional argument to act as a Kleene star (i.e.,
+    match zero or more of the previous positional argument)
 
     .set_allow_undef_kwargs(flag):
         toggle if function calls with missing kwargs are permissible
@@ -51,10 +61,16 @@ class Syntax(Syntax):
         if isinstance(ty, type):
             return True
         if isinstance(ty, tuple):
-            return all(Syntax._verify_input(t) for t in ty)
+            for t in ty:
+                if isinstance(t, type):
+                    continue # primitive type
+                if not isinstance(t, tuple) or len(t) != 2 or not isinstance(t[0], type):
+                    raise SyntaxError("Union type must consist of primitive types or (primitive, cons) pairs")
+                Syntax._verify_input(t[1])
+            return True
         if isinstance(ty, list):
             if len(ty) != 2 or not isinstance(ty[1], (int, type(Ellipsis))):
-                raise SyntaxError("Iterable type must be of the form [type, count]")
+                raise SyntaxError("Iterable type must be of the form (type, count)")
             return Syntax._verify_input(ty[0])
         if isinstance(ty, set):
             if len(ty) != 1:
@@ -102,7 +118,10 @@ class Syntax(Syntax):
         if isinstance(ty, type):
             return ty.__name__
         if isinstance(ty, tuple):
-            return f"({', '.join(Syntax._type_name(t) for t in ty)})"
+            union = ", ".join(t.__name__ if isinstance(t, type)
+                    else f"( {t[0].__name__} , {Syntax._type_name(t[1])} )"
+                    for t in ty)
+            return f"( {union}, )"
         if isinstance(ty, list):
             ty1 = "..." if ty[1] is Ellipsis else ty[1]
             return f"[ {Syntax._type_name(ty[0])}, {ty1} ]"
@@ -139,7 +158,7 @@ class Syntax(Syntax):
         other._parent = self
         return other
 
-    def also(self, *args, **kwargs):
+    def union(self, *args, **kwargs):
         return self.__or__(Syntax(*args, **kwargs))
 
     @property
@@ -158,8 +177,15 @@ class Syntax(Syntax):
             if isinstance(arg, ty):
                 return arg
         if isinstance(ty, tuple):
-            if any(Syntax._check_one(arg, t) for t in ty):
-                return arg
+            for t in ty:
+                if isinstance(t, type):
+                    if isinstance(arg, t):
+                        return arg
+                else:
+                    mty, cons = t
+                    if isinstance(arg, mty):
+                        # primitive match, so assert elaborate type "cons"
+                        return Syntax._check_wrap(arg, cons, errmsg=errmsg)
         if isinstance(ty, list):
             if hasattr(arg, "__iter__"):
                 if ty[1] is Ellipsis or len(arg) == ty[1]:
@@ -211,12 +237,12 @@ class Syntax(Syntax):
             types = self._types
         if len(args) != len(types):
             raise TypeError(f"{func_name} expects {len(self._types)} positional arguments; {len(args)} given.")
-        wrapped_args = tuple(map(lambda P:
+        wrapped_args = map(lambda P:
                 Syntax._check_wrap(
                     arg=P[1][0], # arg
                     ty=P[1][1], # type
                     errmsg=f"{func_name} argument {P[0]} expects {Syntax._type_name(P[1][1])}; unexpected {type(P[1][0]).__name__} given."),
-                enumerate(zip(args, types))))
+                enumerate(zip(args, types)))
         wrapped_kwargs = dict()
         for kw in kwargs:
             if kw not in self._kwtypes:
@@ -256,7 +282,7 @@ Valid syntaxes are:
         return retval
 
     def __repr__(self):
-        positional = ", ".join(ty.__name__ for ty in self._types)
+        positional = ", ".join(Syntax._type_name(ty) for ty in self._types)
         keyword = ", ".join(f"{kw}:{Syntax._type_name(self._kwtypes[kw])}" for kw in self._kwtypes)
         if not positional and not keyword:
             return "Syntax() >> {Syntax._type_name(self._return_type)}"
