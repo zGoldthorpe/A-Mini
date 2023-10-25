@@ -180,7 +180,7 @@ class BranchTargets(BranchTargets):
         return "BranchTargets()"
     
     @property
-    @(Syntax(object) >> [BasicBlock, ..., tuple])
+    @(Syntax(object) >> [tuple, BasicBlock, [0, 2]])
     def tuple(self):
         if self._cond is not None:
             return (self._iftrue, self._iffalse)
@@ -256,7 +256,7 @@ class BasicBlock(BasicBlock):
         return self._branch_targets
 
     @property
-    @(Syntax(object) >> [BasicBlock, ..., set])
+    @(Syntax(object) >> [set, BasicBlock])
     def parents(self):
         return set(self._parents)
 
@@ -367,7 +367,7 @@ class CFG:
         return self._blocks[label]
 
     @property
-    @(Syntax(object) >> [str, ..., set])
+    @(Syntax(object) >> [set, str])
     def labels(self):
         return set(self._blocks.keys())
 

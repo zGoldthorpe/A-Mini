@@ -16,18 +16,24 @@ class Syntax(Syntax):
     NB: a union can tell primitive types apart, but cannot perform more
     elaborate checks such as "list of ints vs list of strings".
     To assert element types after matching with an iterable (list, dict, etc.)
-    use a pair [type, cons] inside the list, where type is primitive
+    use a pair (type, cons) inside the list, where type is primitive
     (for matching) and cons is a more specific constructor.
-    E.g., Syntax([int, [list, (int, 5)], [dict, {str:str}]]) expects one
+    E.g., Syntax((int, (list, [int, 5]), (dict, {str:str}))) expects one
     argument whose type is one of:
     - int
     - list (after which is asserted to be a list of 5 integers)
     - dict (after which is asserted to be a map from strings to strings)
 
-    Put [type, N] to indicate type must be an iterable of N items whose
-    keys specified type (use ellipses for N if arbitrary length is okay)
-    Add a third argument to indicate the type of the iterable
-    (default: list; accepts: list, set, tuple, str)
+    [container, type, [lo, hi]]
+    Type must be a container-like iterable of entries of specified
+    type, where the number of entries is bounded between lo and hi,
+    inclusive.
+    Use ellipses for lo or hi to indicate unboundedness in either
+    direction.
+
+    [*, type, N] is shorthand for [*, type, [N, N]]
+    [*, type] is shorthand for [*, type, ...] = [*, type, [...,...]]
+    [type, *] is shorthand for [list, type, *]
 
     Put {type0:type1} to indicate type must be a dict from type0 to type1
 
@@ -71,16 +77,37 @@ class Syntax(Syntax):
                 Syntax._verify_input(t[1])
             return True
         if isinstance(ty, list):
-            errmsg = "Iterable type must be of the form [type, count] or [type, count, iterable_type]"
-            if len(ty) < 2 or len(ty) > 3:
-                raise SyntaxError(errmsg)
-            if not isinstance(ty[1], (int, type(Ellipsis))):
-                raise SyntaxError(errmsg + " where the count is an integer or ellipses")
-            if len(ty) < 3:
-                ty.append(list)
-            if ty[2] not in (list, set, tuple, str):
-                raise SyntaxError(errmsg + " where the iterable_type is one of: list, set, tuple, str")
-            return Syntax._verify_input(ty[0])
+            errmsg = "Iterable type must be of the form [container, type, count]"
+            containers = (list, set, tuple, str)
+            match len(ty):
+                case 1: # [type] = [list, type, ...]
+                    ty.insert(0, list)
+                    ty.append(Ellipsis)
+                case 2: # [container, type] or [type, count]
+                    if isinstance(ty[1], (int, type(Ellipsis), list)):
+                        # [type, count] = [list, type, count]
+                        ty.insert(0, list)
+                    else:
+                        # [container, type] = [container, type, ...]
+                        ty.append(Ellipsis)
+                case 3:
+                    pass
+                case _: # invalid
+                    raise SyntaxError(errmsg)
+            # now, ty = [container, type, counter]
+            if not ty[0] in containers:
+                raise SyntaxError(errmsg + " where the container is one of: " + ", ".join(t.__name__ for t in containers))
+            if not isinstance(ty[2], list):
+                if not isinstance(ty[2], (int, type(Ellipsis))):
+                    raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
+                # [*,*, N] = [*,*, [N, N]]
+                ty[2] = [ty[2], ty[2]]
+            # now, counter is a list
+            if len(ty[2]) != 2 or not all(isinstance(t, (int, type(Ellipsis))) for t in ty[2]):
+                raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
+            # now, ty = [container, type, [lo, hi]]
+            return Syntax._verify_input(ty[1])
+
         if isinstance(ty, set):
             if len(ty) != 1:
                 raise SyntaxError("Generator type must be of the form {type}")
@@ -131,9 +158,13 @@ class Syntax(Syntax):
                     else f"( {t[0].__name__} , {Syntax._type_name(t[1])} )"
                     for t in ty)
             return f"( {union}, )"
+
         if isinstance(ty, list):
-            ty1 = "..." if ty[1] is Ellipsis else ty[1]
-            return f"[ {Syntax._type_name(ty[0])}, {ty1}, {ty[2].__name__} ]"
+            ty0 = ty[0].__name__
+            ty1 = Syntax._type_name(ty[1])
+            lo, hi = map(lambda t: "..." if t is Ellipsis else t, ty[2])
+            return f"[ {ty0}, {ty1}, [ {lo}, {hi} ] ]"
+
         if isinstance(ty, set):
             gty = list(ty)[0]
             return f"{{ {Syntax._type_name(gty)} }}"
@@ -195,17 +226,22 @@ class Syntax(Syntax):
                     if isinstance(arg, mty):
                         # primitive match, so assert elaborate type "cons"
                         return Syntax._check_wrap(arg, cons, errmsg=errmsg)
+
         if isinstance(ty, list):
             if hasattr(arg, "__iter__"):
-                if ty[1] is Ellipsis or len(arg) == ty[1]:
-                    if ty[2] == list:
-                        return LazySyntaxList(arg, ty[0], errmsg=errmsg)
-                    if ty[2] == set:
-                        return LazySyntaxSet(arg, ty[0], errmsg=errmsg)
-                    if ty[2] == tuple:
-                        return LazySyntaxTuple(arg, ty[0], errmsg=errmsg)
-                    if ty[2] == str:
-                        return LazySyntaxString(arg, ty[0], errmsg=errmsg)
+                lo, hi = ty[2]
+                lo = 0 if lo is Ellipsis else lo
+                hi = len(arg) if hi is Ellipsis else hi
+                if lo <= len(arg) <= hi:
+                    if ty[0] == list:
+                        return LazySyntaxList(arg, ty[1], errmsg=errmsg)
+                    if ty[0] == set:
+                        return LazySyntaxSet(arg, ty[1], errmsg=errmsg)
+                    if ty[0] == tuple:
+                        return LazySyntaxTuple(arg, ty[1], errmsg=errmsg)
+                    if ty[0] == str:
+                        return LazySyntaxString(arg, ty[1], errmsg=errmsg)
+
         if isinstance(ty, set):
             gty = list(ty)[0]
             if hasattr(arg, "__next__"):
