@@ -45,7 +45,7 @@ class MovInstruction(InstructionClass):
         self.operand = rhs
 
 class PhiInstruction(InstructionClass):
-    @Syntax(object, str, [[str, 2], ...], ...)
+    @Syntax(object, str, [str, 2], ...)
     def __init__(self, lhs, *conds):
         self.target = lhs
         self.conds = conds
@@ -93,7 +93,8 @@ class GotoInstruction(BranchInstructionClass):
         super().__init__(f"goto {tgt}")
 
 class BranchInstruction(BranchInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str)
+      | Syntax(object, cond=str, iftrue=str, iffalse=str))
     def __init__(self, cond, iftrue, iffalse):
         self.cond = cond
         self.iftrue = iftrue
@@ -101,6 +102,7 @@ class BranchInstruction(BranchInstructionClass):
         super().__init__(f"if ({cond}) goto {iftrue} else goto {iffalse}")
 
 class ExitInstruction(BranchInstructionClass):
+    @Syntax(object)
     def __init__(self):
         super().__init__("exit")
 
@@ -141,7 +143,7 @@ class BranchTargets(BranchTargets):
         self._iftrue = iftrue
         self._iffalse = iffalse
 
-    @Syntax(object, BranchTargets)
+    @(Syntax(object, BranchTargets) >> bool)
     def __eq__(self, other):
         return (self._target == other._target
                 and self._cond == other._cond
@@ -153,6 +155,7 @@ class BranchTargets(BranchTargets):
                 else 1 if self._target is not None
                 else 0)
 
+    @(Syntax(object) >> {BasicBlock})
     def __iter__(self):
         if self._cond is not None:
             yield self._iftrue
@@ -161,11 +164,11 @@ class BranchTargets(BranchTargets):
             yield self._target
         # empty yield otherwise
 
-    @Syntax(object, BasicBlock)
+    @(Syntax(object, BasicBlock) >> bool)
     def __in__(self, block):
         return block in self.tuple
 
-    @Syntax(object, int)
+    @(Syntax(object, int) >> BasicBlock)
     def __getitem__(self, idx):
         return self.tuple[idx]
     
@@ -177,6 +180,7 @@ class BranchTargets(BranchTargets):
         return "BranchTargets()"
     
     @property
+    @(Syntax(object) >> [BasicBlock, ..., tuple])
     def tuple(self):
         if self._cond is not None:
             return (self._iftrue, self._iffalse)
@@ -185,15 +189,17 @@ class BranchTargets(BranchTargets):
         return ()
 
     @property
+    @(Syntax(object) >> (str, type(None)))
     def branch_condition(self):
         return self._cond
 
     @property
+    @(Syntax(object) >> InstructionClass)
     def instruction(self):
         if self._cond is not None:
             return BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
         if self._target is not None:
-            return GotoInstruction(target=self._target.label)
+            return GotoInstruction(self._target.label)
         return ExitInstruction()
 
 class BasicBlock(BasicBlock):
@@ -219,6 +225,7 @@ class BasicBlock(BasicBlock):
     def __len__(self):
         return len(self._instructions)
 
+    @(Syntax(object) >> {InstructionClass})
     def __iter__(self):
         for I in self._instructions:
             yield I
@@ -226,30 +233,35 @@ class BasicBlock(BasicBlock):
     def __hash__(self):
         return hash(self.label)
 
-    @Syntax(object, (BasicBlock, type(None)))
-    def __eq__(self, other:BasicBlock):
+    @(Syntax(object, (BasicBlock, type(None))) >> bool)
+    def __eq__(self, other):
         # Basic blocks should be uniquely determined by their label
         if other is None:
             return False
         return self.label == other.label
 
     @property
+    @(Syntax(object) >> str)
     def label(self):
         return self._label
 
     @property
+    @(Syntax(object) >> str)
     def name(self):
         return f"Block{self.label}"
 
     @property
+    @(Syntax(object) >> BranchTargets)
     def children(self):
         return self._branch_targets
 
     @property
+    @(Syntax(object) >> [BasicBlock, ..., set])
     def parents(self):
         return set(self._parents)
 
     @property
+    @(Syntax(object) >> InstructionClass)
     def branch_instruction(self):
         return self._branch_targets.instruction
 
@@ -343,26 +355,31 @@ class CFG:
     def __len__(self):
         return len(self._blocks)
 
+    @(Syntax(object) >> {BasicBlock})
     def __iter__(self):
         for label in self._blocks:
             yield self._blocks[label]
 
-    @Syntax(object, str)
+    @(Syntax(object, str) >> BasicBlock)
     def __getitem__(self, label):
         if label not in self.labels:
             raise KeyError(f"{label} does not label an existing block")
         return self._blocks[label]
 
     @property
+    @(Syntax(object) >> [str, ..., set])
     def labels(self):
         return set(self._blocks.keys())
 
     @property
+    @(Syntax(object) >> {BasicBlock})
     def blocks(self):
         for label in self._blocks:
-            yield self._blocks[label]
+            if label not in self._undef_blocks:
+                yield self._blocks[label]
 
     @property
+    @(Syntax(object) >> {BasicBlock})
     def undefined_blocks(self):
         for label in self._undef_blocks:
             yield self._blocks[label]
@@ -380,7 +397,7 @@ class CFG:
         self._blocks[label] = BasicBlock(label)
         # all basic blocks are exit nodes by default
 
-    @Syntax(object, str)
+    @(Syntax(object, str) >> BasicBlock)
     def _fetch_or_create_block(self, label):
         if label not in self.labels:
             self._create_block(label)
@@ -412,6 +429,7 @@ class CFG:
         self._entrypoint = self._fetch_or_create_block(label)
 
     @property
+    @(Syntax(object) >> BasicBlock)
     def entrypoint(self):
         return self._entrypoint
 

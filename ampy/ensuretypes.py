@@ -26,6 +26,8 @@ class Syntax(Syntax):
 
     Put [type, N] to indicate type must be an iterable of N items whose
     keys specified type (use ellipses for N if arbitrary length is okay)
+    Add a third argument to indicate the type of the iterable
+    (default: list; accepts: list, set, tuple, str)
 
     Put {type0:type1} to indicate type must be a dict from type0 to type1
 
@@ -69,8 +71,15 @@ class Syntax(Syntax):
                 Syntax._verify_input(t[1])
             return True
         if isinstance(ty, list):
-            if len(ty) != 2 or not isinstance(ty[1], (int, type(Ellipsis))):
-                raise SyntaxError("Iterable type must be of the form (type, count)")
+            errmsg = "Iterable type must be of the form [type, count] or [type, count, iterable_type]"
+            if len(ty) < 2 or len(ty) > 3:
+                raise SyntaxError(errmsg)
+            if not isinstance(ty[1], (int, type(Ellipsis))):
+                raise SyntaxError(errmsg + " where the count is an integer or ellipses")
+            if len(ty) < 3:
+                ty.append(list)
+            if ty[2] not in (list, set, tuple, str):
+                raise SyntaxError(errmsg + " where the iterable_type is one of: list, set, tuple, str")
             return Syntax._verify_input(ty[0])
         if isinstance(ty, set):
             if len(ty) != 1:
@@ -124,7 +133,7 @@ class Syntax(Syntax):
             return f"( {union}, )"
         if isinstance(ty, list):
             ty1 = "..." if ty[1] is Ellipsis else ty[1]
-            return f"[ {Syntax._type_name(ty[0])}, {ty1} ]"
+            return f"[ {Syntax._type_name(ty[0])}, {ty1}, {ty[2].__name__} ]"
         if isinstance(ty, set):
             gty = list(ty)[0]
             return f"{{ {Syntax._type_name(gty)} }}"
@@ -189,7 +198,14 @@ class Syntax(Syntax):
         if isinstance(ty, list):
             if hasattr(arg, "__iter__"):
                 if ty[1] is Ellipsis or len(arg) == ty[1]:
-                    return LazySyntaxList(arg, ty[0], errmsg=errmsg)
+                    if ty[2] == list:
+                        return LazySyntaxList(arg, ty[0], errmsg=errmsg)
+                    if ty[2] == set:
+                        return LazySyntaxSet(arg, ty[0], errmsg=errmsg)
+                    if ty[2] == tuple:
+                        return LazySyntaxTuple(arg, ty[0], errmsg=errmsg)
+                    if ty[2] == str:
+                        return LazySyntaxString(arg, ty[0], errmsg=errmsg)
         if isinstance(ty, set):
             gty = list(ty)[0]
             if hasattr(arg, "__next__"):
@@ -329,8 +345,19 @@ class LazySyntaxList(list):
 
     def __repr__(self):
         return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
+    
+    def __iter__(self):
+        return Syntax._check_wrap(
+                arg=super().__iter__(),
+                ty={self._ty}, # iterator
+                errmsg=self._errmsg)
 
     def __getitem__(self, index):
+        if isinstance(index, slice):
+            return Syntax._check_wrap(
+                    arg=super().__getitem__(index),
+                    ty=[self._ty, ..., list],
+                    errmsg=self._errmsg)
         return Syntax._check_wrap(
                 arg=super().__getitem__(index),
                 ty=self._ty,
@@ -341,6 +368,106 @@ class LazySyntaxList(list):
                 arg=value,
                 ty=self._ty,
                 errmsg=self._errmsg + f" Assigning incorrect type to index {index}."))
+
+class LazySyntaxSet(set):
+    """
+    Lazy type-checker for set-like iterable
+    """
+    def __new__(cls, st, ty, errmsg=""):
+        return super().__new__(cls)
+
+    def __init__(self, st, ty, errmsg=""):
+        self._ty = ty
+        self._errmsg = errmsg
+        super().__init__(st)
+
+    def __repr__(self):
+        return f"{repr(set(self))}:{Syntax._type_name(self._ty)}"
+    
+    def __iter__(self):
+        return Syntax._check_wrap(
+                arg=super().__iter__(),
+                ty={self._ty}, # iterator
+                errmsg=self._errmsg)
+
+    def pop(self):
+        return Syntax._check_wrap(
+                arg=super().pop(),
+                ty=self._ty,
+                errmsg=self._errmsg + " Set poppsed incorrect type.")
+
+    def add(self, item):
+        super().add(Syntax._check_wrap(
+                arg=item,
+                ty=self._ty,
+                errmsg=self._errmsg + " Trying to add incorrect type."))
+
+class LazySyntaxTuple(tuple):
+    """
+    Lazy type-checker for tuple-like iterable
+    """
+    def __new__(cls, tp, ty, errmsg=""):
+        # tuple is immutable
+        return super().__new__(cls, tp)
+
+    def __init__(self, tp, ty, errmsg=""):
+        self._ty = ty
+        self._errmsg = errmsg
+    
+    def __iter__(self):
+        return Syntax._check_wrap(
+                arg=super().__iter__(),
+                ty={self._ty}, # iterator
+                errmsg=self._errmsg)
+
+    def __repr__(self):
+        return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return Syntax._check_wrap(
+                    arg=super().__getitem__(index),
+                    ty=[self._ty, ..., tuple],
+                    errmsg=self._errmsg)
+        return Syntax._check_wrap(
+                arg=super().__getitem__(index),
+                ty=self._ty,
+                errmsg=self._errmsg + f" Index {index} has incorrect type.")
+
+class LazySyntaxString(str):
+    """
+    Lazy type-checker for string-like iterable
+
+    Implementation is also lazy; it's easy to cheat this checker,
+    but that's deviating from the point of the ensuretypes module
+    (which is just designed to keep myself honest).
+    """
+    def __new__(cls, st, ty, errmsg=""):
+        return super().__new__(cls, st)
+
+    def __init__(self, st, ty, errmsg=""):
+        self._ty = ty
+        self._errmsg = errmsg
+
+    def __iter__(self):
+        return Syntax._check_wrap(
+                arg=super().__iter__(),
+                ty={self._ty}, # iterator
+                errmsg=self._errmsg)
+
+    def __repr__(self):
+        return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
+
+    def __getitem__(self, index):
+        if isinstance(index, slice):
+            return Syntax._check_wrap(
+                    arg=super().__getitem__(index),
+                    ty=[self._ty, ..., str],
+                    errmsg=self._errmsg)
+        return Syntax._check_wrap(
+                arg=super().__getitem__(index),
+                ty=self._ty,
+                errmsg=self._errmsg + f" Index {index} has incorrect type.")
 
 def LazySyntaxDict(dict):
     """
