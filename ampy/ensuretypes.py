@@ -32,7 +32,7 @@ class Syntax(Syntax):
         toggle if function calls with unanticipated kwargs are permissible
         (default: False)
 
-    .also(*args, **kwargs)
+    .union(*args, **kwargs)
     | Syntax(*args, **kwargs)
         match either current syntax object or next syntax object
         NB: piped syntax objects do not inherit above flags
@@ -301,6 +301,9 @@ class LazySyntaxList(list):
         self._errmsg = errmsg
         super().__init__(ls)
 
+    def __repr__(self):
+        return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
+
     def __getitem__(self, index):
         return Syntax._check_wrap(
                 arg=super().__getitem__(index),
@@ -322,7 +325,10 @@ def LazySyntaxDict(dict):
         self._vty = vty
         self._errmsg = errmsg
         super().__init__(dc)
-    
+
+    def __repr__(self):
+        return f"{super().__repr__()}:{Syntax._type_name(self._kty)}->{Syntax._type_name(self._vty)}"
+
     def __getitem__(self, key):
         return Syntax._check_wrap(
                 arg=super().__getitem__(Syntax._check_wrap(
@@ -354,6 +360,9 @@ class LazySyntaxIterator:
         self._it = iterator
         self._ty = ty
         self._errmsg = errmsg
+
+    def __repr__(self):
+        return f"{repr(self._it)}:{Syntax._type_name(self._ty)}"
 
     def __iter__(self):
         return self
