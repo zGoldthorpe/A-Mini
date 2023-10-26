@@ -558,7 +558,7 @@ class LazySyntaxString(str):
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
 
-def LazySyntaxDict(dict):
+class LazySyntaxDict(dict):
     """
     Lazy type-checker for dict-like objects
     """
