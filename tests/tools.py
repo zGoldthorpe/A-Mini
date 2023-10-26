@@ -5,7 +5,7 @@ import functools
 import traceback
 import sys
 
-from ampy.printing import psuccess, perror
+from ampy.printing import psuccess, perror, tame_whitespace
 
 class TestSuite:
     """
@@ -109,15 +109,55 @@ class PythonExecutionTestSuite(TestSuite):
 
     @TestSuite.test
     def exec(self, *lines, state=None, expected=None):
+        """
+        Test execution of several lines of Python code.
+        A "line" can be an entire block (to handle loops / if statements etc)
+        If a line is a pair (src, exception), then the test
+        will run the source code and expect the specified exception.
+        If the exception is not thrown, then the test will fail.
+        """
         
-        state = dict(locals() if state is None else state)
+        state = dict(globals() if state is None else state)
         for (i, line) in enumerate(lines):
+            if isinstance(line, tuple):
+                # line is supposed to throw a specified error
+                line, Error = line
+                try:
+                    exec(line, state)
+                except Error as e:
+                    continue
+                except Exception as e:
+                    self._error(tame_whitespace(f"""
+                        Unexpected {type(e).__name__} occurred while processing line {i+1}:
+                            {line}
+                        Exception: {e}
+                        Expected exception {Error.__name__}"""))
+                    return False, dict(
+                            type="exec-error",
+                            lines=lines,
+                            failed_at=i,
+                            exception=Exception(e),
+                            expected_exception=Error,
+                            exec_state=state,
+                            traceback=traceback.format_exc())
+                # if you reached here, no error was thrown despite expecting Error
+                self._error(tame_whitespace(f"""
+                    After processing line {i+1}:
+                        {line}
+                    Expected exception {Error.__name__} did NOT occur."""))
+                return False, dict(
+                        type="exec-noerror",
+                        lines=lines,
+                        failed_at=i,
+                        expected_exception=Error,
+                        exec_state=state)
             try:
                 exec(line, state)
             except Exception as e:
-                self._error(f"""{type(e).__name__} occurred while processing line {i+1}:
-\t{line}
-Exception: {e}""")
+                self._error(tame_whitespace(f"""
+                {type(e).__name__} occurred while processing line {i+1}:
+                    {line}
+                Exception: {e}"""))
                 return False, dict(
                         type="exec-error",
                         lines=lines,
@@ -125,6 +165,7 @@ Exception: {e}""")
                         exception=Exception(e),
                         exec_state=state,
                         traceback=traceback.format_exc())
+
         if expected is not None:
             diff = dict(missing=set(), diff={})
             for var in expected:
