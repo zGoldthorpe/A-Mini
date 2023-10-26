@@ -3,9 +3,6 @@ Simple module for formatted printing (only supporting linux)
 """
 import sys
 
-def _can_format():
-    return sys.platform.startswith("linux")
-
 class Printing:
 
     # class variable to toggle formatting
