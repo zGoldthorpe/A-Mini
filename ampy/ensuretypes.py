@@ -1,6 +1,7 @@
 """
 Type-checking functionality to ensure methods are used as intended.
 """
+import functools
 
 class Syntax:
     # forward declaration
@@ -379,20 +380,29 @@ Valid syntaxes are:
         return args, kwargs
 
     def __repr__(self):
-        positional = ", ".join(Syntax._type_name(ty) for ty in self._types)
+        if self._parent is not None:
+            head = self._parent.__repr__() + '\n'
+        else:
+            head = ""
+
+        positional_ty = list(self._types)
+        if self._ellipsis > -1:
+            positional_ty.insert(self._ellipsis+1, Ellipsis)
+        positional = ", ".join(Syntax._type_name(ty) for ty in positional_ty)
         keyword = ", ".join(f"{kw}:{Syntax._type_name(self._kwtypes[kw])}" for kw in self._kwtypes)
         if not positional and not keyword:
-            return "Syntax() >> {Syntax._type_name(self._return_type)}"
+            return head + "Syntax() >> {Syntax._type_name(self._return_type)}"
         if not positional:
-            return f"Syntax({keyword}) >> {Syntax._type_name(self._return_type)}"
+            return head + f"Syntax({keyword}) >> {Syntax._type_name(self._return_type)}"
         if not keyword:
-            return f"Syntax({positional}) >> {Syntax._type_name(self._return_type)}"
-        return f"Syntax({positional}; {keyword}) >> {Syntax._type_name(self._return_type)}"
+            return head + f"Syntax({positional}) >> {Syntax._type_name(self._return_type)}"
+        return head + f"Syntax({positional}; {keyword}) >> {Syntax._type_name(self._return_type)}"
 
     def __call__(self, func):
         """
         Wrapper for type assertions
         """
+        @functools.wraps(func)
         def wrap(*args, **kwargs):
             if self._parent is None:
                 args, kwargs = self.check(func.__name__, *args, **kwargs)
@@ -403,6 +413,9 @@ Valid syntaxes are:
                     arg=retval,
                     ty=self._return_type,
                     errmsg=f"{func.__name__} expected to return {Syntax._type_name(self._return_type)}; returned unexpected {type(retval).__name__}")
+
+        wrap.__doc__ = repr(self) + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+
         return wrap
 
 
