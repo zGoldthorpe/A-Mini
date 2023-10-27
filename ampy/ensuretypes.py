@@ -18,37 +18,47 @@ class Syntax(Syntax):
 
     Checks positional and keyword argument types.
 
-    Put types in a tuple to "union" them.
-    NB: a union can tell primitive types apart, but cannot perform more
-    elaborate checks such as "list of ints vs list of strings".
-    To assert element types after matching with an iterable (list, dict, etc.)
-    use a pair (type, cons) inside the list, where type is primitive
-    (for matching) and cons is a more specific constructor.
-    E.g., Syntax((int, (list, [int, 5]), (dict, {str:str}))) expects one
-    argument, whose type is one of:
-    - int
-    - list (after which is asserted to be a list of 5 integers)
-    - dict (after which is asserted to be a map from strings to strings)
+    (type0, type1, type2 [, ...])
+        Match any of the above types
+        Each typeN should be a primitive type (Syntax does lazy type-checking, so
+        will incorrectly match types if typeN is more elaborate, and then assert
+        that typeN matches this constructed type).
+        If more elaborate types are needed, replace typeN with a pair (hintN, consN)
+        where hintN is a primitive type for quick matching, and consN is the more
+        precise match (which is then asserted to whatever matches hintN).
+        
+        E.g., Syntax((int, (list, [int, 5]), (dict, {str:str}))) expects one
+        argument, whose type is one of:
+        - int
+        - list (after which is asserted to be a list of 5 integers)
+        - dict (after which is asserted to be a map from strings to strings)
 
     [container, type, [lo, hi]]
-    Type must be a container-like iterable of entries of specified
-    type, where the number of entries is bounded between lo and hi,
-    inclusive.
-    Use ellipses for lo or hi to indicate unboundedness in either
-    direction.
+        Type must be a container-like iterable of entries of specified
+        type, where the number of entries is bounded between lo and hi,
+        inclusive.
+        Use ellipses for lo or hi to indicate unboundedness in either
+        direction.
 
-    [*, type, N] is shorthand for [*, type, [N, N]]
-    [*, type] is shorthand for [*, type, ...] = [*, type, [...,...]]
-    [type, *] is shorthand for [list, type, *]
+        [*, type, N] is shorthand for [*, type, [N, N]]
+        [*, type] is shorthand for [*, type, ...] = [*, type, [...,...]]
+        [type, *] is shorthand for [list, type, *]
 
-    Put {type0:type1} to indicate type must be a dict from type0 to type1
+    {type0 : type1}
+        Type must be a dict from type0 to type1
 
-    Put {type} to indicate type comes from a generator of indicated type
+    {type}
+        Type must be a generator of indicated type
 
-    Put lambda:syntax to indicate type is a function with specified syntax
+    lambda : Syntax(*args, **kwargs) >> type
+        Type must be a function with specified syntax
 
-    Put ellipses after a positional argument to act as a Kleene star (i.e.,
-    match zero or more of the previous positional argument)
+    type, ...
+        If type is a positional argument, then the ellipses act as a Kleene star
+        for this type; i.e., match zero or more of this type as positional arguments.
+
+    kwarg=type
+        If function takes keyword argument kwarg, then kwarg must have specified type.
 
     .set_allow_undef_kwargs(flag):
         toggle if function calls with missing kwargs are permissible
