@@ -53,6 +53,9 @@ class Syntax(Syntax):
     lambda : Syntax(*args, **kwargs) >> type
         Type must be a function with specified syntax
 
+    None
+        Alias for NoneType
+
     type, ...
         If type is a positional argument, then the ellipses act as a Kleene star
         for this type; i.e., match zero or more of this type as positional arguments.
@@ -92,6 +95,10 @@ class Syntax(Syntax):
 
         Does not handle ellipses; handle these externally
         """
+        if ty is None:
+            # NoneType
+            return True
+
         if isinstance(ty, type):
             # primitive type
             return True
@@ -99,6 +106,8 @@ class Syntax(Syntax):
         if isinstance(ty, tuple):
             # union
             for t in ty:
+                if t is None:
+                    continue
                 if isinstance(t, type):
                     continue # primitive type
                 if not isinstance(t, tuple) or len(t) != 2 or not isinstance(t[0], type):
@@ -205,6 +214,9 @@ class Syntax(Syntax):
         """
         Presents abstract Syntax types in a readable fashion
         """
+        if ty is None:
+            return "None"
+
         if ty is Ellipsis:
             return "..."
 
@@ -212,7 +224,8 @@ class Syntax(Syntax):
             return ty.__name__
 
         if isinstance(ty, tuple):
-            union = ", ".join(t.__name__ if isinstance(t, type)
+            union = ", ".join("None" if t is None
+                    else t.__name__ if isinstance(t, type)
                     else f"( {t[0].__name__} , {Syntax._type_name(t[1])} )"
                     for t in ty)
             return f"( {union}, )"
@@ -303,12 +316,19 @@ class Syntax(Syntax):
         Lazily check if arg is of type ty, given conventions of the
         Syntax class
         """
+        if ty is None:
+            if arg is None:
+                return arg
+
         if isinstance(ty, type):
             if isinstance(arg, ty):
                 return arg
 
         if isinstance(ty, tuple):
             for t in ty:
+                if t is None:
+                    if arg is None:
+                        return arg
                 if isinstance(t, type):
                     if isinstance(arg, t):
                         return arg

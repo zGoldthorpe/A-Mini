@@ -189,7 +189,7 @@ class BranchTargets(BranchTargets):
         return ()
 
     @property
-    @(Syntax(object) >> (str, type(None)))
+    @(Syntax(object) >> (str, None))
     def branch_condition(self):
         return self._cond
 
@@ -233,7 +233,7 @@ class BasicBlock(BasicBlock):
     def __hash__(self):
         return hash(self.label)
 
-    @(Syntax(object, (BasicBlock, type(None))) >> bool)
+    @(Syntax(object, (BasicBlock, None)) >> bool)
     def __eq__(self, other):
         # Basic blocks should be uniquely determined by their label
         if other is None:

@@ -82,6 +82,13 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @(Syntax(int) >> None)
+        def foo(x): pass"""),
+        "foo(0)",
+        ("foo('a')", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @(Syntax(int) >> {int})
         def foo(N):
             for i in range(N):
