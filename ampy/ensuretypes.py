@@ -441,18 +441,25 @@ Valid syntaxes are:
         else:
             head = ""
 
+        if self._return_type is object:
+            # I thought to suppress notation of return is NoneType
+            # but the default return type is "object"
+            tail = ""
+        else:
+            tail = f" >> {Syntax._type_name(self._return_type)}"
+
         positional_ty = list(self._types)
         if self._ellipsis > -1:
             positional_ty.insert(self._ellipsis+1, Ellipsis)
         positional = ", ".join(Syntax._type_name(ty) for ty in positional_ty)
         keyword = ", ".join(f"{kw}:{Syntax._type_name(self._kwtypes[kw])}" for kw in self._kwtypes)
         if not positional and not keyword:
-            return head + "Syntax() >> {Syntax._type_name(self._return_type)}"
+            return head + "Syntax()" + tail
         if not positional:
-            return head + f"Syntax({keyword}) >> {Syntax._type_name(self._return_type)}"
+            return head + f"Syntax({keyword})" + tail
         if not keyword:
-            return head + f"Syntax({positional}) >> {Syntax._type_name(self._return_type)}"
-        return head + f"Syntax({positional}; {keyword}) >> {Syntax._type_name(self._return_type)}"
+            return head + f"Syntax({positional})" + tail
+        return head + f"Syntax({positional}; {keyword})" + tail
 
     def __call__(self, func):
         """
