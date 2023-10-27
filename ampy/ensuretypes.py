@@ -5,7 +5,6 @@ import functools
 from types import (
         EllipsisType,
         FunctionType,
-        NoneType,
         )
 
 class Syntax:
