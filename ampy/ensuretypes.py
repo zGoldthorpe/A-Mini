@@ -2,6 +2,11 @@
 Type-checking functionality to ensure methods are used as intended.
 """
 import functools
+from types import (
+        EllipsisType,
+        FunctionType,
+        NoneType,
+        )
 
 class Syntax:
     # forward declaration
@@ -39,6 +44,8 @@ class Syntax(Syntax):
     Put {type0:type1} to indicate type must be a dict from type0 to type1
 
     Put {type} to indicate type comes from a generator of indicated type
+
+    Put lambda:syntax to indicate type is a function with specified syntax
 
     Put ellipses after a positional argument to act as a Kleene star (i.e.,
     match zero or more of the previous positional argument)
@@ -101,7 +108,7 @@ class Syntax(Syntax):
                     ty.insert(0, list)
                     ty.append(Ellipsis)
                 case 2: # [container, type] or [type, count]
-                    if isinstance(ty[1], (int, type(Ellipsis), list)):
+                    if isinstance(ty[1], (int, EllipsisType, list)):
                         # [type, count] = [list, type, count]
                         ty.insert(0, list)
                     else:
@@ -116,13 +123,13 @@ class Syntax(Syntax):
             if not ty[0] in containers:
                 raise SyntaxError(errmsg + " where the container is one of: " + ", ".join(t.__name__ for t in containers))
             if not isinstance(ty[2], list):
-                if not isinstance(ty[2], (int, type(Ellipsis))):
+                if not isinstance(ty[2], (int, EllipsisType)):
                     raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
                 # [*,*, N] = [*,*, [N, N]]
                 ty[2] = [ty[2], ty[2]]
 
             # now, counter is a list
-            if len(ty[2]) != 2 or not all(isinstance(t, (int, type(Ellipsis))) for t in ty[2]):
+            if len(ty[2]) != 2 or not all(isinstance(t, (int, EllipsisType)) for t in ty[2]):
                 raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
 
             # now, ty = [container, type, [lo, hi]]
@@ -141,6 +148,17 @@ class Syntax(Syntax):
                 raise SyntaxError("Dict type must be of the form {ktype : vtype}")
             kty = list(ty)[0]
             return Syntax._verify_input(kty) and Syntax._verify_input(ty[kty])
+
+        if isinstance(ty, FunctionType):
+            # function must have zero arity
+            errmsg = "Function type must be of the form lambda:Syntax(*args, **kwargs)."
+            try:
+                syntax = ty()
+            except TypeError:
+                raise SyntaxError(errmsg + " Lambda has nonzero arity.")
+            if not isinstance(syntax, Syntax):
+                raise SyntaxError(errmsg + " Lambda does not return Syntax object")
+            return True
 
         # input type does not match any of the above syntax
         raise SyntaxError(f"Unrecognised type {repr(ty)}")
@@ -203,6 +221,10 @@ class Syntax(Syntax):
             kty = list(ty)[0]
             vty = ty[kty]
             return f"{{ {Syntax._type_name(kty)} : {Syntax._type_name(vty)} }}"
+
+        if isinstance(ty, FunctionType):
+            syntax = ty()
+            return f"lambda : {repr(syntax)}"
 
     def extract_syntax(*args, **kwargs):
         """
@@ -311,6 +333,11 @@ class Syntax(Syntax):
             vty = ty[kty]
             if hasattr(arg, "__iter__") and hasattr(arg, "__getitem__"):
                 return LazySyntaxDict(arg, kty, vty, errmsg=errmsg)
+
+        if isinstance(ty, FunctionType):
+            syntax = ty()
+            if isinstance(arg, FunctionType):
+                return syntax(arg)
 
         # at this point, arg failed typecheck
         raise TypeError(errmsg)

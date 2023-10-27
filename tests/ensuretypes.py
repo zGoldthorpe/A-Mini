@@ -110,6 +110,30 @@ ts.exec(tw("""
         ("foo(dict(a=3, b=5, c='10'), 8)", TypeError),
         state=dict(Syntax=Syntax))
 
+ts.exec(tw("""
+        @Syntax(lambda:Syntax(int)>>int, int).returns(int)
+        def foo(func, x): return func(x)"""),
+        "assert foo(lambda x: x+1, 0) == 1",
+        ("foo(lambda:0, 5)", TypeError),
+        ("foo(lambda x, y: x+y, 5)", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
+        @Syntax(lambda:Syntax(int)>>str,
+                lambda:Syntax(str)>>int
+                ).returns([tuple, lambda:Syntax(object), 2])
+        def foo(func0, func1):
+            return (
+                lambda n: func1(func0(n)),
+                lambda s: func0(func1(s)),
+            )"""),
+        "f, g = foo(lambda x:str(x), lambda s:len(s))",
+        "assert f(10) == 2",
+        "assert g('10') == '2'",
+        ("f('10')", TypeError),
+        ("g(10)", TypeError),
+        state=dict(Syntax=Syntax))
+
 if __name__ == "__main__":
     ts.print_results()
     if not sys.flags.interactive:
