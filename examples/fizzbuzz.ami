@@ -17,7 +17,7 @@
 @count:
     %n = %n + 1
     %cmp = %N < %n
-    branch %cmp ? @exit : @div
+    branch %cmp ? @exit : @div              ; count to N
 
 @div:
     %n.mod.3 = %n
@@ -25,38 +25,38 @@
 
 @mod.3:
     %cmp = %n.mod.3 < 3
-    branch %cmp ? @mod.5 : @reduce.3
+    branch %cmp ? @mod.5 : @reduce.3        ; compute remainder mod 3
 @reduce.3:
     %n.mod.3 = %n.mod.3 - 3
     goto @mod.3
 
 @mod.5:
     %cmp = %n.mod.5 < 5
-    branch %cmp ? @print : @reduce.5
+    branch %cmp ? @print : @reduce.5        ; compute remainder mod 5
 @reduce.5:
     %n.mod.5 = %n.mod.5 - 5
     goto @mod.5
 
 @print:
-    branch %n.mod.3 ? @noFizz : @mayFizz
+    branch %n.mod.3 ? @noFizz : @mayFizz    ; check if number is a multiple of 3
 
-@mayFizz:
-    branch %n.mod.5 ? @Fizz : @FizzBuzz
+@mayFizz:                                   ; number is a multiple of 3
+    branch %n.mod.5 ? @Fizz : @FizzBuzz     ; check if also a multiple of 5
 
 @noFizz:
-    branch %n.mod.5 ? @n : @Buzz
+    branch %n.mod.5 ? @n : @Buzz            ; check if a multiple of 5
 
-@Fizz:
+@Fizz:                                      ; number is only a multiple of 3
     write %Fizz
     goto @count
-@Buzz:
+@Buzz:                                      ; number is only a multiple of 5
     write %Buzz
     goto @count
-@FizzBuzz:
+@FizzBuzz:                                  ; number is a multiple of 15
     write %FizzBuzz
     goto @count
-@n:
+@n:                                         ; number is not a multiple of 3 or 5
     write %n
     goto @count
     
-@exit:
+@exit:                                      ; implicitly exit program

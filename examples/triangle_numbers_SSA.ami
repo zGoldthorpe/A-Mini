@@ -1,0 +1,29 @@
+; takes a single input and outputs the sum
+; from the input to zero
+; but this time in SSA form
+
+@0:
+    read %N.0
+    %sum.0 = 0
+
+@loop:
+    %N.l = phi [%N.0, @0], [%N.i, @increment], [%N.d, @decrement]
+    %sum.l = phi [%sum.0, @0], [%sum.a, @increment], [%sum.a, @decrement]
+    %done = %N.l == 0
+    branch %done ? @print : @add
+
+@add:
+    %sum.a = %sum.l + %N.l
+    %positive = 0 < %N.l
+    branch %positive ? @decrement : @increment
+
+@increment:
+    %N.i = %N.l + 1
+    goto @loop
+
+@decrement:
+    %N.d = %N.l + 1
+    goto @loop
+
+@print:
+    print %sum.l

@@ -1,0 +1,35 @@
+; Takes an input N and determines if N = a^2 + b^2 for some a, b
+; If so, will print a and b (a >= b)
+; Otherwise, will print -1
+
+    read %N
+    %a = -1
+    goto @inc_a
+
+@failed:
+    write -1
+    exit
+
+@succeeded:
+    write %a
+    write %b
+    exit
+
+@inc_a:
+    %b = %a
+    %a = %a + 1
+    %a_squared = %a * %a
+    %failed = %a_squared > %N
+    branch %failed ? @failed : @inc_b
+
+@inc_b:
+    ; assumes a is correct, and tries to find b
+    %b = %b + 1
+    %b_squared = %b * %b
+    %sum = %a_squared + %b_squared
+    %success = %sum == %N
+    branch %success ? @succeeded : @continue
+
+@continue:
+    %overshoot = %sum > %N
+    branch %overshoot ? @inc_a : @inc_b
