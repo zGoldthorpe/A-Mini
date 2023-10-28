@@ -76,6 +76,28 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @Syntax(int, ...).returns(int)
+        def foo(*x): return len(x)"""),
+        "assert foo() == 0",
+        "assert foo(1) == 1",
+        "assert foo(1, 2) == 2",
+        "assert foo(*[1, 2, 3]) == 3",
+        ("foo(1, 2, 'a')", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
+        @Syntax(int, str, ..., int).returns(int)
+        def foo(*x): return x[0] + x[-1]"""),
+        "assert foo(1, 2) == 3",
+        "assert foo(1, 'a', 2) == 3",
+        "assert foo(1, 'a', 'b', 2) == 3",
+        ("foo(1)", TypeError),
+        ("foo(1, 'a')", TypeError),
+        ("foo('a', 2)", TypeError),
+        ("foo(1, 'a', 2, 'b', 3)", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @(Syntax({int}) >> int)
         def foo(gen): return sum(gen)"""),
         "assert foo(i for i in range(5)) == 10",
