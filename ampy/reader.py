@@ -1,3 +1,13 @@
+"""
+A-Mi reader
+=============
+Goldthorpe
+
+This module provides the CFGBuilder, which takes A-Mi code
+(written in a plaintext file) and yields an ampy.types.CFG abstraction
+for analysis or interpretation.
+"""
+
 import ampy.types
 from ampy.ensuretypes import Syntax
 

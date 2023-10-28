@@ -1,5 +1,12 @@
 """
-Type-checking functionality to ensure methods are used as intended.
+EnsureTypes
+=============
+Goldthorpe
+
+This module provides wrapper classes for type-assertions for methods.
+Non-primitive types are asserted lazily (e.g., if an object must be an iterable
+consisting of 10 integers, then the entries will be asserted to be integers as
+they are used by the callee function).
 """
 import functools
 from types import (

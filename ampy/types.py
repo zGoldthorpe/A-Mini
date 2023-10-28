@@ -1,3 +1,15 @@
+"""
+A-Mi types
+============
+Goldthorpe
+
+This module contains the abstract types necessary for encoding an A-Mi program
+
+An A-Mi program is stored abstractly as a control flow graph of basic blocks,
+where each basic block consists of several InstructionClass instances ending with
+an instruction of the BranchInstructionClass subclass.
+"""
+
 from ampy.ensuretypes import Syntax
 
 ### Instructions ###
