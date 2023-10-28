@@ -5,23 +5,28 @@ CFG=$(patsubst %,CFG/%,\
 	basicblocks.py \
 	cfg.py)
 
-TESTS=ensuretypes.py \
-	  $(CFG)
+PARSING=$(patsubst %,parsing/%,\
+		reader.py)
 
-FOLDERS=CFG
+TESTS=ensuretypes.py \
+	  $(CFG) \
+	  $(PARSING)
+
+FOLDERS=CFG parsing
 
 RUNTESTS=$(TESTS:%=tests/%.vfy)
 FOLDERTESTS=$(FOLDERS:%=tests/%.vfy)
 
 INTERACT=$(TESTS:%.py=interact/%.py)
 
-.PHONY: $(INTERACT) clean echo
+.PHONY: $(INTERACT) clean all
 
-echo:
-	@echo $(TESTS)
-	@echo $(RUNTESTS)
+all: $(RUNTESTS) $(FOLDERTESTS)
 
 tests/CFG.vfy: $(CFG:%=tests/%.vfy)
+	@touch $@
+
+tests/parsing.vfy: $(PARSING:%=tests/%.vfy)
 	@touch $@
 
 $(filter %.py.vfy,$(RUNTESTS)): %.py.vfy: %.py
