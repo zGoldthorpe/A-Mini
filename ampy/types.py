@@ -236,13 +236,24 @@ class BasicBlock(BasicBlock):
                 + '\n' + '\n'.join(repr(I) for I in self))
 
     def __len__(self):
-        return len(self._instructions)
+        return len(self._instructions) + 1
+        # the + 1 is for the branch instruction
 
     @(Syntax(object) >> {InstructionClass})
     def __iter__(self):
         for I in self._instructions:
             yield I
         yield self.branch_instruction
+
+    @(Syntax(object, int) >> InstructionClass)
+    def __getitem__(self, index):
+        if index < 0:
+            index += len(self._instructions) + 1
+        if index > len(self._instructions) or index < 0:
+            raise IndexError
+        if index == len(self._instructions):
+            return self.branch_instruction
+        return self._instructions[index]
 
     def __hash__(self):
         return hash(self.label)
