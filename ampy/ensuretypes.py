@@ -482,7 +482,7 @@ Valid syntaxes are:
             return Syntax._check_wrap(
                     arg=retval,
                     ty=self._return_type,
-                    errmsg=f"{func.__name__} expected to return {Syntax._type_name(self._return_type)}; returned unexpected {type(retval).__name__}")
+                    errmsg=f"{func.__name__} expected to return {Syntax._type_name(self._return_type)}; returned unexpected {type(retval).__name__}.")
 
         wrap.__doc__ = repr(self) + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
 

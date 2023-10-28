@@ -1,5 +1,9 @@
 """
-General testing functionality, implemented as-needed
+Testing tools
+===============
+Goldthorpe
+
+General test suite functionality
 """
 import functools
 import traceback

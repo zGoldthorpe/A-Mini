@@ -8,11 +8,19 @@ CFG=$(patsubst %,CFG/%,\
 PARSING=$(patsubst %,parsing/%,\
 		reader.py)
 
+EXEC=$(patsubst %,execution/%,\
+	 	arith.py \
+		comp.py \
+		branch.py \
+		phi.py \
+		io.py)
+
 TESTS=ensuretypes.py \
 	  $(CFG) \
-	  $(PARSING)
+	  $(PARSING) \
+	  $(EXEC)
 
-FOLDERS=CFG parsing
+FOLDERS=CFG parsing execution
 
 RUNTESTS=$(TESTS:%=tests/%.vfy)
 FOLDERTESTS=$(FOLDERS:%=tests/%.vfy)
@@ -27,6 +35,9 @@ tests/CFG.vfy: $(CFG:%=tests/%.vfy)
 	@touch $@
 
 tests/parsing.vfy: $(PARSING:%=tests/%.vfy)
+	@touch $@
+
+tests/execution.vfy: $(EXEC:%=tests/%.vfy)
 	@touch $@
 
 $(filter %.py.vfy,$(RUNTESTS)): %.py.vfy: %.py
