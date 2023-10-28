@@ -21,7 +21,7 @@
     %b.1 = phi [ %a.0, @0 ], [ %a.2, @continue ]
     %a.1 = %b.1 + 1
     %a_squared = %a.1 * %a.1
-    %failed = %a_squared > %N
+    %failed = %N < %a_squared
     branch %failed ? @failed : @inc_b
 
 @inc_b:
@@ -34,5 +34,5 @@
     branch %success ? @succeeded : @continue
 
 @continue:
-    %overshoot = %sum > %N
+    %overshoot = %N < %sum
     branch %overshoot ? @inc_a : @inc_b

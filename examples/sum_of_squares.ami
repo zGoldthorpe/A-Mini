@@ -19,7 +19,7 @@
     %b = %a
     %a = %a + 1
     %a_squared = %a * %a
-    %failed = %a_squared > %N
+    %failed = %N < %a_squared
     branch %failed ? @failed : @inc_b
 
 @inc_b:
@@ -31,5 +31,5 @@
     branch %success ? @succeeded : @continue
 
 @continue:
-    %overshoot = %sum > %N
+    %overshoot = %N < %sum
     branch %overshoot ? @inc_a : @inc_b

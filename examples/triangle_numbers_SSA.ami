@@ -26,4 +26,4 @@
     goto @loop
 
 @print:
-    print %sum.l
+    write %sum.l
