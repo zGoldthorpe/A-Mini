@@ -6,7 +6,7 @@ class InstructionClass:
     """
     Parent instruction type
     """
-    @Syntax(object, str, str)
+    @(Syntax(object, str, str) >> None)
     def __init__(self, rep, typ):
         self.type = typ
         self.repr = rep
@@ -17,84 +17,85 @@ class InstructionClass:
 ### General instruction classes ###
 
 class ArithInstructionClass(InstructionClass):
-    @Syntax(object, str, str, str, str)
+    @(Syntax(object, str, str, str, str) >> None)
     def __init__(self, rep, res, op1, op2):
         super().__init__(rep, "arith")
         self.target = res
         self.operands = (op1, op2)
 
 class CompInstructionClass(InstructionClass):
-    @Syntax(object, str, str, str, str)
+    @(Syntax(object, str, str, str, str) >> None)
     def __init__(self, rep, res, op1, op2):
         super().__init__(rep, "comp")
         self.target = res
         self.operands = (op1, op2)
 
 class BranchInstructionClass(InstructionClass):
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def __init__(self, rep):
         super().__init__(rep, "branch")
 
 ### Instruction types ###
 
 class MovInstruction(InstructionClass):
-    @Syntax(object, str, str)
+    @(Syntax(object, str, str) >> None)
     def __init__(self, lhs, rhs):
         super().__init__(f"{lhs} = {rhs}", "move")
         self.target = lhs
         self.operand = rhs
 
 class PhiInstruction(InstructionClass):
-    @Syntax(object, str, [str, 2], ...)
+    @(Syntax(object, str, [str, 2], ...) >> None)
     def __init__(self, lhs, *conds):
         self.target = lhs
         self.conds = conds
         super().__init__(f"{lhs} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds), "move")
 
 class AddInstruction(ArithInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} + {op2}", dest, op1, op2)
 
 class SubInstruction(ArithInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} - {op2}", dest, op1, op2)
 
 class MulInstruction(ArithInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} * {op2}", dest, op1, op2)
 
 class EqInstruction(CompInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} == {op2}", dest, op1, op2)
 
 class NeqInstruction(CompInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} != {op2}", dest, op1, op2)
 
 class LtInstruction(CompInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} < {op2}", dest, op1, op2)
 
 class LeqInstruction(CompInstructionClass):
-    @Syntax(object, str, str, str)
+    @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
         super().__init__(f"{dest} = {op1} <= {op2}", dest, op1, op2)
 
 class GotoInstruction(BranchInstructionClass):
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def __init__(self, tgt):
         self.target = tgt
         super().__init__(f"goto {tgt}")
 
 class BranchInstruction(BranchInstructionClass):
     @(Syntax(object, str, str, str)
-      | Syntax(object, cond=str, iftrue=str, iffalse=str))
+      | Syntax(object, cond=str, iftrue=str, iffalse=str)
+      >> None)
     def __init__(self, cond, iftrue, iffalse):
         self.cond = cond
         self.iftrue = iftrue
@@ -102,24 +103,24 @@ class BranchInstruction(BranchInstructionClass):
         super().__init__(f"if ({cond}) goto {iftrue} else goto {iffalse}")
 
 class ExitInstruction(BranchInstructionClass):
-    @Syntax(object)
+    @(Syntax(object) >> None)
     def __init__(self):
         super().__init__("exit")
 
 class ReadInstruction(InstructionClass):
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
         super().__init__(f"read {lhs}", "I/O")
 
 class WriteInstruction(InstructionClass):
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
         super().__init__(f"write {lhs}", "I/O")
 
 class BrkInstruction(InstructionClass):
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def __init__(self, name):
         self.id = name
         super().__init__(f"{name} [breakpoint]", "debug")
@@ -136,7 +137,8 @@ class BranchTargets(BranchTargets):
     @(Syntax(object) # exit note; no children
       | Syntax(object, BasicBlock) # goto
       | Syntax(object, target=BasicBlock) # goto with kwarg
-      | Syntax(object, cond=str, iftrue=BasicBlock, iffalse=BasicBlock)) # branch
+      | Syntax(object, cond=str, iftrue=BasicBlock, iffalse=BasicBlock) # branch
+      >> None)
     def __init__(self, target=None, cond=None, iftrue=None, iffalse=None):
         self._target = target
         self._cond = cond
@@ -204,7 +206,7 @@ class BranchTargets(BranchTargets):
 
 class BasicBlock(BasicBlock):
 
-    @Syntax(object, str, InstructionClass, ...)
+    @(Syntax(object, str, InstructionClass, ...) >> None)
     def __init__(self, label:str, *instructions):
         """
         label: string @label indicating block's "name"
@@ -267,11 +269,11 @@ class BasicBlock(BasicBlock):
 
     ### Block modification ###
 
-    @Syntax(object, BasicBlock)
+    @(Syntax(object, BasicBlock) >> None)
     def add_parent(self, parent):
         self._parents.add(parent)
 
-    @Syntax(object, BasicBlock, ignore_keyerror=bool, propagate=bool)
+    @(Syntax(object, BasicBlock, ignore_keyerror=bool, propagate=bool) >> None)
     def remove_parent(self, parent, ignore_keyerror=False, propagate=True):
         if parent not in self._parents:
             if ignore_keyerror:
@@ -283,7 +285,8 @@ class BasicBlock(BasicBlock):
 
     @(Syntax(object, BasicBlock) # if no existing children
       | Syntax(object, BasicBlock, cond=str) # if new child is true target
-      | Syntax(object, BasicBlock, cond=str, new_child_if_cond=bool))
+      | Syntax(object, BasicBlock, cond=str, new_child_if_cond=bool)
+      >> None)
     def add_child(self, child, cond=None, new_child_if_cond=True):
         num_children = len(self.children)
         if num_children == 0:
@@ -309,7 +312,7 @@ class BasicBlock(BasicBlock):
         # num_children == 2
         raise BranchError(self.label, f"Cannot have three branch targets out of {self.name}")
     
-    @Syntax(object, BasicBlock, ignore_keyerror=bool, propagate=bool, keep_duplicate=bool)
+    @(Syntax(object, BasicBlock, ignore_keyerror=bool, propagate=bool, keep_duplicate=bool) >> None)
     def remove_child(self, child, ignore_keyerror=False, propagate=True, keep_duplicate=False):
         """
         Removes child as branch target for current block.
@@ -339,6 +342,7 @@ class BasicBlock(BasicBlock):
 
 class CFG:
 
+    @(Syntax(object) >> None)
     def __init__(self):
         self._blocks = dict() # str(label) : BasicBlock dictionary
         self._undef_blocks = dict()
@@ -384,7 +388,7 @@ class CFG:
         for label in self._undef_blocks:
             yield self._blocks[label]
 
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def _create_block(self, label):
         if not label.startswith('@'):
             raise ValueError(f"Invalid label {label}: labels must begin with '@'")
@@ -405,7 +409,7 @@ class CFG:
             # block does not exist, so buffer a new one as "undefined"
         return self[label]
 
-    @Syntax(object, str, InstructionClass, ...)
+    @(Syntax(object, str, InstructionClass, ...) >> None)
     def _populate_block(self, label, *instructions):
         block = self[label]
         for (i, I) in enumerate(instructions):
@@ -424,7 +428,7 @@ class CFG:
                     return
             self[label]._instructions.append(I)
 
-    @Syntax(object, str)
+    @(Syntax(object, str) >> None)
     def set_entrypoint(self, label):
         self._entrypoint = self._fetch_or_create_block(label)
 
@@ -433,13 +437,22 @@ class CFG:
     def entrypoint(self):
         return self._entrypoint
 
-    @Syntax(object, str, InstructionClass, ...)
+    @(Syntax(object, str, InstructionClass, ...) >> None)
     def add_block(self, label, *instructions):
+        """
+        Add the instructions for a single basic block to the CFG.
+        Intermediate instructions cannot be branches.
+        If final instruction is not a branch, then block is assumed to be
+        an exit node.
+        """
         self._create_block(label)
         self._populate_block(label, *instructions)
 
-    @Syntax(object, str, ignore_keyerror=bool)
+    @(Syntax(object, str, ignore_keyerror=bool) >> None)
     def remove_block(self, label, ignore_keyerror=False):
+        """
+        Remove block of given label from CFG
+        """
         if label not in self:
             if ignore_keyerror:
                 return
@@ -455,7 +468,7 @@ class CFG:
 
         del self._blocks[label]
 
-    @Syntax(object, fix_lost_parents=bool)
+    @(Syntax(object, fix_lost_parents=bool) >> None)
     def assert_completeness(self, fix_lost_parents=False):
         """
         Assert that all children know their parents and vice versa
