@@ -221,8 +221,7 @@ class BasicBlock(BasicBlock):
     def __repr__(self):
         return (f"{self.name}\n{'':->{len(self.name)}}\n"
                 + "parents: " + ", ".join(parent.label for parent in sorted(self._parents, key=lambda p: p.label))
-                + '\n' + '\n'.join(repr(I) for I in self)
-                + '\n' + repr(self.branch_instruction))
+                + '\n' + '\n'.join(repr(I) for I in self))
 
     def __len__(self):
         return len(self._instructions)
@@ -231,6 +230,7 @@ class BasicBlock(BasicBlock):
     def __iter__(self):
         for I in self._instructions:
             yield I
+        yield self.branch_instruction
 
     def __hash__(self):
         return hash(self.label)
@@ -352,7 +352,7 @@ class CFG:
         return ("Control Flow Graph:\nEntry point: "
                 + (self.entrypoint.label
                     if self.entrypoint is not None
-                    else "<not set>") + '\n'
+                    else "<not set>") + "\n\n"
                 + "\n\n".join(("(?)" if block.label in self._undef_blocks
                                 else "") + repr(block) for block in self))
 
@@ -473,8 +473,7 @@ class CFG:
         """
         Assert that all children know their parents and vice versa
         """
-        for label in self:
-            block = self[label]
+        for block in self:
             for child in block.children:
                 if block not in child.parents:
                     if fix_lost_parents:
