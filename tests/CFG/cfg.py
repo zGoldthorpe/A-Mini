@@ -3,7 +3,7 @@ import sys
 import ampy.types as amt
 from tests.tools import PythonExecutionTestSuite
 
-ts = PythonExecutionTestSuite("cfg")
+ts = PythonExecutionTestSuite("CFG/cfg")
 
 ts.exec("cfg = amt.CFG()",
         "cfg.add_block('@A')",

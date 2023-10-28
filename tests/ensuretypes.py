@@ -4,7 +4,7 @@ from ampy.ensuretypes import Syntax
 from ampy.printing import tame_whitespace as tw
 from tests.tools import PythonExecutionTestSuite
 
-ts = PythonExecutionTestSuite("ensure-types")
+ts = PythonExecutionTestSuite("ensuretypes")
 
 ts.exec(tw("""
         @Syntax(int)

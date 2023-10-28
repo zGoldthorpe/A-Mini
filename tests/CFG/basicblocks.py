@@ -3,7 +3,7 @@ import sys
 import ampy.types as amt
 from tests.tools import PythonExecutionTestSuite
 
-ts = PythonExecutionTestSuite("basic-blocks")
+ts = PythonExecutionTestSuite("CFG/basicblocks")
 
 ts.exec("A = BasicBlock('@A')",
         "B = BasicBlock('@B')",

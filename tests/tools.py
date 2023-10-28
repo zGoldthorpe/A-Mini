@@ -156,8 +156,9 @@ class PythonExecutionTestSuite(TestSuite):
             except Exception as e:
                 self._error(tame_whitespace(f"""
                 {type(e).__name__} occurred while processing line {i+1}:
-                    {line}
-                Exception: {e}"""))
+                    {{line}}
+                Exception: {{e}}"""
+                ).format(line=line, e=e))
                 return False, dict(
                         type="exec-error",
                         lines=lines,
