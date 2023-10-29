@@ -14,11 +14,11 @@
 
 @succeeded:
     write %a.1
-    write %b.1
+    write %b.2
     exit
 
 @inc_a:
-    %b.1 = phi [ %a.0, @0 ], [ %a.2, @continue ]
+    %b.1 = phi [ %a.0, @0 ], [ %a.1, @continue ]
     %a.1 = %b.1 + 1
     %a_squared = %a.1 * %a.1
     %failed = %N < %a_squared

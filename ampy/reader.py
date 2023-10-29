@@ -159,8 +159,8 @@ class CFGBuilder:
     """
     Factory for constructing control flow graphs
     """
-    @(Syntax(object, allow_anon_blocks=bool, entrypoint_label=str) >> None)
-    def __init__(self, allow_anon_blocks=True, entrypoint_label="@main"):
+    @(Syntax(object, allow_anon_blocks=bool, entrypoint_label=(str,None)) >> None)
+    def __init__(self, allow_anon_blocks=True, entrypoint_label=None):
         """
         The allow_anon_blocks flag toggles whether or not basic blocks are
         all required to be labelled
@@ -194,6 +194,9 @@ class CFGBuilder:
         # instruction after a branch is not labelled, then this is necessary
         # (alternatively, the language syntax could be more strict)
 
+        self._block_start = 0
+        # tracks the line of the block being built
+
         cfg = ampy.types.CFG()
         for (i, instruction) in enumerate(instructions):
             if ';' in instruction:
@@ -203,7 +206,8 @@ class CFGBuilder:
             if instruction.startswith('@') and ':' in instruction:
                 # new label; possible fallthrough
                 # (unless self._block_label is None or self._current_block is nonempty)
-                self._commit_block(i, cfg, fallthrough=True)
+                self._commit_block(cfg, fallthrough=True)
+                self._block_start = i
                 self._block_label, instruction = instruction.split(':', 1)
 
             instruction = instruction.strip() # strip whitespace
@@ -218,28 +222,35 @@ class CFGBuilder:
                 if decoded is not None:
                     break
             if decoded is None:
-                raise ParseError(i, f"Cannot parse instruction \"{instruction}\"")
+                raise ParseError(i, f"Unrecognised instruction \"{instruction}\"")
 
             self._current_block.append(decoded)
             
             if isinstance(decoded, ampy.types.BranchInstructionClass):
                 # branch means the end of a basic block
-                self._commit_block(i, cfg)
+                self._commit_block(cfg)
+                self._block_start = i + 1
 
         # all instructions have been parsed
         # but unless an exit instruction is explicitly called
         # there may still be a block to commit
-        self._commit_block(-1, cfg)
+        self._commit_block(cfg)
+
+        if self._entrypoint is None:
+            raise EmptyCFGError
 
         # finally, assert entrypoint
         cfg.set_entrypoint(self._entrypoint)
+        if self._entrypoint_label is not None and cfg.entrypoint.label != self._entrypoint_label:
+            raise NoEntryPointError(len(instructions), f"Entrypoint {self._entrypoint_label} does not exist in program")
+
 
         # Now, CFG should be completed
         cfg.assert_completeness()
         return cfg
 
-    @(Syntax(object, int, ampy.types.CFG, fallthrough=bool) >> None)
-    def _commit_block(self, line, cfg, fallthrough=False):
+    @(Syntax(object, ampy.types.CFG, fallthrough=bool) >> None)
+    def _commit_block(self, cfg, fallthrough=False):
         """
         Pushes the block built so far into the cfg, unless both the label
         is None and the current block is empty.
@@ -250,7 +261,7 @@ class CFGBuilder:
                 return
             # otherwise, this is an anonymous block
             if not self.allow_anon_blocks:
-                raise AnonymousBlockError(line)
+                raise AnonymousBlockError(self._block_start)
             self._block_label = f"@.__{self._anon}"
             self._anon += 1
 
@@ -282,14 +293,19 @@ class CFGBuilder:
 class ParseError(Exception):
 
     def __init__(self, line, message=""):
-        self.message = f"[Line {line}]"
-        if len(message) > 0:
-            self.message += f": {message}"
+        self.message = message
         self.line = line
         super().__init__(message)
 
+class NoEntryPointError(ParseError):
+    pass
+
 class AnonymousBlockError(ParseError):
     pass
+
+class EmptyCFGError(ParseError):
+    def __init__(self, message=""):
+        super().__init__(-1, message=message)
 
 ### Private helper methods ###
 

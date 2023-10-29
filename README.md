@@ -1,9 +1,9 @@
-# A-Mini
-Assembly-Minimal: a toy language for testing optimisation
+# A-Mi
+**A**ssembly-**Mi**nimal: a toy language for testing optimisation
 
 ## Language specs
 
-A/Mini uses virtual registers of the form `%[.\w]+`, which are all of `int` type.
+A-Mi uses "virtual registers" of the form `%[.\w]+`, which are all of `int` type.
 Decimal constants are also supported, but obviously cannot be assigned to.
 
 Program locations (for branches) require explicit labels of the form `@[.\w]+`.
@@ -43,4 +43,4 @@ There is a `phi` instruction, but code does not need to be in SSA form.
 
 `read` only accepts decimal integers, and `write` prints an integer in decimal in a single line to output.
 
-Every time a breakpoint is reached, the program stalls and spits out its current state.
+Every time a breakpoint is reached, the program stalls, and you can interface with its current state.

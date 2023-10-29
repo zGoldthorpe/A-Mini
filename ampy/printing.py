@@ -27,6 +27,8 @@ def psubtle(*args, **kwargs):
     Printing.formatted("\033[33m", "\033[m", *args, **kwargs)
 def pprompt(*args, **kwargs):
     Printing.formatted("\033[34m", "\033[m", *args, **kwargs)
+def pdebug(*args, **kwargs):
+    Printing.formatted("\033[35m", "\033[m", *args, **kwargs)
 
 
 def tame_whitespace(src:str, indent_second_line=False, tab_width=4):

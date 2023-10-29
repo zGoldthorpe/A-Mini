@@ -127,44 +127,23 @@ class Interpreter:
             raise LoadError("Cannot fetch instruction when program is not executing.")
         return self._block[self._block_i]
 
-    @(Syntax(object, ampy.types.CFG, entrypoint=(str, None)) >> None)
-    def load(self, cfg, entrypoint=None):
+    @(Syntax(object, ampy.types.CFG) >> None)
+    def load(self, cfg):
         """
         Load CFG for execution.
-
-        If no entrypoint is given, the program will start at
-        the CFG's assigned entrypoint (unless CFG does not have
-        an assigned entrypoint)
         """
         self._cfg = cfg
         self._rd = RegDict()
-
-        if entrypoint is None:
-            if self._cfg.entrypoint is None:
-                raise NoEntryPointError("Loading CFG with no set entrypoint.")
-            self._block = self._cfg.entrypoint
-        else:
-            if entrypoint not in self._cfg.labels:
-                raise NoEntryPointError(f"CFG has no entrypoint labelled {entrypoint}.")
-            self._block = self._cfg[entrypoint]
-
+        self._block = self._cfg.entrypoint
         self._block_i = 0
         self._prev_label = None
 
-    @(Syntax(object, entrypoint=(str,None)) >> None)
-    def reload(self, entrypoint=None):
+    @(Syntax(object) >> None)
+    def reload(self):
         if self._cfg is None:
             raise LoadError("Cannot reload without loading at least once first.")
 
-        self._rd = RegDict()
-        if entrypoint is None:
-            # can assume cfg has an entrypoint, as we have already loaded once
-            self._block = self._cfg.entrypoint
-        else:
-            if entrypoint not in self._cfg.labels:
-                raise NoEntryPointError(f"CFG has no entrypoint labelled {entrypoint}.")
-            self._block = self._cfg[entrypoint]
-
+        self._block = self._cfg.entrypoint
         self._block_i = 0
         self._prev_label = None
 
@@ -281,7 +260,7 @@ class Interpreter:
         Read value of register (or an integer constant)
         """
         if reg not in self._rd:
-            raise IndexError(f"{reg} does not define a register or integer")
+            raise KeyError(f"{reg} does not define a register or integer")
         return self._rd[reg]
 
     @(Syntax(object, str, int) >> None)
@@ -302,9 +281,6 @@ class LoadError(Exception):
     def __init__(self, message=""):
         self.message = message
         super().__init__(message)
-
-class NoEntryPointError(LoadError):
-    pass
 
 class InstructionException(Exception):
     """

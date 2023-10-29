@@ -63,7 +63,7 @@ class PhiInstruction(InstructionClass):
         self.conds = conds
 
     def __repr__(self):
-        return f"{self.target} = " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds)
+        return f"{self.target} = " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
 
 class AddInstruction(ArithInstructionClass):
     @(Syntax(object, str, str, str) >> None)
@@ -147,10 +147,10 @@ class WriteInstruction(InstructionClass):
 class BrkInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, name):
-        self.id = name
+        self.name = name
 
     def __repr__(self):
-        return f"brkpt !{self.id}"
+        return f"brkpt !{self.name}"
 
 ### Basic blocks ###
 

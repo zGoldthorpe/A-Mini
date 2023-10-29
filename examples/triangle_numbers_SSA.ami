@@ -22,7 +22,7 @@
     goto @loop
 
 @decrement:
-    %N.d = %N.l + 1
+    %N.d = %N.l - 1
     goto @loop
 
 @print:

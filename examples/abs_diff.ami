@@ -9,5 +9,5 @@
 @fix:
     %diff.1 = -1 * %diff.0                          ; if difference is negative, adjust by -1
 @print:
-    %diff = phi [ %diff.0, @0 ], [ %diff.1, @fix ]
+    %diff = phi [ %diff.0, @main ], [ %diff.1, @fix ]
     write %diff                                     ; print final answer
