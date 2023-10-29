@@ -18,7 +18,8 @@ class InstructionClass:
     """
     Parent instruction type
     """
-    pass
+    def __repr__(self):
+        raise NotImplementedError("Every instruction must override this method.")
 
 ### General instruction classes ###
 
@@ -63,7 +64,7 @@ class PhiInstruction(InstructionClass):
         self.conds = conds
 
     def __repr__(self):
-        return f"{self.target} = " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
+        return f"{self.target} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
 
 class AddInstruction(ArithInstructionClass):
     @(Syntax(object, str, str, str) >> None)
