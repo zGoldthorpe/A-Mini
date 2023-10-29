@@ -18,91 +18,95 @@ class InstructionClass:
     """
     Parent instruction type
     """
-    @(Syntax(object, str, str) >> None)
-    def __init__(self, rep, typ):
-        self.type = typ
-        self.repr = rep
-
-    def __repr__(self):
-        return f"<{self.type}> {self.repr}"
+    pass
 
 ### General instruction classes ###
 
 class ArithInstructionClass(InstructionClass):
     @(Syntax(object, str, str, str, str) >> None)
-    def __init__(self, rep, res, op1, op2):
-        super().__init__(rep, "arith")
+    def __init__(self, op, res, op1, op2):
         self.target = res
+        self.op = op
         self.operands = (op1, op2)
+
+    def __repr__(self):
+        return f"{self.target} = {self.operands[0]} {self.op} {self.operands[1]}"
 
 class CompInstructionClass(InstructionClass):
     @(Syntax(object, str, str, str, str) >> None)
-    def __init__(self, rep, res, op1, op2):
-        super().__init__(rep, "comp")
+    def __init__(self, cmp, res, op1, op2):
         self.target = res
+        self.cmp = cmp
         self.operands = (op1, op2)
 
+    def __repr__(self):
+        return f"{self.target} = {self.operands[0]} {self.cmp} {self.operands[1]}"
+
 class BranchInstructionClass(InstructionClass):
-    @(Syntax(object, str) >> None)
-    def __init__(self, rep):
-        super().__init__(rep, "branch")
+    pass
 
 ### Instruction types ###
 
 class MovInstruction(InstructionClass):
     @(Syntax(object, str, str) >> None)
     def __init__(self, lhs, rhs):
-        super().__init__(f"{lhs} = {rhs}", "move")
         self.target = lhs
         self.operand = rhs
+
+    def __repr__(self):
+        return f"{self.target} = {self.operand}"
 
 class PhiInstruction(InstructionClass):
     @(Syntax(object, str, [str, 2], ...) >> None)
     def __init__(self, lhs, *conds):
         self.target = lhs
         self.conds = conds
-        super().__init__(f"{lhs} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds), "move")
+
+    def __repr__(self):
+        return f"{self.target} = " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in conds)
 
 class AddInstruction(ArithInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} + {op2}", dest, op1, op2)
+        super().__init__('+', dest, op1, op2)
 
 class SubInstruction(ArithInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} - {op2}", dest, op1, op2)
+        super().__init__('-', dest, op1, op2)
 
 class MulInstruction(ArithInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} * {op2}", dest, op1, op2)
+        super().__init__('*', dest, op1, op2)
 
 class EqInstruction(CompInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} == {op2}", dest, op1, op2)
+        super().__init__("==", dest, op1, op2)
 
 class NeqInstruction(CompInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} != {op2}", dest, op1, op2)
+        super().__init__("!=", dest, op1, op2)
 
 class LtInstruction(CompInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} < {op2}", dest, op1, op2)
+        super().__init__("<", dest, op1, op2)
 
 class LeqInstruction(CompInstructionClass):
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(f"{dest} = {op1} <= {op2}", dest, op1, op2)
+        super().__init__("<=", dest, op1, op2)
 
 class GotoInstruction(BranchInstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, tgt):
         self.target = tgt
-        super().__init__(f"goto {tgt}")
+
+    def __repr__(self):
+        return f"goto {self.target}"
 
 class BranchInstruction(BranchInstructionClass):
     @(Syntax(object, str, str, str)
@@ -112,30 +116,41 @@ class BranchInstruction(BranchInstructionClass):
         self.cond = cond
         self.iftrue = iftrue
         self.iffalse = iffalse
-        super().__init__(f"if ({cond}) goto {iftrue} else goto {iffalse}")
+
+    def __repr__(self):
+        return f"branch {self.cond} ? {self.iftrue} : {self.iffalse}"
 
 class ExitInstruction(BranchInstructionClass):
     @(Syntax(object) >> None)
     def __init__(self):
-        super().__init__("exit")
+        pass
+
+    def __repr__(self):
+        return "exit"
 
 class ReadInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
-        super().__init__(f"read {lhs}", "I/O")
+
+    def __repr__(self):
+        return f"read {self.target}"
 
 class WriteInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
-        super().__init__(f"write {lhs}", "I/O")
+
+    def __repr__(self):
+        return f"write {self.target}"
 
 class BrkInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, name):
         self.id = name
-        super().__init__(f"{name} [breakpoint]", "debug")
+
+    def __repr__(self):
+        return f"brkpt !{self.id}"
 
 ### Basic blocks ###
 

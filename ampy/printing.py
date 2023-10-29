@@ -19,14 +19,14 @@ class Printing:
 
 ### special cases ###
 
+def perror(*args, **kwargs):
+    Printing.formatted("\033[31m", "\033[m", *args, **kwargs)
+def psuccess(*args, **kwargs):
+    Printing.formatted("\033[32m", "\033[m", *args, **kwargs)
 def psubtle(*args, **kwargs):
     Printing.formatted("\033[33m", "\033[m", *args, **kwargs)
 def pprompt(*args, **kwargs):
     Printing.formatted("\033[34m", "\033[m", *args, **kwargs)
-def psuccess(*args, **kwargs):
-    Printing.formatted("\033[32m", "\033[m", *args, **kwargs)
-def perror(*args, **kwargs):
-    Printing.formatted("\033[31m", "\033[m", *args, **kwargs)
 
 
 def tame_whitespace(src:str, indent_second_line=False, tab_width=4):
