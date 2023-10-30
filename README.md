@@ -53,7 +53,9 @@ Metadata is provided to instructions, blocks, or the entire program via comments
 - `;@!arg: ...` pass `arg` to current basic block (with value `...`)
 - `;%!arg: ...` pass `arg` to current instruction (with value `...`)
 
-The value `...` is treated as a space-separated list of strings
+The value `...` is treated as a space-separated list of strings.
+
+The metavariable argument `arg` can be any pattern matching `[a-zA-Z0-9\-_.,;|]+`.
 
 Instruction metadata can be passed from subsequent lines, so long as they are not preceded by
 - another instruction

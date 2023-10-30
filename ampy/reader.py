@@ -61,6 +61,8 @@ _var = rf"({_reg})"
 _op  = rf"({_ron})"
 _lbl = rf"({_tgt})"
 
+_meta = r"([a-zA-Z0-9\-_.,;/|]+)"
+
 ### Parsing information ###
 
 # Phi parsing
@@ -223,9 +225,9 @@ class CFGBuilder:
             instruction = instruction.strip() # strip whitespace
 
             # process comment for metadata
-            prog_arg = re.fullmatch(r"#!(\w+):(.*)", comment)
-            block_arg = re.fullmatch(r"@!(\w+):(.*)", comment)
-            instr_arg = re.fullmatch(r"%!(\w+):(.*)", comment)
+            prog_arg = re.fullmatch(rf"#!{_meta}:(.*)", comment)
+            block_arg = re.fullmatch(rf"@!{_meta}:(.*)", comment)
+            instr_arg = re.fullmatch(rf"%!{_meta}:(.*)", comment)
             if prog_arg is not None:
                 cfg.meta.setdefault(prog_arg.group(1), []
                         ).extend(prog_arg.group(2).split())
