@@ -44,3 +44,19 @@ There is a `phi` instruction, but code does not need to be in SSA form.
 `read` only accepts decimal integers, and `write` prints an integer in decimal in a single line to output.
 
 Every time a breakpoint is reached, the program stalls, and you can interface with its current state.
+
+### Metadata
+
+Metadata is provided to instructions, blocks, or the entire program via comments with a specified prefix:
+
+- `;#!arg: ...` pass `arg` to entire program (with value `...`)
+- `;@!arg: ...` pass `arg` to current basic block (with value `...`)
+- `;%!arg: ...` pass `arg` to current instruction (with value `...`)
+
+The value `...` is treated as a space-separated list of strings
+
+Instruction metadata can be passed from subsequent lines, so long as they are not preceded by
+- another instruction
+- a new label (and thus the start of a new basic block)
+In the former case, the metadata will be assigned to the most recent instruction.
+In the latter case, the metadata will not be assigned anywhere

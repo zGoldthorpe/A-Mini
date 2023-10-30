@@ -177,8 +177,12 @@ class CFGBuilder:
         Assumes first basic block in code is the entrypoint, unless it
         finds a block with label given by self._entrypoint_label
         """
+        self._meta = {}
+        # tracks metadata for CFG
         self._current_block = []
         # list of instructions in current basic block
+        self._block_meta = {}
+        # tracks metadata of current block being built
         self._block_label = None
         # label string of current block
         self._entrypoint = None
@@ -197,39 +201,61 @@ class CFGBuilder:
         self._block_start = 0
         # tracks the line of the block being built
 
+        self._last_instruction = None
+        # tracks the previous decoded instruction, in case we can append metadata
+
         cfg = ampy.types.CFG()
         for (i, instruction) in enumerate(instructions):
             if ';' in instruction:
                 # ignore comment
-                instruction, _ = instruction.split(';', 1)
+                instruction, comment = instruction.split(';', 1)
+            else:
+                comment = ""
             
             if instruction.startswith('@') and ':' in instruction:
                 # new label; possible fallthrough
                 # (unless self._block_label is None or self._current_block is nonempty)
                 self._commit_block(cfg, fallthrough=True)
                 self._block_start = i
+                self._last_instruction = None
                 self._block_label, instruction = instruction.split(':', 1)
 
             instruction = instruction.strip() # strip whitespace
-            if len(instruction) == 0:
-                # empty instruction
-                continue
-            
-            decoded = None
-            for op in _opcodes:
-                # try decoding with each opcode
-                decoded = _opcodes[op].read(instruction)
-                if decoded is not None:
-                    break
-            if decoded is None:
-                raise ParseError(i, f"Unrecognised instruction \"{instruction}\"")
 
-            self._current_block.append(decoded)
+            # process comment for metadata
+            prog_arg = re.fullmatch(r"#!(\w+):(.*)", comment)
+            block_arg = re.fullmatch(r"@!(\w+):(.*)", comment)
+            instr_arg = re.fullmatch(r"%!(\w+):(.*)", comment)
+            if prog_arg is not None:
+                cfg.meta.setdefault(prog_arg.group(1), []
+                        ).extend(prog_arg.group(2).split())
+            elif block_arg is not None:
+                self._block_meta.setdefault(block_arg.group(1), []
+                        ).extend(block_arg.group(2).split())
+
+
+            if len(instruction) != 0:
+                decoded = None
+                for op in _opcodes:
+                    # try decoding with each opcode
+                    decoded = _opcodes[op].read(instruction)
+                    if decoded is not None:
+                        break
+                if decoded is None:
+                    raise ParseError(i, f"Unrecognised instruction \"{instruction}\"")
+
+                self._current_block.append(decoded)
+                self._last_instruction = decoded
             
-            if isinstance(decoded, ampy.types.BranchInstructionClass):
-                # branch means the end of a basic block
-                self._commit_block(cfg)
-                self._block_start = i + 1
+                if isinstance(decoded, ampy.types.BranchInstructionClass):
+                    # branch means the end of a basic block
+                    self._commit_block(cfg)
+                    self._block_start = i + 1
+
+
+            if instr_arg is not None and self._last_instruction is not None:
+                self._last_instruction.meta.setdefault(
+                        instr_arg.group(1), []).extend(instr_arg.group(2).split())
 
         # all instructions have been parsed
         # but unless an exit instruction is explicitly called
@@ -275,6 +301,10 @@ class CFGBuilder:
         
         cfg.add_block(self._block_label, *self._current_block)
         block = cfg[self._block_label]
+
+        # add and reset metadata
+        block.meta = self._block_meta
+        self._block_meta = {}
 
         # handle fallthroughs
         if self._fallthrough_parent is not None:

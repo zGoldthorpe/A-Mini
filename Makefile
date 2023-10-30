@@ -6,7 +6,8 @@ CFG=$(patsubst %,CFG/%,\
 	cfg.py)
 
 PARSING=$(patsubst %,parsing/%,\
-		reader.py)
+		reader.py \
+		meta.py)
 
 EXEC=$(patsubst %,execution/%,\
 	 	arith.py \

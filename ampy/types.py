@@ -18,6 +18,24 @@ class InstructionClass:
     """
     Parent instruction type
     """
+    @(Syntax(object) >> None)
+    def __init__(self):
+        self.meta = dict()
+
+    def __getitem__(self, key):
+        """
+        Fetch metadata
+        """
+        if key not in self._meta:
+            return None
+        return self._meta[key]
+    
+    def __setitem__(self, key, value):
+        """
+        Add metadata
+        """
+        self._meta[key] = value
+
     def __repr__(self):
         raise NotImplementedError("Every instruction must override this method.")
 
@@ -29,6 +47,7 @@ class ArithInstructionClass(InstructionClass):
         self.target = res
         self.op = op
         self.operands = (op1, op2)
+        super().__init__()
 
     def __repr__(self):
         return f"{self.target} = {self.operands[0]} {self.op} {self.operands[1]}"
@@ -39,12 +58,16 @@ class CompInstructionClass(InstructionClass):
         self.target = res
         self.cmp = cmp
         self.operands = (op1, op2)
+        super().__init__()
 
     def __repr__(self):
         return f"{self.target} = {self.operands[0]} {self.cmp} {self.operands[1]}"
 
 class BranchInstructionClass(InstructionClass):
-    pass
+    
+    @(Syntax(object) >> None)
+    def __init__(self):
+        super().__init__()
 
 ### Instruction types ###
 
@@ -53,6 +76,7 @@ class MovInstruction(InstructionClass):
     def __init__(self, lhs, rhs):
         self.target = lhs
         self.operand = rhs
+        super().__init__()
 
     def __repr__(self):
         return f"{self.target} = {self.operand}"
@@ -62,6 +86,7 @@ class PhiInstruction(InstructionClass):
     def __init__(self, lhs, *conds):
         self.target = lhs
         self.conds = conds
+        super().__init__()
 
     def __repr__(self):
         return f"{self.target} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
@@ -105,6 +130,7 @@ class GotoInstruction(BranchInstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, tgt):
         self.target = tgt
+        super().__init__()
 
     def __repr__(self):
         return f"goto {self.target}"
@@ -117,6 +143,7 @@ class BranchInstruction(BranchInstructionClass):
         self.cond = cond
         self.iftrue = iftrue
         self.iffalse = iffalse
+        super().__init__()
 
     def __repr__(self):
         return f"branch {self.cond} ? {self.iftrue} : {self.iffalse}"
@@ -124,7 +151,7 @@ class BranchInstruction(BranchInstructionClass):
 class ExitInstruction(BranchInstructionClass):
     @(Syntax(object) >> None)
     def __init__(self):
-        pass
+        super().__init__()
 
     def __repr__(self):
         return "exit"
@@ -133,6 +160,7 @@ class ReadInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
+        super().__init__()
 
     def __repr__(self):
         return f"read {self.target}"
@@ -141,6 +169,7 @@ class WriteInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, lhs):
         self.target = lhs
+        super().__init__()
 
     def __repr__(self):
         return f"write {self.target}"
@@ -149,6 +178,7 @@ class BrkInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, name):
         self.name = name
+        super().__init__()
 
     def __repr__(self):
         return f"brkpt !{self.name}"
@@ -172,6 +202,7 @@ class BranchTargets(BranchTargets):
         self._cond = cond
         self._iftrue = iftrue
         self._iffalse = iffalse
+        self.meta = dict() # metadata for the corresponding branch instruction
 
     @(Syntax(object, BranchTargets) >> bool)
     def __eq__(self, other):
@@ -227,10 +258,13 @@ class BranchTargets(BranchTargets):
     @(Syntax(object) >> InstructionClass)
     def instruction(self):
         if self._cond is not None:
-            return BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
-        if self._target is not None:
-            return GotoInstruction(self._target.label)
-        return ExitInstruction()
+            I = BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
+        elif self._target is not None:
+            I = GotoInstruction(self._target.label)
+        else:
+            I = ExitInstruction()
+        I.meta = self.meta # copy reference for meta modifications
+        return I
 
 class BasicBlock(BasicBlock):
 
@@ -243,8 +277,13 @@ class BasicBlock(BasicBlock):
         """
         self._label = label
         self._instructions = list(instructions)
-        self._branch_targets = BranchTargets()
+        self.__branch_targets = BranchTargets()
         self._parents = set()
+        self.meta = dict()
+        self.__branch_meta = dict()
+        # every instruction has its own metadata, but branch instructions at the
+        # end of a basic block are treated differently, so the metadata needs to be
+        # carried by the basic block itself
 
     def __repr__(self):
         return (f"{self.name}\n{'':->{len(self.name)}}\n"
@@ -294,12 +333,34 @@ class BasicBlock(BasicBlock):
     @property
     @(Syntax(object) >> BranchTargets)
     def children(self):
-        return self._branch_targets
+        return self.__branch_targets
 
     @property
     @(Syntax(object) >> [set, BasicBlock])
     def parents(self):
         return set(self._parents)
+
+    @property
+    @(Syntax(object) >> dict)
+    def _branch_meta(self):
+        return self.__branch_meta
+
+    @_branch_meta.setter
+    @(Syntax(object, dict) >> None)
+    def _branch_meta(self, dc):
+        self.__branch_meta = dc
+        self.__branch_targets.meta = self.__branch_meta
+
+    @property
+    @(Syntax(object) >> BranchTargets)
+    def _branch_targets(self):
+        return self.__branch_targets
+
+    @_branch_targets.setter
+    @(Syntax(object, BranchTargets) >> None)
+    def _branch_targets(self, targets):
+        self.__branch_targets = targets
+        self.__branch_targets.meta = self._branch_meta
 
     @property
     @(Syntax(object) >> InstructionClass)
@@ -346,6 +407,7 @@ class BasicBlock(BasicBlock):
                 self._branch_targets = BranchTargets(cond=cond,
                         iftrue=first,
                         iffalse=child)
+
             child.add_parent(self)
             return
         # num_children == 2
@@ -386,6 +448,7 @@ class CFG:
         self._blocks = dict() # str(label) : BasicBlock dictionary
         self._undef_blocks = dict()
         self._entrypoint = None
+        self.meta = dict()
 
     def __repr__(self):
         return ("Control Flow Graph:\nEntry point: "
@@ -455,6 +518,11 @@ class CFG:
             if isinstance(I, BranchInstructionClass):
                 if i + 1 < len(instructions):
                     raise BranchInBlockException(f"Intermediate instruction {i+1} of block {label} is a branch ({repr(I)})")
+
+                # since branch instructions are treated differently from other instructions,
+                # its metadata must be handled by the basic block
+                block._branch_meta = I.meta
+
                 if isinstance(I, ExitInstruction):
                     return
                 if isinstance(I, GotoInstruction):
