@@ -14,8 +14,9 @@ class CFGWriter:
     """
     Class for formatting the output of a given CFG
     """
-    @(Syntax(object, tabwidth=(int,None), codewidth=(int,None)) >> None)
-    def __init__(self, tabwidth=None, codewidth=None):
+    @(Syntax(object, tabwidth=(int,None), codewidth=(int,None),
+        block_key=lambda:Syntax(ampy.types.BasicBlock)>>object) >> None)
+    def __init__(self, tabwidth=None, codewidth=None, block_key=lambda B:0):
         """
         tabwidth
             number of spaces before an instruction
@@ -26,6 +27,13 @@ class CFGWriter:
             comments are placed after given tabwidth + codewidth characters
             NB: set to None to be automatically-determined
             (default: None)
+        block_key
+            mapping from ampy.types.BasicBlock instances to comparables for
+            the purpose of sorting
+            (default: no sorting)
+            NB: CFG does not remember order in which blocks were written
+            in source code, so the order by default is completely determined
+            by how the blocks are stored into an unordered set.
         """
         self._default_tabwidth = tabwidth
         self._tabwidth = tabwidth
@@ -34,6 +42,8 @@ class CFGWriter:
         self._default_codewidth = codewidth
         self._codewidth = codewidth
         self._autocode = codewidth is None
+
+        self._block_key = block_key
 
         self._cfg = None
 
@@ -94,7 +104,15 @@ class CFGWriter:
         """
         Generates plaintext form of instruction to output list
         """
-        yield ' '*self.tabwidth + repr(instruction)
+        tab = ' '*self.tabwidth
+        instr = f"{repr(instruction): <{self.codewidth}}"
+        line = tab + instr
+        if len(instruction.meta) == 0:
+            yield line
+        else:
+            for var, val in sorted(instruction.meta.items(), key=lambda t:t[0]):
+                yield line + f";%!{var}: " + ' '.join(val)
+                line = ' '*self.width
 
     @(Syntax(object, ampy.types.BasicBlock) >> {str})
     def _block_str(self, block):
@@ -103,10 +121,13 @@ class CFGWriter:
         (starting with a blank line)
         """
         yield ""
-
-        # block header
-        yield (f"{block.label+':': <{self.width}}; parents: "
-                + ", ".join(parent.label for parent in block.parents))
+        line = f"{block.label+':': <{self.width}}"
+        if len(block.meta) == 0:
+            yield line
+        else:
+            for var, val in sorted(block.meta.items(), key=lambda t:t[0]):
+                yield line + f";@!{var}: " + ' '.join(val)
+                line = ' '*self.width
 
         for I in block:
             for I_str in self._instruction_str(I):
@@ -119,8 +140,9 @@ class CFGWriter:
         """
         self._load(cfg)
 
-        yield f"; entrypoint: {cfg.entrypoint.label}"
+        for var, val in sorted(cfg.meta.items(), key=lambda t:t[0]):
+            yield f";#!{var}: " + ' '.join(val)
 
-        for block in cfg:
+        for block in sorted(cfg, key=self._block_key):
             for block_str in self._block_str(block):
                 yield block_str
