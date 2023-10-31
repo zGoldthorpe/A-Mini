@@ -1,6 +1,7 @@
 ; Takes an input N and determines if N = a^2 + b^2 for some a, b
-; If so, will print a and b (a >= b)
+; If so, will print a and b with smallest possible a
 ; Otherwise, will print -1
+; Runtime: O(N)
 
     read %N
     %a = -1
