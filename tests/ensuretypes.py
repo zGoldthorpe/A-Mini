@@ -140,6 +140,15 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @Syntax(r"h[ae]y[!?]?").returns("hi")
+        def foo(s): return 'hi'"""),
+        "assert foo('hey') == 'hi'",
+        "assert foo('hay?') == 'hi'",
+        "assert foo('hey!') == 'hi'",
+        ("foo('haey')", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @Syntax(slice([int], int, None)).returns(slice(int, [int], int))
         def foo(sl):
             return slice(sl.stop, list(reversed(sl.start)), len(sl.start))"""),

@@ -9,6 +9,7 @@ consisting of 10 integers, then the entries will be asserted to be integers as
 they are used by the callee function).
 """
 import functools
+import re
 from types import (
         EllipsisType,
         FunctionType,
@@ -61,6 +62,9 @@ class Syntax(Syntax):
 
     lambda : Syntax(*args, **kwargs) >> type
         Type must be a function with specified syntax
+
+    "regex"
+        Type must be a string which fully matches RegEx pattern provided
 
     Assertion(func)
         Type must evaluate to True under "func"
@@ -127,6 +131,13 @@ class Syntax(Syntax):
                 # (hint, type) pair
                 Syntax._verify_input(t[1])
             return True
+
+        if isinstance(ty, str):
+            try:
+                re.compile(ty)
+                return True
+            except SyntaxError as e:
+                raise SyntaxError(f"\"{ty}\" is not a valid regular expression\n{e}")
 
         if isinstance(ty, slice):
             return Syntax._verify_input(ty.start) and Syntax._verify_input(ty.stop) and Syntax._verify_input(ty.step)
@@ -250,6 +261,9 @@ class Syntax(Syntax):
                     for t in ty)
             return f"( {union}, )"
 
+        if isinstance(ty, str):
+            return f"r\"{ty}\""
+
         if isinstance(ty, slice):
             start = Syntax._type_name(ty.start)
             stop = Syntax._type_name(ty.stop)
@@ -355,7 +369,6 @@ class Syntax(Syntax):
                 return arg
             raise TypeError(errmsg + f"\nExpected {ty.__name__}, but received {type(arg).__name__}.")
 
-
         if isinstance(ty, tuple):
             for t in ty:
                 if t is None:
@@ -370,6 +383,13 @@ class Syntax(Syntax):
                         # primitive match, so assert elaborate type "cons"
                         return Syntax._check_wrap(arg, cons, errmsg=errmsg)
             raise TypeError(errmsg + f"\nFailed to match any of {Syntax._type_name(ty)}")
+
+        if isinstance(ty, str):
+            if isinstance(arg, str):
+                if re.fullmatch(ty, arg) is not None:
+                    return arg
+                raise TypeError(errmsg + f"\n\"{arg}\" does not match regular expression {Syntax._type_name(ty)}")
+            raise TypeError(f"Regular expression expects a string; received {type(arg).__name__}")
 
         if isinstance(ty, slice):
             if isinstance(arg, slice):
