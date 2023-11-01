@@ -25,7 +25,7 @@ argparser.add_argument("fname",
             metavar="<prog.ami>",
             nargs="?",
             help="""File containing plaintext A-Mi instructions.
-                    If omitted, code will be read from user.""")
+                    If omitted, code will be read through STDIN.""")
 argparser.add_argument("-e", "--entrypoint",
             dest="entrypoint",
             action="store",
@@ -61,7 +61,7 @@ argparser.add_argument("--interrupt",
 
 args = argparser.parse_args()
 
-amp.Printing.can_format = args.format
+amp.Printing.can_format &= args.format
 
 if args.entrypoint is not None and not args.entrypoint.startswith('@'):
     args.entrypoint = f"@{args.entrypoint}"
