@@ -540,7 +540,7 @@ class CFG:
         self._entrypoint = self._fetch_or_create_block(label)
 
     @property
-    @(Syntax(object) >> BasicBlock)
+    @(Syntax(object) >> (BasicBlock, None))
     def entrypoint(self):
         return self._entrypoint
 

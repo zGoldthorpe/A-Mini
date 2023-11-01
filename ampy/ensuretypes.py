@@ -483,7 +483,7 @@ class Syntax(Syntax):
 
         return wrapped_args, wrapped_kwargs
 
-    def check_iter(self, func_name, syntax_list, *args, **kwargs):
+    def check_iter(self, func_name, viz, *args, **kwargs):
         """
         If Syntax is part of a union, recursively check all instances
         in the union and find the first match (in reverse order of
@@ -492,19 +492,18 @@ class Syntax(Syntax):
         Returns args and kwargs modified according to the first ancestor
         to (lazily) accept the arguments.
         """
-        syntax_list.append(repr(self))
         try:
-            args, kwargs = self.check(func_name, *args, **kwargs)
-            args = tuple(args) # force type check
+            # use new names in case the exception happens after self.check
+            new_args, new_kwargs = self.check(func_name, *args, **kwargs)
+            new_args = tuple(new_args) # force type check
+            return new_args, new_kwargs
         except Exception as e:
             if self._parent is None:
                 raise TypeError(f"""{func_name} received unrecognised argument pattern
 \t{repr(Syntax.extract_syntax(*args, **kwargs))}
 Valid syntaxes are:
-\t{(chr(10)+chr(9)).join(syntax for syntax in reversed(syntax_list))}""")
-
-            args, kwargs = self._parent.check_iter(func_name, syntax_list, *args, **kwargs)
-        return args, kwargs
+\t{viz.replace(chr(10), chr(10)+chr(9))}""")
+            return self._parent.check_iter(func_name, viz, *args, **kwargs)
 
     def __repr__(self):
         if self._parent is not None:
@@ -541,7 +540,7 @@ Valid syntaxes are:
             if self._parent is None:
                 args, kwargs = self.check(func.__name__, *args, **kwargs)
             else:
-                args, kwargs = self.check_iter(func.__name__, [], *args, **kwargs)
+                args, kwargs = self.check_iter(func.__name__, repr(self), *args, **kwargs)
             retval = func(*args, **kwargs)
             return Syntax._check_wrap(
                     arg=retval,
