@@ -22,6 +22,12 @@ from analysis import AnalysisManager as AM
 argparser = argparse.ArgumentParser(
                 description="Proof-of-concept optimiser for A-Mi")
 
+
+argparser.add_argument("--plain",
+            dest="format",
+            action="store_false",
+            help="Print output in plaintext (without ANSI colouring)")
+
 # handling source code
 argparser.add_argument("fname",
             metavar="<prog.ami>",
@@ -53,11 +59,24 @@ argparser.add_argument("-p", "--add-pass",
             dest="passes",
             action="append",
             help="Append a pass to run (order-sensitive).")
+argparser.add_argument("-l", "--list-passes",
+            dest="ls",
+            action="store_true",
+            help="List all available passes and exit.")
 
 args = argparser.parse_args()
 
+amp.Printing.can_format &= args.format
+
 ### get source code ###
 #TODO: make modular
+
+if args.ls:
+    amp.psubtle("Analysis passes:")
+    for opt in sorted(AM):
+        amp.pdebug(f"\t{opt}")
+    exit(0)
+
 
 if args.fname is not None:
     if not os.path.exists(args.fname):

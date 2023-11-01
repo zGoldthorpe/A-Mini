@@ -34,6 +34,10 @@ class _AnalysisManager:
 
         self._registered[alias] = cls
 
+    def __iter__(self):
+        for alias in self._registered:
+            yield alias
+
     def __contains__(self, alias):
         return alias in self._registered
 
@@ -44,3 +48,4 @@ class _AnalysisManager:
 
 AnalysisManager = _AnalysisManager()
 AnalysisManager.register("analysis.example.ExampleAnalysis", "example")
+AnalysisManager.register("analysis.domtree.DomTreeAnalysis", "domtree")
