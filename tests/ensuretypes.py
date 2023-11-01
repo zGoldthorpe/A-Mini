@@ -1,6 +1,6 @@
 import sys
 
-from ampy.ensuretypes import Syntax
+from ampy.ensuretypes import Syntax, Assertion
 from ampy.printing import tame_whitespace as tw
 from tests.tools import PythonExecutionTestSuite
 
@@ -140,6 +140,14 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @Syntax(slice([int], int, None)).returns(slice(int, [int], int))
+        def foo(sl):
+            return slice(sl.stop, list(reversed(sl.start)), len(sl.start))"""),
+        "assert foo(slice([1,2,3], 4)) == slice(4, [3,2,1], 3)",
+        ("foo(slice([], 1, 1))", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @Syntax(lambda:Syntax(int)>>int, int).returns(int)
         def foo(func, x): return func(x)"""),
         "assert foo(lambda x: x+1, 0) == 1",
@@ -162,6 +170,13 @@ ts.exec(tw("""
         ("f('10')", TypeError),
         ("g(10)", TypeError),
         state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
+        @Syntax(Assertion(lambda x: len(x) == 5)).returns(Assertion(lambda x: len(x) == 2 and x[0] <= x[1]))
+        def foo(ls): return (min(ls), max(ls))"""),
+        "assert foo([3, 2, 5, 4, 1]) == (1, 5)",
+        ("foo([1, 2, 3, 4])", TypeError),
+        state=dict(Syntax=Syntax,Assertion=Assertion))
 
 if __name__ == "__main__":
     ts.print_results()

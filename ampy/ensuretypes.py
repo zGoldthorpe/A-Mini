@@ -56,8 +56,14 @@ class Syntax(Syntax):
     {type}
         Type must be a generator of indicated type
 
+    slice(start, stop, step)
+        Type is a slice object whose start, stop, and step types are as specified
+
     lambda : Syntax(*args, **kwargs) >> type
         Type must be a function with specified syntax
+
+    Assertion(func)
+        Type must evaluate to True under "func"
 
     None
         Alias for NoneType
@@ -122,6 +128,9 @@ class Syntax(Syntax):
                 Syntax._verify_input(t[1])
             return True
 
+        if isinstance(ty, slice):
+            return Syntax._verify_input(ty.start) and Syntax._verify_input(ty.stop) and Syntax._verify_input(ty.step)
+
         if isinstance(ty, list):
             # iterable of fixed element type
             errmsg = "Iterable type must be of the form [container, type, count]"
@@ -185,6 +194,11 @@ class Syntax(Syntax):
                 raise SyntaxError(errmsg + " Lambda does not return Syntax object")
             return True
 
+        if isinstance(ty, Assertion):
+            if ty.message is None:
+                ty.message = "{arg} fails assertion"
+            return True
+
         # input type does not match any of the above syntax
         raise SyntaxError(f"Unrecognised type {repr(ty)}")
 
@@ -236,6 +250,12 @@ class Syntax(Syntax):
                     for t in ty)
             return f"( {union}, )"
 
+        if isinstance(ty, slice):
+            start = Syntax._type_name(ty.start)
+            stop = Syntax._type_name(ty.stop)
+            step = Syntax._type_name(ty.step)
+            return f"slice({start}, {stop}, {step})"
+
         if isinstance(ty, list):
             ty0 = ty[0].__name__
             ty1 = Syntax._type_name(ty[1])
@@ -254,6 +274,9 @@ class Syntax(Syntax):
         if isinstance(ty, FunctionType):
             syntax = ty()
             return f"lambda : {repr(syntax)}"
+
+        if isinstance(ty, Assertion):
+            return f"<assertion>"
 
     def extract_syntax(*args, **kwargs):
         """
@@ -325,10 +348,13 @@ class Syntax(Syntax):
         if ty is None:
             if arg is None:
                 return arg
+            raise TypeError(errmsg + f"\nExpected NoneType, but received {type(arg).__name__}.")
 
         if isinstance(ty, type):
             if isinstance(arg, ty):
                 return arg
+            raise TypeError(errmsg + f"\nExpected {ty.__name__}, but received {type(arg).__name__}.")
+
 
         if isinstance(ty, tuple):
             for t in ty:
@@ -343,6 +369,14 @@ class Syntax(Syntax):
                     if isinstance(arg, mty):
                         # primitive match, so assert elaborate type "cons"
                         return Syntax._check_wrap(arg, cons, errmsg=errmsg)
+            raise TypeError(errmsg + f"\nFailed to match any of {Syntax._type_name(ty)}")
+
+        if isinstance(ty, slice):
+            if isinstance(arg, slice):
+                return slice(Syntax._check_wrap(arg.start, ty.start, errmsg=errmsg),
+                        Syntax._check_wrap(arg.stop, ty.stop, errmsg=errmsg),
+                        Syntax._check_wrap(arg.step, ty.step, errmsg=errmsg))
+            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects a slice; received {type(arg).__name__}")
 
         if isinstance(ty, list):
             if hasattr(arg, "__iter__"):
@@ -358,22 +392,32 @@ class Syntax(Syntax):
                         return LazySyntaxTuple(arg, ty[1], errmsg=errmsg)
                     if ty[0] == str:
                         return LazySyntaxString(arg, ty[1], errmsg=errmsg)
+                raise TypeError(errmsg + f"\nIterable {arg} does not have appropriate length to match {Syntax._type_name(ty)}")
+            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects an iterable; received {type(arg).__name__}")
 
         if isinstance(ty, set):
             gty = list(ty)[0]
             if hasattr(arg, "__next__"):
                 return LazySyntaxIterator(arg, gty, errmsg=errmsg)
+            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects iterator; received {type(arg).__name__}")
                 
         if isinstance(ty, dict):
             kty = list(ty)[0]
             vty = ty[kty]
             if hasattr(arg, "__iter__") and hasattr(arg, "__getitem__"):
                 return LazySyntaxDict(arg, kty, vty, errmsg=errmsg)
+            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects dictionary; received {type(arg).__name__}")
 
         if isinstance(ty, FunctionType):
             syntax = ty()
             if isinstance(arg, FunctionType):
                 return syntax(arg)
+            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects function; received {type(arg).__name__}")
+
+        if isinstance(ty, Assertion):
+            if ty(arg):
+                return arg
+            # assertion throws a TypeError on failure
 
         # at this point, arg failed typecheck
         raise TypeError(errmsg)
@@ -488,6 +532,34 @@ Valid syntaxes are:
 
         return wrap
 
+class Assertion:
+
+    def __init__(self, assertion, message=None):
+        """
+        Assertion type
+        Takes a unary function and, when passed an argument, asserts that
+        this function returns True
+        Otherwise, throws an error.
+        The message can contain {arg}, which would be replaced by the argument passed
+        """
+        if not isinstance(assertion, FunctionType):
+            raise SyntaxError("Assertion requires assertion to be a function")
+        self._assertion = assertion
+        self.message = message
+
+    def __call__(self, arg):
+        try:
+            res = self._assertion(arg)
+        except TypeError:
+            raise SyntaxError("Assertion function must have arity 1")
+
+        if not res:
+            raise TypeError(self.message.format(arg=arg))
+
+        return True
+
+    def __repr__(self):
+        return "Assertion"
 
 class LazySyntaxList(list):
     """
