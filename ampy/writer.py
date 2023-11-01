@@ -14,10 +14,12 @@ class CFGWriter:
     """
     Class for formatting the output of a given CFG
     """
-    @(Syntax(object, tabwidth=(int,None), codewidth=(int,None),
+    @(Syntax(object, meta=bool, tabwidth=(int,None), codewidth=(int,None),
         block_key=lambda:Syntax(ampy.types.BasicBlock)>>object) >> None)
-    def __init__(self, tabwidth=None, codewidth=None, block_key=lambda B:0):
+    def __init__(self, meta=True, tabwidth=None, codewidth=None, block_key=lambda B:0):
         """
+        meta
+            toggle if metadata should be written in output
         tabwidth
             number of spaces before an instruction
             NB: set to None to be automatically-determined by CFG labels
@@ -35,6 +37,8 @@ class CFGWriter:
             in source code, so the order by default is completely determined
             by how the blocks are stored into an unordered set.
         """
+        self._meta = meta
+
         self._default_tabwidth = tabwidth
         self._tabwidth = tabwidth
         self._autotab = tabwidth is None
@@ -84,6 +88,11 @@ class CFGWriter:
         return self._codewidth
 
     @property
+    @(Syntax(object) >> bool)
+    def meta(self):
+        return self._meta
+
+    @property
     @(Syntax(object) >> int)
     def width(self):
         if self._cfg is None:
@@ -107,7 +116,7 @@ class CFGWriter:
         tab = ' '*self.tabwidth
         instr = f"{repr(instruction): <{self.codewidth}}"
         line = tab + instr
-        if len(instruction.meta) == 0:
+        if not self.meta or len(instruction.meta) == 0:
             yield line
         else:
             for var, val in sorted(instruction.meta.items(), key=lambda t:t[0]):
@@ -122,7 +131,7 @@ class CFGWriter:
         """
         yield ""
         line = f"{block.label+':': <{self.width}}"
-        if len(block.meta) == 0:
+        if not self.meta or len(block.meta) == 0:
             yield line
         else:
             for var, val in sorted(block.meta.items(), key=lambda t:t[0]):
@@ -140,8 +149,9 @@ class CFGWriter:
         """
         self._load(cfg)
 
-        for var, val in sorted(cfg.meta.items(), key=lambda t:t[0]):
-            yield f";#!{var}: " + ' '.join(val)
+        if self.meta:
+            for var, val in sorted(cfg.meta.items(), key=lambda t:t[0]):
+                yield f";#!{var}: " + ' '.join(val)
 
         for block in sorted(cfg, key=self._block_key):
             for block_str in self._block_str(block):

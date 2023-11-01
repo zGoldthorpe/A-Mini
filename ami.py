@@ -47,7 +47,7 @@ argparser.add_argument("-B", "--suppress-breakpoint",
             dest="brkpt",
             action="store_false",
             help="Ignore breakpoints in code")
-argparser.add_argument("-p", "--plain",
+argparser.add_argument("--plain",
             dest="format",
             action="store_false",
             help="Print output in plaintext (without ANSI colouring)")
