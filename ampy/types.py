@@ -10,7 +10,19 @@ where each basic block consists of several InstructionClass instances ending wit
 an instruction of the BranchInstructionClass subclass.
 """
 
-from ampy.ensuretypes import Syntax
+from ampy.ensuretypes import Syntax, TypedDict
+
+### Metadata ###
+
+class MetaDict(TypedDict):
+    """
+    Lazy type-checked metadata dictionary
+    """
+    @(Syntax(object, dc={str:((list,[str]),None)})
+      | Syntax(object, {str:((list,[str]),None)})
+      >> None)
+    def __init__(self, dc={}):
+        super().__init__(dc, str, ((list,[str]), None))
 
 ### Instructions ###
 
@@ -20,21 +32,7 @@ class InstructionClass:
     """
     @(Syntax(object) >> None)
     def __init__(self):
-        self.meta = dict()
-
-    def __getitem__(self, key):
-        """
-        Fetch metadata
-        """
-        if key not in self._meta:
-            return None
-        return self._meta[key]
-    
-    def __setitem__(self, key, value):
-        """
-        Add metadata
-        """
-        self._meta[key] = value
+        self.meta = MetaDict()
 
     def __repr__(self):
         raise NotImplementedError("Every instruction must override this method.")
@@ -202,7 +200,7 @@ class BranchTargets(BranchTargets):
         self._cond = cond
         self._iftrue = iftrue
         self._iffalse = iffalse
-        self.meta = dict() # metadata for the corresponding branch instruction
+        self.meta = MetaDict() # metadata for the corresponding branch instruction
 
     @(Syntax(object, BranchTargets) >> bool)
     def __eq__(self, other):
@@ -279,8 +277,8 @@ class BasicBlock(BasicBlock):
         self._instructions = list(instructions)
         self.__branch_targets = BranchTargets()
         self._parents = set()
-        self.meta = dict()
-        self.__branch_meta = dict()
+        self.meta = MetaDict()
+        self.__branch_meta = MetaDict()
         # every instruction has its own metadata, but branch instructions at the
         # end of a basic block are treated differently, so the metadata needs to be
         # carried by the basic block itself
@@ -341,12 +339,12 @@ class BasicBlock(BasicBlock):
         return set(self._parents)
 
     @property
-    @(Syntax(object) >> dict)
+    @(Syntax(object) >> MetaDict)
     def _branch_meta(self):
         return self.__branch_meta
 
     @_branch_meta.setter
-    @(Syntax(object, dict) >> None)
+    @(Syntax(object, MetaDict) >> None)
     def _branch_meta(self, dc):
         self.__branch_meta = dc
         self.__branch_targets.meta = self.__branch_meta
@@ -448,7 +446,7 @@ class CFG:
         self._blocks = dict() # str(label) : BasicBlock dictionary
         self._undef_blocks = dict()
         self._entrypoint = None
-        self.meta = dict()
+        self.meta = MetaDict()
 
     def __repr__(self):
         return ("Control Flow Graph:\nEntry point: "

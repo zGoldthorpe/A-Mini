@@ -14,12 +14,12 @@ class CFGWriter:
     """
     Class for formatting the output of a given CFG
     """
-    @(Syntax(object, meta=bool, tabwidth=(int,None), codewidth=(int,None),
+    @(Syntax(object, write_meta=bool, tabwidth=(int,None), codewidth=(int,None),
         block_key=lambda:Syntax(ampy.types.BasicBlock)>>object) >> None)
-    def __init__(self, meta=True, tabwidth=None, codewidth=None, block_key=lambda B:0):
+    def __init__(self, write_meta=True, tabwidth=None, codewidth=None, block_key=lambda B:0):
         """
-        meta
-            toggle if metadata should be written in output
+        write_meta
+            toggle if metadata should be written to output
         tabwidth
             number of spaces before an instruction
             NB: set to None to be automatically-determined by CFG labels
@@ -37,7 +37,7 @@ class CFGWriter:
             in source code, so the order by default is completely determined
             by how the blocks are stored into an unordered set.
         """
-        self._meta = meta
+        self._write_meta = write_meta
 
         self._default_tabwidth = tabwidth
         self._tabwidth = tabwidth
@@ -89,8 +89,8 @@ class CFGWriter:
 
     @property
     @(Syntax(object) >> bool)
-    def meta(self):
-        return self._meta
+    def write_meta(self):
+        return self._write_meta
 
     @property
     @(Syntax(object) >> int)
@@ -116,10 +116,12 @@ class CFGWriter:
         tab = ' '*self.tabwidth
         instr = f"{repr(instruction): <{self.codewidth}}"
         line = tab + instr
-        if not self.meta or len(instruction.meta) == 0:
+        if not self.write_meta or len(instruction.meta) == 0:
             yield line
         else:
             for var, val in sorted(instruction.meta.items(), key=lambda t:t[0]):
+                if val is None:
+                    continue
                 yield line + f";%!{var}: " + ' '.join(val)
                 line = ' '*self.width
 
@@ -131,10 +133,12 @@ class CFGWriter:
         """
         yield ""
         line = f"{block.label+':': <{self.width}}"
-        if not self.meta or len(block.meta) == 0:
+        if not self.write_meta or len(block.meta) == 0:
             yield line
         else:
             for var, val in sorted(block.meta.items(), key=lambda t:t[0]):
+                if val is None:
+                    continue
                 yield line + f";@!{var}: " + ' '.join(val)
                 line = ' '*self.width
 
@@ -149,8 +153,10 @@ class CFGWriter:
         """
         self._load(cfg)
 
-        if self.meta:
+        if self.write_meta:
             for var, val in sorted(cfg.meta.items(), key=lambda t:t[0]):
+                if val is None:
+                    continue
                 yield f";#!{var}: " + ' '.join(val)
 
         for block in sorted(cfg, key=self._block_key):
