@@ -74,7 +74,7 @@ amp.Printing.can_format &= args.format
 if args.ls:
     amp.psubtle("Analysis passes:")
     for opt in sorted(AM):
-        amp.pdebug(f"\t{opt}")
+        amp.pquery(f"\t{opt}")
     exit(0)
 
 

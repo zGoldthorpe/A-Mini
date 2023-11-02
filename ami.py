@@ -11,6 +11,7 @@ import os
 import re
 import sys
 
+import ampy.debug     as amd
 import ampy.interpret as ami
 import ampy.printing  as amp
 import ampy.reader    as amr
@@ -21,6 +22,14 @@ import ampy.types     as amt
 argparser = argparse.ArgumentParser(
                 description="Proof-of-concept interpreter for A-Mi")
 
+argparser.add_argument("--plain",
+            dest="format",
+            action="store_false",
+            help="Print output in plaintext (without ANSI colouring)")
+argparser.add_argument("-D", "--debug",
+            dest="debug",
+            action="store_true",
+            help="Enable debug messages")
 argparser.add_argument("fname",
             metavar="<prog.ami>",
             nargs="?",
@@ -47,10 +56,6 @@ argparser.add_argument("-B", "--suppress-breakpoint",
             dest="brkpt",
             action="store_false",
             help="Ignore breakpoints in code")
-argparser.add_argument("--plain",
-            dest="format",
-            action="store_false",
-            help="Print output in plaintext (without ANSI colouring)")
 argparser.add_argument("--interrupt",
             dest="step",
             choices=("never", "instructions", "blocks"),
@@ -61,6 +66,7 @@ argparser.add_argument("--interrupt",
 
 args = argparser.parse_args()
 
+amd.enabled = args.debug
 amp.Printing.can_format &= args.format
 
 if args.entrypoint is not None and not args.entrypoint.startswith('@'):
@@ -173,10 +179,10 @@ while interpreter.is_executing:
             brkpt = f"<{repr(I)}>"
 
     if args.brkpt and brkpt is not None:
-        amp.pdebug(f"Reached breakpoint {brkpt}")
+        amp.pprompt(f"Reached breakpoint {brkpt}")
 
         while True:
-            amp.pdebug("(ami-db) ", end='', flush=True)
+            amp.pprompt("(ami-db) ", end='', flush=True)
             try:
                 q = input().lower().strip()
             except:
@@ -185,9 +191,9 @@ while interpreter.is_executing:
                 break
 
             if q.startswith('h'):
-                amp.pdebug("Press <enter> to resume execution.")
-                amp.pdebug("Enter a space-separated list of register names or regex patterns to query register values.")
-                amp.pdebug("Enter \"exit\" to terminate execution and quit.")
+                amp.pquery("Press <enter> to resume execution.")
+                amp.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
+                amp.pquery("Enter \"exit\" to terminate execution and quit.")
             if q == "exit":
                 exit(0)
 
@@ -221,4 +227,4 @@ while interpreter.is_executing:
                     qhist[reg] = val
 
             for reg in sorted(queries):
-                amp.pprompt(f"{reg: >{maxllen}} = {response[reg]}")
+                amp.pquery(f"{reg: >{maxllen}} = {response[reg]}")

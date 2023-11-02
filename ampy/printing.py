@@ -23,12 +23,16 @@ def perror(*args, **kwargs):
     Printing.formatted("\033[31m", "\033[m", *args, **kwargs)
 def psuccess(*args, **kwargs):
     Printing.formatted("\033[32m", "\033[m", *args, **kwargs)
-def psubtle(*args, **kwargs):
+def pdebug(*args, **kwargs):
     Printing.formatted("\033[33m", "\033[m", *args, **kwargs)
 def pprompt(*args, **kwargs):
     Printing.formatted("\033[34m", "\033[m", *args, **kwargs)
-def pdebug(*args, **kwargs):
+def pquery(*args, **kwargs):
     Printing.formatted("\033[35m", "\033[m", *args, **kwargs)
+def psubtle(*args, **kwargs):
+    Printing.formatted("\033[36m", "\033[m", *args, **kwargs)
+def phidden(*args, **kwargs):
+    Printing.formatted("\033[37m", "\033[m", *args, **kwargs)
 
 
 def tame_whitespace(src:str, indent_second_line=False, tab_width=4):
