@@ -107,40 +107,46 @@ class Syntax(Syntax):
         comprehensible, making adjustments to the more elaborate
         types
 
-        Returns True or throws a SyntaxError
+        Returns the verified type (in case it needs to be modified)
+        or throws a SyntaxError
 
         Does not handle ellipses; handle these externally
         """
         if ty is None:
             # NoneType
-            return True
+            return ty
 
         if isinstance(ty, type):
             # primitive type
-            return True
+            return ty
 
         if isinstance(ty, tuple):
             # union
+            newty = []
             for t in ty:
                 if t is None:
+                    newty.append(t)
                     continue
                 if isinstance(t, type):
+                    newty.append(t)
                     continue # primitive type
                 if not isinstance(t, tuple) or len(t) != 2 or not isinstance(t[0], type):
                     raise SyntaxError("Union type must consist of primitive types or (primitive, cons) pairs")
                 # (hint, type) pair
-                Syntax._verify_input(t[1])
-            return True
+                newty.append((t[0], Syntax._verify_input(t[1])))
+            return tuple(newty)
 
         if isinstance(ty, str):
             try:
                 re.compile(ty)
-                return True
+                return ty
             except SyntaxError as e:
                 raise SyntaxError(f"\"{ty}\" is not a valid regular expression\n{e}")
 
         if isinstance(ty, slice):
-            return Syntax._verify_input(ty.start) and Syntax._verify_input(ty.stop) and Syntax._verify_input(ty.step)
+            return slice(Syntax._verify_input(ty.start),
+                         Syntax._verify_input(ty.stop),
+                         Syntax._verify_input(ty.step))
 
         if isinstance(ty, list):
             # iterable of fixed element type
@@ -178,21 +184,21 @@ class Syntax(Syntax):
                 raise SyntaxError(errmsg + " where the count is an integer, ellipses, or a [lo, hi] pair of such")
 
             # now, ty = [container, type, [lo, hi]]
-            return Syntax._verify_input(ty[1])
+            return [ty[0], Syntax._verify_input(ty[1]), ty[2]]
 
         if isinstance(ty, set):
             # iterator of fixed type
             if len(ty) != 1:
                 raise SyntaxError("Iterator type must be of the form {type}")
             gty = list(ty)[0]
-            return Syntax._verify_input(gty)
+            return {Syntax._verify_input(gty)}
 
         if isinstance(ty, dict):
             # dictionary of fixed key-value type pairing
             if len(ty) != 1:
                 raise SyntaxError("Dict type must be of the form {ktype : vtype}")
             kty = list(ty)[0]
-            return Syntax._verify_input(kty) and Syntax._verify_input(ty[kty])
+            return {Syntax._verify_input(kty) : Syntax._verify_input(ty[kty])}
 
         if isinstance(ty, FunctionType):
             # function must have zero arity
@@ -203,12 +209,12 @@ class Syntax(Syntax):
                 raise SyntaxError(errmsg + " Lambda has nonzero arity.")
             if not isinstance(syntax, Syntax):
                 raise SyntaxError(errmsg + " Lambda does not return Syntax object")
-            return True
+            return ty
 
         if isinstance(ty, Assertion):
             if ty.message is None:
                 ty.message = "{arg} fails assertion"
-            return True
+            return ty
 
         # input type does not match any of the above syntax
         raise SyntaxError(f"Unrecognised type {repr(ty)}")
@@ -227,14 +233,12 @@ class Syntax(Syntax):
                     raise SyntaxError("Syntax cannot have multiple instances of ellipses in positional argument")
                 self._ellipsis = i - 1
                 continue
-            if Syntax._verify_input(ty):
-                pretypes.append(ty)
+            pretypes.append(Syntax._verify_input(ty))
         self._types = tuple(pretypes)
         
         self._kwtypes = dict()
         for kw in kwtypes:
-            if Syntax._verify_input(kwtypes[kw]):
-                self._kwtypes[kw] = kwtypes[kw]
+            self._kwtypes[kw] = Syntax._verify_input(kwtypes[kw])
 
         # other flags / etc. set to default
         self._allow_undef_kwargs = True
@@ -321,8 +325,7 @@ class Syntax(Syntax):
         """
         Set return type of Syntax
         """
-        Syntax._verify_input(ty)
-        self._return_type = ty
+        self._return_type = Syntax._verify_input(ty)
         if self._parent is not None:
             self._parent.__rshift__(ty)
         return self
@@ -405,27 +408,46 @@ class Syntax(Syntax):
                 hi = len(arg) if hi is Ellipsis else hi
                 if lo <= len(arg) <= hi:
                     if ty[0] == list:
-                        return LazySyntaxList(arg, ty[1], errmsg=errmsg)
+                        if isinstance(arg, TypedList):
+                            arg._ty = ty[1]
+                            return arg
+                        return TypedList(arg, ty[1], errmsg=errmsg)
                     if ty[0] == set:
-                        return LazySyntaxSet(arg, ty[1], errmsg=errmsg)
+                        if isinstance(arg, TypedSet):
+                            arg._ty = ty[1]
+                            return arg
+                        return TypedSet(arg, ty[1], errmsg=errmsg)
                     if ty[0] == tuple:
-                        return LazySyntaxTuple(arg, ty[1], errmsg=errmsg)
+                        if isinstance(arg, TypedTuple):
+                            arg._ty = ty[1]
+                            return arg
+                        return TypedTuple(arg, ty[1], errmsg=errmsg)
                     if ty[0] == str:
-                        return LazySyntaxString(arg, ty[1], errmsg=errmsg)
+                        if isinstance(arg, TypedString):
+                            arg._ty = ty[1]
+                            return arg
+                        return TypedString(arg, ty[1], errmsg=errmsg)
                 raise TypeError(errmsg + f"\nIterable {arg} does not have appropriate length to match {Syntax._type_name(ty)}")
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects an iterable; received {type(arg).__name__}")
 
         if isinstance(ty, set):
             gty = list(ty)[0]
             if hasattr(arg, "__next__"):
-                return LazySyntaxIterator(arg, gty, errmsg=errmsg)
+                if isinstance(arg, TypedIterator):
+                    arg._ty = gty
+                    return arg
+                return TypedIterator(arg, gty, errmsg=errmsg)
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects iterator; received {type(arg).__name__}")
                 
         if isinstance(ty, dict):
             kty = list(ty)[0]
             vty = ty[kty]
             if hasattr(arg, "__iter__") and hasattr(arg, "__getitem__"):
-                return LazySyntaxDict(arg, kty, vty, errmsg=errmsg)
+                if isinstance(arg, TypedDict):
+                    arg._kty = kty
+                    arg._vty = vty
+                    return arg
+                return TypedDict(arg, kty, vty, errmsg=errmsg)
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects dictionary; received {type(arg).__name__}")
 
         if isinstance(ty, FunctionType):
@@ -580,7 +602,7 @@ class Assertion:
     def __repr__(self):
         return "Assertion"
 
-class LazySyntaxList(list):
+class TypedList(list):
     """
     Lazy type-checker for list-like iterable
 
@@ -589,7 +611,7 @@ class LazySyntaxList(list):
     (which is just designed to keep myself honest).
     """
     def __init__(self, ls, ty, errmsg=""):
-        self._ty = ty
+        self._ty = Syntax._verify_input(ty)
         self._errmsg = errmsg
         super().__init__(ls)
 
@@ -619,7 +641,7 @@ class LazySyntaxList(list):
                 ty=self._ty,
                 errmsg=self._errmsg + f" Assigning incorrect type to index {index}."))
 
-class LazySyntaxSet(set):
+class TypedSet(set):
     """
     Lazy type-checker for set-like iterable
     """
@@ -627,7 +649,7 @@ class LazySyntaxSet(set):
         return super().__new__(cls)
 
     def __init__(self, st, ty, errmsg=""):
-        self._ty = ty
+        self._ty = Syntax._verify_input(ty)
         self._errmsg = errmsg
         super().__init__(st)
 
@@ -652,7 +674,11 @@ class LazySyntaxSet(set):
                 ty=self._ty,
                 errmsg=self._errmsg + " Trying to add incorrect type."))
 
-class LazySyntaxTuple(tuple):
+    @property
+    def type(self):
+        return self._ty
+
+class TypedTuple(tuple):
     """
     Lazy type-checker for tuple-like iterable
     """
@@ -661,7 +687,7 @@ class LazySyntaxTuple(tuple):
         return super().__new__(cls, tp)
 
     def __init__(self, tp, ty, errmsg=""):
-        self._ty = ty
+        self._ty = Syntax._verify_input(ty)
         self._errmsg = errmsg
     
     def __iter__(self):
@@ -684,7 +710,7 @@ class LazySyntaxTuple(tuple):
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
 
-class LazySyntaxString(str):
+class TypedString(str):
     """
     Lazy type-checker for string-like iterable
 
@@ -696,7 +722,7 @@ class LazySyntaxString(str):
         return super().__new__(cls, st)
 
     def __init__(self, st, ty, errmsg=""):
-        self._ty = ty
+        self._ty = Syntax._verify_input(ty)
         self._errmsg = errmsg
 
     def __iter__(self):
@@ -719,13 +745,13 @@ class LazySyntaxString(str):
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
 
-class LazySyntaxDict(dict):
+class TypedDict(dict):
     """
     Lazy type-checker for dict-like objects
     """
     def __init__(self, dc, kty, vty, errmsg=""):
-        self._kty = kty
-        self._vty = vty
+        self._kty = Syntax._verify_input(kty)
+        self._vty = Syntax._verify_input(vty)
         self._errmsg = errmsg
         super().__init__(dc)
 
@@ -755,13 +781,66 @@ class LazySyntaxDict(dict):
                     errmsg=self._errmsg
                     + f" Assigning incorrect type to key {key}."))
 
-class LazySyntaxIterator:
+    def get(self, key, default=None):
+        return Syntax._check_wrap(
+                arg=super().get(Syntax._check_wrap(
+                        arg=key,
+                        ty=self._kty,
+                        errmsg=self._errmsg
+                            + f" Key {key} has incorrect type."),
+                    default),
+                ty=self._vty,
+                errmsg=self._errmsg
+                    + f" Get yields incorrect type for key {key}.")
+
+    def pop(self, key, default=None):
+        return Syntax._check_wrap(
+                arg=super().pop(Syntax._check_wrap(
+                        arg=key,
+                        ty=self._kty,
+                        errmsg=self._errmsg
+                            + f" Key {key} has incorrect type."),
+                    default),
+                ty=self._vty,
+                errmsg=self._errmsg
+                    + f" Pop yields incorrect type for key {key}.")
+
+    def popitem(self):
+        k, v = super().popitem()
+        return (Syntax._check_wrap(
+                    arg=k,
+                    ty=self._kty,
+                    errmsg=self._errmsg
+                            + f" Key {k} has incorrect type."),
+                Syntax._check_wrap(
+                    arg=v,
+                    ty=self._vty,
+                    errmsg=self._errmsg
+                            + f" Value {v} has incorrect type."))
+
+    def setdefault(self, key, default=None):
+        return Syntax._check_wrap(
+                arg=super().setdefault(Syntax._check_wrap(
+                        arg=key,
+                        ty=self._kty,
+                        errmsg=self._errmsg
+                                + f" Key {key} has incorrect type."),
+                    Syntax._check_wrap( # explicit check since it assigns default if key is not found
+                        arg=default,
+                        ty=self._vty,
+                        errmsg=self._errmsg
+                                + f" Default {default} has incorrect type.")),
+                ty=self._vty,
+                errmsg=self._errmsg
+                        + f" Setdefault yields incorrect type for key {key}.")
+
+class TypedIterator:
     """
     Very lazy iterator type to wrap around iterators
     """
     def __init__(self, iterator, ty, errmsg=""):
         self._it = iterator
-        self._ty = ty
+        self._ty = Syntax._verify_input(ty)
         self._errmsg = errmsg
 
     def __repr__(self):
