@@ -17,4 +17,4 @@ file = sys.stderr
 def print(obj, *args, **kwargs):
     global enabled, file
     if enabled:
-        ampy.printing.pdebug(repr(obj), "::", *args, **kwargs, file=file)
+        ampy.printing.pdebug(obj, "::", *args, **kwargs, file=file)

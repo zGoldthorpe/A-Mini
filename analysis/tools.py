@@ -13,6 +13,7 @@ import re
 import functools
 
 from ampy.ensuretypes import Syntax, Assertion
+import ampy.debug
 import ampy.types
 
 _ID = r"[a-zA-Z0-9\-_.,;|]+"
@@ -36,6 +37,7 @@ class Analysis:
         def wrap(self):
             if self.valid:
                 return
+            ampy.debug.print(type(self).__name__, "running analysis")
             func(self)
             self.valid = True
         

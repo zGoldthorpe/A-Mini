@@ -10,6 +10,7 @@ import argparse
 import os
 import sys
 
+import ampy.debug    as amd
 import ampy.printing as amp
 import ampy.reader   as amr
 import ampy.types    as amt
@@ -27,6 +28,10 @@ argparser.add_argument("--plain",
             dest="format",
             action="store_false",
             help="Print output in plaintext (without ANSI colouring)")
+argparser.add_argument("-D", "--debug",
+            dest="debug",
+            action="store_true",
+            help="Enable debug messages")
 
 # handling source code
 argparser.add_argument("fname",
@@ -66,6 +71,7 @@ argparser.add_argument("-l", "--list-passes",
 
 args = argparser.parse_args()
 
+amd.enabled = args.debug
 amp.Printing.can_format &= args.format
 
 ### get source code ###
@@ -140,7 +146,7 @@ if args.passes is not None:
         exit(-7)
 
 ### output ###
-writer = amw.CFGWriter(meta=args.meta)
+writer = amw.CFGWriter(write_meta=args.meta)
 
 if args.output is not None:
     with open(args.output, 'w') as file:

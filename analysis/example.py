@@ -7,8 +7,8 @@ This simple analysis is meant to serve as a template for the current analysis
 system. This analysis gives three pieces of data:
 
 At the CFG level: "num_blocks" counts the number of blocks in the CFG
-At the block level: "adds" is a list of indices for which instructions are additions
-At the instruction level: "idx" indicates the index of the instruction in the block
+At the block level: "add_indices" is a list of indices for which instructions are additions
+At the instruction level: "index" indicates the index of the instruction in the block
 """
 
 from ampy.ensuretypes import Syntax
@@ -42,9 +42,9 @@ class ExampleAnalysis(ExampleAnalysis):
         for block in self.CFG:
             for (i, I) in enumerate(block):
                 if isinstance(I, ampy.types.AddInstruction):
-                    self.assign(block, "adds", str(i), append=True)
+                    self.assign(block, "add_indices", str(i), append=True)
             # could have equivalently used
-            # self.assign(block, "adds",
+            # self.assign(block, "add_indices",
             #             *(str(i) for i in range(len(block))
             #             if isinstance(block[i], ampy.types.AddInstruction)))
 
@@ -52,4 +52,4 @@ class ExampleAnalysis(ExampleAnalysis):
         # (not combined with above iteration for the sake of showcasing)
         for block in self.CFG:
             for (i, I) in enumerate(block):
-                self.assign(block, i, "idx", str(i))
+                self.assign(block, i, "index", str(i))
