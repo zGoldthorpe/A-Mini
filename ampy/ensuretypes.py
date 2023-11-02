@@ -666,7 +666,7 @@ class TypedSet(set):
         return Syntax._check_wrap(
                 arg=super().pop(),
                 ty=self._ty,
-                errmsg=self._errmsg + " Set poppsed incorrect type.")
+                errmsg=self._errmsg + " Set popped incorrect type.")
 
     def add(self, item):
         super().add(Syntax._check_wrap(

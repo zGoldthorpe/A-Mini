@@ -8,7 +8,7 @@ endif
 
 syn keyword amiCommand phi goto branch exit read write
 
-syn match amiInteger '\d\+'
+syn match amiInteger '-\?\d\+'
 syn match amiLabel '@[.a-zA-Z0-9_]\+'
 syn match amiReg '%[.a-zA-Z0-9_]\+'
 
