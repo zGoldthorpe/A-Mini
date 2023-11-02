@@ -80,7 +80,7 @@ amp.Printing.can_format &= args.format
 if args.ls:
     amp.psubtle("Analysis passes:")
     for opt in sorted(AM):
-        amp.pquery(f"\t{opt}")
+        amp.pquery(f"\t{opt}\t({AM[opt].__module__}.{AM[opt].__name__})")
     exit(0)
 
 
