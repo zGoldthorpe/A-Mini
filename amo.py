@@ -74,7 +74,7 @@ argparser.add_argument("-l", "--list-passes",
             dest="ls",
             action="store_true",
             help="List all available passes and exit.")
-argparser.add_argument("--explain",
+argparser.add_argument("-?", "--explain",
             dest="explain",
             action="store",
             metavar="PASS",

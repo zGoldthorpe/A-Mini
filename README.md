@@ -1,64 +1,125 @@
 # A-Mi
-**A**ssembly-**Mi**nimal: a toy language for testing optimisation
+**A**ssembly-**Mi**nimal: a toy language for testing optimisation.
 
-## Language specs
+1. [About the language](#about-the-language)
+1. [Running A-Mi code](#running-a-mi-code)
+1. [A-Mi code analysis and optimisation](#a-mi-code-analysis-and-optimisation)
 
-A-Mi uses "virtual registers" of the form `%[.\w]+`, which are all of `int` type.
-Decimal constants are also supported, but obviously cannot be assigned to.
+## About the language
 
-Program locations (for branches) require explicit labels of the form `@[.\w]+`.
-Every label must be unique.
-Branch targets are necessarily labelled.
+A-Mi has unlimited "virtual registers", whose names are prefixed with a `%`.
+All registers store integers.
 
-Comments are prefixed with a semicolon (`;`).
-The language is capable of the following operations:
+A-Mi branches are all necessarily direct, and branch labels are prefixed with a `@`.
 
+Comments are prefixed by a semicolon `;`, and span until the end of the line.
+
+Sample code can be found in `examples/`.
+
+### Arithmetic operations
+
+A-Mi only supports polynomial arithmetic instructions:
 ```
-; move
-%res  = %a
-%res  = phi [%a1, @lbl1], [%a2, @lbl2], ...
-; arithmetic
-%sum  = %a + %b
-%diff = %a - %b
-%prod = %a * %b
-; comparisons
-%eq   = %a == %b
-%neq  = %a != %b
-%lt   = %a < %b
-%leq  = %a <= %b
-; branching
-@label:
-goto   @label
-branch %cond ? @iftrue : @iffalse
-; I/O
-read    %in
-write   %out
-; debugging
-brkpt   !name
-; exiting
-exit
+    %a = %b                             ; copy
+    %a = %b + %c                        ; addition
+    %a = %b - %c                        ; subtraction
+    %a = %b * %c                        ; multiplication
 ```
 
-There is a `phi` instruction, but code does not need to be in SSA form.
+The operands `%b` and `%c` may also be given by decimal integer constants.
 
-`read` only accepts decimal integers, and `write` prints an integer in decimal in a single line to output.
+### Comparisons
 
-Every time a breakpoint is reached, the program stalls, and you can interface with its current state.
+A-Mi supports integer comparison, and stores the result as either a `0` or a `1` (as an integer) to a register:
+```
+    %cond = %b == %c                    ; equal
+    %cond = %b != %c                    ; unequal
+    %cond = %b <  %c                    ; strictly less than
+    %cond = %b <= %c                    ; less than or equal to
+```
 
-### Metadata
+Again, the operands `%b` and `%c` may be given by decimal integer constants.
 
-Metadata is provided to instructions, blocks, or the entire program via comments with a specified prefix:
+### Control flow
 
-- `;#!arg: ...` pass `arg` to entire program (with value `...`)
-- `;@!arg: ...` pass `arg` to current basic block (with value `...`)
-- `;%!arg: ...` pass `arg` to current instruction (with value `...`)
+A-Mi branches are direct, and branch target labels cannot be manipulated.
+```
+@label:                                 ; declare a branch target
+    goto @target                        ; unconditional direct branch
+    branch %cond ? @iftrue : @iffalse   ; conditional branch
+    exit                                ; terminate program
+```
+To support single static assignment (SSA), A-Mi also has a `phi` instruction.
+```
+%a = phi [%1, @1], [%2, @2], ...        ; variadic phi instruction
+```
+The value of `%a` is given by `%1` if the previous branch had source `@1`, and given by `%2` if the previous branch had source `@2`, and so on.
+The operands `%1`, `%2`, and so on may also be given by decimal integer constants.
 
-The value `...` is treated as a space-separated list of strings.
+### Input and output
 
-The metavariable argument `arg` can be any pattern matching `[a-zA-Z0-9\-_.,;/|]+`.
+A-Mini allows for integers to be read (one per line) and printed (one per line).
 
-Instruction metadata can be passed from subsequent lines, so long as they are not preceded by
-- another instruction
-- a new label (and thus the start of a new basic block)
-In the former case, the metadata will be assigned to the most recent instruction.
-In the latter case, the metadata will not be assigned anywhere
+```
+    read  %a                            ; store input to register
+    write %b                            ; write value of register to output
+```
+The register `%b` may also be given by a decimal constant.
+
+### Debugging
+
+A-Mini also has a built-in "breakpoint" instruction
+```
+    brkpt !name                         ; trigger breakpoint with given name
+```
+which pauses the program and allows the user to query registers.
+
+
+## Running A-Mi code
+
+The A-Mi interpreter is given by `ami.py`.
+To run the interpreter, simply call
+```console
+python3 ami.py path/to/code.ami
+```
+The interpreter supports some command-line options; for instance,
+```console
+python3 ami.py path/to/code.ami --trace
+```
+outputs a trace of the execution to `stderr`.
+
+For a list of all options for the A-Mi interpreter, just run
+```console
+python3 ami.py --help
+```
+
+## A-Mi code analysis and optimisation
+
+A-Mi analyses and optimisations are managed with `amo.py`.
+A generic call to the optimiser may look like
+```console
+python3 amo.py code.ami -o opt.ami \
+    --add-pass="pass1" \
+    --add-pass="pass2(arg0, arg1)" \
+    --add-pass="pass3(arg0, key1=arg1)"
+```
+Passes are run in the order they are added to the command.
+Notice that `pass2` receives two positional arguments, and `pass3` receives a positional argument and a keyword argument.
+
+The analysed/optimised code is printed to `opt.ami`.
+If an output file is not specified with `-o`, then the code is printed to `stdout`.
+
+To see the registered passes, run
+```console
+python3 amo.py --list-passes
+```
+
+To see details about a particular pass, run
+```console
+python3 amo.py --explain "pass"
+```
+
+Of course, the list of all options for the A-Mi optimiser can be found by running
+```console
+python3 amo.py --help
+```
