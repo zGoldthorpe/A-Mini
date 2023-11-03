@@ -357,7 +357,7 @@ class Syntax(Syntax):
                 yield syntax
         yield repr(self)
 
-    def _check_wrap(arg, ty, errmsg=""):
+    def _check(arg, ty, errmsg=""):
         """
         Lazily check if arg is of type ty, given conventions of the
         Syntax class
@@ -384,7 +384,7 @@ class Syntax(Syntax):
                     mty, cons = t
                     if isinstance(arg, mty):
                         # primitive match, so assert elaborate type "cons"
-                        return Syntax._check_wrap(arg, cons, errmsg=errmsg)
+                        return Syntax._check(arg, cons, errmsg=errmsg)
             raise TypeError(errmsg + f"\nFailed to match any of {Syntax._type_name(ty)}")
 
         if isinstance(ty, str):
@@ -396,13 +396,13 @@ class Syntax(Syntax):
 
         if isinstance(ty, slice):
             if isinstance(arg, slice):
-                return slice(Syntax._check_wrap(arg.start, ty.start, errmsg=errmsg),
-                        Syntax._check_wrap(arg.stop, ty.stop, errmsg=errmsg),
-                        Syntax._check_wrap(arg.step, ty.step, errmsg=errmsg))
+                return slice(Syntax._check(arg.start, ty.start, errmsg=errmsg),
+                        Syntax._check(arg.stop, ty.stop, errmsg=errmsg),
+                        Syntax._check(arg.step, ty.step, errmsg=errmsg))
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects a slice; received {type(arg).__name__}")
 
         if isinstance(ty, list):
-            if hasattr(arg, "__iter__"):
+            if hasattr(arg, "__len__"):
                 lo, hi = ty[2]
                 lo = 0 if lo is Ellipsis else lo
                 hi = len(arg) if hi is Ellipsis else hi
@@ -483,7 +483,7 @@ class Syntax(Syntax):
         if len(args) != len(types):
             raise TypeError(f"{func_name} expects {len(self._types)} positional arguments; {len(args)} given.")
         wrapped_args = map(lambda P:
-                Syntax._check_wrap(
+                Syntax._check(
                     arg=P[1][0], # arg
                     ty=P[1][1], # type
                     errmsg=f"{func_name} argument {P[0]} expects {Syntax._type_name(P[1][1])}; unexpected {type(P[1][0]).__name__} given."),
@@ -492,9 +492,10 @@ class Syntax(Syntax):
         for kw in kwargs:
             if kw not in self._kwtypes:
                 if self._allow_extra_kwargs:
+                    wrapped_kwargs[kw] = kwargs[kw] # do nothing to argument
                     continue
                 raise TypeError(f"{func_name} received unexpected keyword argument {kw}.")
-            wrapped_kwargs[kw] = Syntax._check_wrap(
+            wrapped_kwargs[kw] = Syntax._check(
                         arg=kwargs[kw],
                         ty=self._kwtypes[kw],
                         errmsg=f"{func_name} keyword argument {kw} expects {Syntax._type_name(self._kwtypes[kw])}; unexpected {Syntax._type_name(type(kwargs[kw]))} given.")
@@ -505,7 +506,7 @@ class Syntax(Syntax):
 
         return wrapped_args, wrapped_kwargs
 
-    def check_iter(self, func_name, viz, *args, **kwargs):
+    def check_recursive(self, func_name, viz, *args, **kwargs):
         """
         If Syntax is part of a union, recursively check all instances
         in the union and find the first match (in reverse order of
@@ -525,7 +526,7 @@ class Syntax(Syntax):
 \t{repr(Syntax.extract_syntax(*args, **kwargs))}
 Valid syntaxes are:
 \t{viz.replace(chr(10), chr(10)+chr(9))}""")
-            return self._parent.check_iter(func_name, viz, *args, **kwargs)
+            return self._parent.check_recursive(func_name, viz, *args, **kwargs)
 
     def __repr__(self):
         if self._parent is not None:
@@ -558,20 +559,20 @@ Valid syntaxes are:
         Wrapper for type assertions
         """
         @functools.wraps(func)
-        def wrap(*args, **kwargs):
+        def Syntax_call_wrap(*args, **kwargs):
             if self._parent is None:
                 args, kwargs = self.check(func.__name__, *args, **kwargs)
             else:
-                args, kwargs = self.check_iter(func.__name__, repr(self), *args, **kwargs)
+                args, kwargs = self.check_recursive(func.__name__, repr(self), *args, **kwargs)
             retval = func(*args, **kwargs)
-            return Syntax._check_wrap(
+            return Syntax._check(
                     arg=retval,
                     ty=self._return_type,
                     errmsg=f"{func.__name__} expected to return {Syntax._type_name(self._return_type)}; returned unexpected {type(retval).__name__}.")
 
-        wrap.__doc__ = repr(self) + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+        Syntax_call_wrap.__doc__ = repr(self) + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
 
-        return wrap
+        return Syntax_call_wrap
 
 class Assertion:
 
@@ -619,24 +620,24 @@ class TypedList(list):
         return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
     
     def __iter__(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__iter__(),
                 ty={self._ty}, # iterator
                 errmsg=self._errmsg)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return Syntax._check_wrap(
+            return Syntax._check(
                     arg=super().__getitem__(index),
                     ty=[self._ty, ..., list],
                     errmsg=self._errmsg)
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__getitem__(index),
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
 
     def __setitem__(self, index, value):
-        super().__setitem__(index, Syntax._check_wrap(
+        super().__setitem__(index, Syntax._check(
                 arg=value,
                 ty=self._ty,
                 errmsg=self._errmsg + f" Assigning incorrect type to index {index}."))
@@ -657,19 +658,19 @@ class TypedSet(set):
         return f"{repr(set(self))}:{Syntax._type_name(self._ty)}"
     
     def __iter__(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__iter__(),
                 ty={self._ty}, # iterator
                 errmsg=self._errmsg)
 
     def pop(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().pop(),
                 ty=self._ty,
                 errmsg=self._errmsg + " Set popped incorrect type.")
 
     def add(self, item):
-        super().add(Syntax._check_wrap(
+        super().add(Syntax._check(
                 arg=item,
                 ty=self._ty,
                 errmsg=self._errmsg + " Trying to add incorrect type."))
@@ -691,7 +692,7 @@ class TypedTuple(tuple):
         self._errmsg = errmsg
     
     def __iter__(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__iter__(),
                 ty={self._ty}, # iterator
                 errmsg=self._errmsg)
@@ -701,11 +702,11 @@ class TypedTuple(tuple):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return Syntax._check_wrap(
+            return Syntax._check(
                     arg=super().__getitem__(index),
                     ty=[self._ty, ..., tuple],
                     errmsg=self._errmsg)
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__getitem__(index),
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
@@ -726,7 +727,7 @@ class TypedString(str):
         self._errmsg = errmsg
 
     def __iter__(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__iter__(),
                 ty={self._ty}, # iterator
                 errmsg=self._errmsg)
@@ -736,11 +737,11 @@ class TypedString(str):
 
     def __getitem__(self, index):
         if isinstance(index, slice):
-            return Syntax._check_wrap(
+            return Syntax._check(
                     arg=super().__getitem__(index),
                     ty=[self._ty, ..., str],
                     errmsg=self._errmsg)
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=super().__getitem__(index),
                 ty=self._ty,
                 errmsg=self._errmsg + f" Index {index} has incorrect type.")
@@ -759,8 +760,8 @@ class TypedDict(dict):
         return f"{super().__repr__()}:{Syntax._type_name(self._kty)}->{Syntax._type_name(self._vty)}"
 
     def __getitem__(self, key):
-        return Syntax._check_wrap(
-                arg=super().__getitem__(Syntax._check_wrap(
+        return Syntax._check(
+                arg=super().__getitem__(Syntax._check(
                     arg=key,
                     ty=self._kty,
                     errmsg=self._errmsg
@@ -770,20 +771,20 @@ class TypedDict(dict):
                             + f" Value at {key} has incorrect type.")
     
     def __setitem__(self, key, value):
-        super().__setitem__(Syntax._check_wrap(
+        super().__setitem__(Syntax._check(
                 arg=key,
                 ty=self._kty,
                 errmsg=self._errmsg
                     + f" Key {key} has incorrect type."),
-                Syntax._check_wrap(
+                Syntax._check(
                     arg=value,
                     ty=self._vty,
                     errmsg=self._errmsg
                     + f" Assigning incorrect type to key {key}."))
 
     def get(self, key, default=None):
-        return Syntax._check_wrap(
-                arg=super().get(Syntax._check_wrap(
+        return Syntax._check(
+                arg=super().get(Syntax._check(
                         arg=key,
                         ty=self._kty,
                         errmsg=self._errmsg
@@ -794,8 +795,8 @@ class TypedDict(dict):
                     + f" Get yields incorrect type for key {key}.")
 
     def pop(self, key, default=None):
-        return Syntax._check_wrap(
-                arg=super().pop(Syntax._check_wrap(
+        return Syntax._check(
+                arg=super().pop(Syntax._check(
                         arg=key,
                         ty=self._kty,
                         errmsg=self._errmsg
@@ -807,25 +808,25 @@ class TypedDict(dict):
 
     def popitem(self):
         k, v = super().popitem()
-        return (Syntax._check_wrap(
+        return (Syntax._check(
                     arg=k,
                     ty=self._kty,
                     errmsg=self._errmsg
                             + f" Key {k} has incorrect type."),
-                Syntax._check_wrap(
+                Syntax._check(
                     arg=v,
                     ty=self._vty,
                     errmsg=self._errmsg
                             + f" Value {v} has incorrect type."))
 
     def setdefault(self, key, default=None):
-        return Syntax._check_wrap(
-                arg=super().setdefault(Syntax._check_wrap(
+        return Syntax._check(
+                arg=super().setdefault(Syntax._check(
                         arg=key,
                         ty=self._kty,
                         errmsg=self._errmsg
                                 + f" Key {key} has incorrect type."),
-                    Syntax._check_wrap( # explicit check since it assigns default if key is not found
+                    Syntax._check( # explicit check since it assigns default if key is not found
                         arg=default,
                         ty=self._vty,
                         errmsg=self._errmsg
@@ -850,7 +851,7 @@ class TypedIterator:
         return self
 
     def __next__(self):
-        return Syntax._check_wrap(
+        return Syntax._check(
                 arg=self._it.__next__(),
                 ty=self._ty,
                 errmsg=self._errmsg

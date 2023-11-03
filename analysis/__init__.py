@@ -13,5 +13,5 @@ import analysis.tools
 
 AnalysisManager = ampy.passmanager.PassManager(analysis.tools.Analysis)
 
-AnalysisManager.register("analysis.example.ExampleAnalysis", "example")
-AnalysisManager.register("analysis.domtree.DomTreeAnalysis", "domtree")
+AnalysisManager.register("analysis.example.ExampleAnalysis")
+AnalysisManager.register("analysis.domtree.DomTreeAnalysis")

@@ -7,6 +7,7 @@ This is a proof-of-concept analyser/optimiser for A-Mi
 """
 
 import argparse
+import re
 import os
 import sys
 
@@ -16,7 +17,10 @@ import ampy.reader   as amr
 import ampy.types    as amt
 import ampy.writer   as amw
 
+from ampy.passmanager import BadArgumentException
+
 from analysis import AnalysisManager as AM
+from analysis.tools import AnalysisList, ID_re
 
 ### command-line argument handling ###
 
@@ -63,11 +67,18 @@ argparser.add_argument("-M", "--omit-metadata",
 argparser.add_argument("-p", "--add-pass",
             dest="passes",
             action="append",
-            help="Append a pass to run (order-sensitive).")
+            metavar="[PASS | \"PASS(arg0, arg1, ..., k0=v0, k1=v1, ...)\"]",
+            help="""Append a pass to run (order-sensitive).
+                    All arguments are passed.""")
 argparser.add_argument("-l", "--list-passes",
             dest="ls",
             action="store_true",
             help="List all available passes and exit.")
+argparser.add_argument("--explain",
+            dest="explain",
+            action="store",
+            metavar="PASS",
+            help="Provide explanation for a particular pass.")
 
 args = argparser.parse_args()
 
@@ -80,9 +91,16 @@ amp.Printing.can_format &= args.format
 if args.ls:
     amp.psubtle("Analysis passes:")
     for opt in sorted(AM):
-        amp.pquery(f"\t{opt}\t({AM[opt].__module__}.{AM[opt].__name__})")
+        amp.pquery(f"\t{opt}")
     exit(0)
 
+if args.explain is not None:
+    if args.explain in AM:
+        amp.pquery(f"{args.explain} ({AM[args.explain].__module__}.{AM[args.explain].__name__})")
+        amp.psubtle("Analysis pass")
+        if AM[args.explain].__doc__ is not None:
+            amp.pquery(AM[args.explain].__doc__)
+    exit(0)
 
 if args.fname is not None:
     if not os.path.exists(args.fname):
@@ -135,15 +153,34 @@ except amr.ParseError as e:
 
 
 ### optimise ###
+
+valid_analyses = AnalysisList()
 if args.passes is not None:
     for opt in args.passes:
+        opt_args = []
+        opt_kwargs = {}
+        m = re.fullmatch(rf"({ID_re})\((.*)\)", opt)
+        if m is not None:
+            opt = m.group(1)
+            passed = list(map(lambda s:s.strip(), m.group(2).split(',')))
+            for arg in passed:
+                if '=' not in arg:
+                    opt_args.append(arg)
+                else:
+                    kw, arg = arg.split('=', 1)
+                    opt_kwargs[kw] = arg
+
         if opt in AM:
-            analysis = AM[opt](cfg)
+            try:
+                analysis = AM[opt](cfg, valid_analyses, *opt_args, **opt_kwargs)
+            except BadArgumentException as e:
+                amp.perror(f"{opt} received invalid argument.\n{e}")
+                exit(-7)
             analysis.perform_analysis()
             continue
 
         amp.perror(f"Unrecognised pass {opt}")
-        exit(-7)
+        exit(-8)
 
 ### output ###
 writer = amw.CFGWriter(write_meta=args.meta)

@@ -6,12 +6,16 @@ Goldthorpe
 This simple analysis is meant to serve as a template for the current analysis
 system. This analysis gives three pieces of data:
 
-At the CFG level: "num_blocks" counts the number of blocks in the CFG
-At the block level: "add_indices" is a list of indices for which instructions are additions
+At the CFG level: you can pass a keyword argument "count=instructions" or
+                  "count=blocks" to track either the number of blocks or the
+                  number of instructions.
+At the block level: you can pass an argument "add" or "mul" to track list of
+                    indices of instructions that are adds or mults, resp.
 At the instruction level: "index" indicates the index of the instruction in the block
 """
 
 from ampy.ensuretypes import Syntax
+from ampy.passmanager import BadArgumentException
 from analysis.tools import Analysis
 
 import ampy.types
@@ -21,12 +25,47 @@ class ExampleAnalysis(Analysis):
     pass
 
 class ExampleAnalysis(ExampleAnalysis):
+    """
+    example(track, *, count)
 
-    @(Syntax(object, ampy.types.CFG) >> None)
-    def __init__(self, cfg):
-        # every Analysis must define its ID
-        self.ID = "example"
-        self.CFG = cfg
+    Example pass to demonstrate analysis functionality.
+    Locally indexes every instruction in each block.
+
+    track: "add" or "mul"
+        for each block, track indices of adds or mults, resp.
+        (default "add")
+
+    count="blocks" or "instructions":
+        counts the total number of blocks or instructions in CFG
+        (default "blocks")
+    """
+    # every class should have a docstring
+
+    # "example" is the ID of the pass
+    # 1 is the max number of positional arguments expected
+    # "count" is a keyword argument
+    # note: all arguments are necessrily of string type
+    @ExampleAnalysis.init("example", 1, "count")
+    def __init__(self, instr_tracker="add", *, count="blocks"):
+        # the wrapper ensures the number of arguments is correct
+        # but the * is just to be safe (and to make it clear which arguments
+        # are positional). It is strongly recommended that arguments to
+        # Analysis objects are all optional.
+        match instr_tracker:
+            case "add":
+                self.track_type = ampy.types.AddInstruction
+                self.var = "add_indices"
+            case "mul":
+                self.track_type = ampy.types.MulInstruction
+                self.var = "mul_indices"
+            case _:
+                raise BadArgumentException("Positional argument to ExampleAnalysis must be either \"add\" or \"mul\".")
+        
+        if count in ["blocks", "instructions"]:
+            self.count = count
+        else:
+            raise BadArgumentException("Keyword argument \"count\" to ExampleAnalysis must be either \"blocks\" or \"instructions\".")
+
 
     @ExampleAnalysis.analysis
     @(Syntax(object) >> None)
@@ -36,17 +75,20 @@ class ExampleAnalysis(ExampleAnalysis):
 
         # CFG metadata
         # note: metadata must be of string type
-        self.assign("num_blocks", str(len(self.CFG)))
+        if self.count == "blocks":
+            self.assign("num_blocks", str(len(self.CFG)))
+        else:
+            self.assign("num_instructions", str(sum(len(block) for block in self.CFG)))
 
         # block metadata
         for block in self.CFG:
             for (i, I) in enumerate(block):
-                if isinstance(I, ampy.types.AddInstruction):
-                    self.assign(block, "add_indices", str(i), append=True)
+                if isinstance(I, self.track_type):
+                    self.assign(block, self.var, str(i), append=True)
             # could have equivalently used
-            # self.assign(block, "add_indices",
+            # self.assign(block, self.var,
             #             *(str(i) for i in range(len(block))
-            #             if isinstance(block[i], ampy.types.AddInstruction)))
+            #             if isinstance(block[i], self.track_type)))
 
         # instruction metadata
         # (not combined with above iteration for the sake of showcasing)

@@ -34,20 +34,22 @@ class PassManager:
     @(Syntax(object, str, (str, None))
       | Syntax(object, str, alias=(str,None))
       >> None)
-    def register(self, cls_path, alias=None):
+    def register(self, cls_path, ID="ID"):
         """
         Register a class (given by cls_path "Module.Submodule...Class"
-        relative to '.') under the specified alias, if provided.
+        relative to '.'), with alias given by the ID field
         """
         components = cls_path.split('.')
         module = '.'.join(components[:-1])
         cls_name = components[-1]
-        if alias is None:
-            alias = cls_name
+        
+        cls = getattr(importlib.import_module(module), cls_name)
+        alias = getattr(cls, ID)
+        if isinstance(alias, property):
+            # in case ID is not a variable but a getter method
+            alias = alias.fget(cls)
 
         assert alias not in self._registered # aliases must be unique
-
-        cls = getattr(importlib.import_module(module), cls_name)
 
         self._registered[alias] = cls
 
@@ -63,3 +65,13 @@ class PassManager:
     @(Syntax(object, str) >> type)
     def __getitem__(self, alias):
         return self._registered[alias]
+
+class BadArgumentException(Exception):
+    """
+    Exception specific to passes being given unexpected
+    or incorrect arguments.
+    """
+
+    def __init__(self, message=""):
+        self.message = message
+        super().__init__(self.message)

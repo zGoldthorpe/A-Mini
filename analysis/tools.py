@@ -6,17 +6,20 @@ Goldthorpe
 This module provides classes for reading and writing metadata
 for analysing a CFG
 """
-#TODO: make metadata an ampy.ensuretypes.LazyDict type
-#TODO: rename Lazy types as Typed types
 
 import re
 import functools
 
-from ampy.ensuretypes import Syntax, Assertion
+from ampy.ensuretypes import (
+        Assertion,
+        Syntax,
+        TypedList,
+        )
+from ampy.passmanager import BadArgumentException
 import ampy.debug
 import ampy.types
 
-_ID = r"[a-zA-Z0-9\-_.,;|]+"
+ID_re = r"[a-zA-Z0-9\-_.,;|]+"
 
 class Analysis:
     # forward declaration
@@ -34,17 +37,61 @@ class Analysis:
             raise Exception("Analysis can only have one analysis method.")
 
         @functools.wraps(func)
-        def wrap(self):
+        def Analysis_analysis_wrap(self):
             if self.valid:
                 return
             ampy.debug.print(type(self).__name__, "running analysis")
             func(self)
             self.valid = True
         
-        wrap.__doc__ = f"{cls.__name__} analysis" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
-        cls._analyser_method = wrap
+        Analysis_analysis_wrap.__doc__ = f"{cls.__name__} analysis" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+        cls._analyser_method = Analysis_analysis_wrap
 
-        return wrap
+        return Analysis_analysis_wrap
+
+    @classmethod
+    @(Syntax(object, str, int, str, ...)
+      | Syntax(object, str))
+    def init(cls, ID, nargs=0, *kwargnames):
+        """
+        Wrapper intended for subclass initialisation, with a specific ID.
+
+        nargs
+            specifies the number of positional arguments that are passed
+            to the initialiser after the CFG and the list of existing analyses
+        kwargnames
+            specifies the expected keyword arguments that are passed after the
+            positional arguments
+
+        NB: this wrapper asserts correctness of arguments on the assumption
+        that everything after the CFG and list of existing analyses are optional
+        """
+        cls.ID = ID
+        def Analysis_init_wrapper(initfunc):
+
+            @functools.wraps(initfunc)
+            @(Syntax(object, ampy.types.CFG, ((TypedList, [Analysis]),), str, ...).set_allow_extra_kwargs(True) >> None)
+            def Analysis_init_wrap(self, cfg, analyses, *args, **kwargs):
+                self.CFG = cfg
+                if len(args) > nargs:
+                    raise BadArgumentException(f"{cls.__name__} expects at most {nargs} positional arguments; received {len(args)}.")
+                for kw in kwargs:
+                    if kw not in kwargnames:
+                        raise BadArgumentException(f"Unrecognised keyword argument {kw} passed to {cls.__name__}")
+
+                self._analyses = analyses
+                self._analyses.append(self)
+                initfunc(self, *args, **kwargs)
+
+            Analysis_init_wrap.__doc__ = ("Expects a CFG, a TypedList of previously-instantiated analyses"
+                        + (f", {nargs} positional argument{'s' if nargs != 1 else ''}" if nargs > 0 else "")
+                        + (f", and keyword argument{'s' if len(kwargnames) > 0 else ''} {', '.join(kwargnames)}" if len(kwargnames) > 0 else "")
+                        + "."
+                        + (f"\n{initfunc.__doc__}" if initfunc.__doc__ is not None else ""))
+
+            return Analysis_init_wrap
+
+        return Analysis_init_wrapper
 
     def get(func):
         """
@@ -52,14 +99,14 @@ class Analysis:
         that require analysis to be valid.
         """
         @functools.wraps(func)
-        def wrap(self, *args, **kwargs):
+        def Analysis_get_wrap(self, *args, **kwargs):
             if not self.valid:
                 self._analyser_method()
             return func(self, *args, **kwargs)
 
-        wrap.__doc__ = "Requires valid data" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+        Analysis_get_wrap.__doc__ = "Requires valid data" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
 
-        return wrap
+        return Analysis_get_wrap
 
     def set(func):
         """
@@ -68,30 +115,30 @@ class Analysis:
         metadata and requiring recomputation)
         """
         @functools.wraps(func)
-        def wrap(self, *args, **kwargs):
+        def Analysis_set_wrap(self, *args, **kwargs):
             self.valid = False
             return func(self, *args, **kwargs)
 
-        wrap.__doc__ = "Invalidates data" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+        Analysis_set_wrap.__doc__ = "Invalidates data" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
 
-        return wrap
+        return Analysis_set_wrap
 
 class Analysis(Analysis):
     """
     Parent class for manipulating metadata in a specific CFG
 
     Analyses are created by subclassing Analysis.
-    The expectations of the __init__ method are:
-    - has syntax matching Syntax(object, CFG) >> None
-    - a field ID is defined
-    - the CFG is stored in self.CFG
+    The __init__ method is required to be wrapped by Subclass.init(ID)
+    Arguments to __init__ (besides "self") are then arguments that will be
+    expected in addition to the required CFG and list of existing analyses.
+
     The ID of an analysis must match the syntax for metadata arguments,
     EXCLUDING the character "/", which is necessary for the AnalysisManager
 
     Validity of an Analysis is tracked via CFG metadata
     """
-    @(Syntax(object, ampy.types.CFG) >> None)
-    def __init__(self, cfg):
+    @(Syntax(object, ampy.types.CFG, [Analysis]) >> None)
+    def __init__(self, cfg, analyses):
         # this method should be overridden by subclass
         raise NotImplementedError
 
@@ -114,15 +161,21 @@ class Analysis(Analysis):
             del self.CFG.meta[self.ID]
 
     @property
+    @classmethod
     @(Syntax(object) >> str)
-    def ID(self):
-        return self._ID
+    def ID(cls):
+        return cls._ID
 
     @ID.setter
-    @(Syntax(object, _ID) >> None)
-    def ID(self, ID):
-        self._ID = ID
-        self._recog = re.compile(f"{self._ID}/(.*)")
+    @classmethod
+    @(Syntax(object, ID_re) >> None)
+    def ID(cls, ID):
+        cls._ID = ID
+
+    @property
+    @(Syntax(object) >> [Analysis])
+    def analyses(self):
+        return self._analyses
 
     @(Syntax(object, str) >> (str, None))
     def extract_arg(self, arg):
@@ -131,7 +184,7 @@ class Analysis(Analysis):
         if owned by this analysis
         (otherwise, returns None)
         """
-        m = self._recog.fullmatch(arg)
+        m = cls._recog.fullmatch(arg)
         if m is None:
             return None
         return m.group(1)
@@ -221,3 +274,13 @@ class Analysis(Analysis):
             meta.setdefault(self.tagged(arg), []).extend(vals)
         else:
             meta[self.tagged(arg)] = list(vals)
+
+class AnalysisList(TypedList):
+    """
+    Lazy type-checked list of analyses
+    """
+    @(Syntax(object, ls=[Analysis])
+      | Syntax(object, [Analysis])
+      >> None)
+    def __init__(self, ls=[]):
+        super().__init__(ls, Analysis)
