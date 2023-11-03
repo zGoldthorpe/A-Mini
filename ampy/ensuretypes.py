@@ -629,7 +629,7 @@ class TypedList(list):
         if isinstance(index, slice):
             return Syntax._check(
                     arg=super().__getitem__(index),
-                    ty=[self._ty, ..., list],
+                    ty=[list, self._ty, [..., ...]],
                     errmsg=self._errmsg)
         return Syntax._check(
                 arg=super().__getitem__(index),

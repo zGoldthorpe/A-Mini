@@ -108,6 +108,32 @@ class CFGWriter:
         self._set_tabwidth()
         self._set_codewidth()
 
+    @(Syntax(object, str, str, [str]) >> {str})
+    def _meta_str(self, char, key, values):
+        """
+        Generates metadata comment.
+
+        char
+            one of "#@%" to indicate level
+        key, values
+            the metadata to write
+
+        Could be multi-line because of the presence of "$" value
+        """
+        start = 0
+        end = -1
+        if values is not None:
+            while end < len(values):
+                try:
+                    end = values.index('$', start) + 1
+                except ValueError: # no '$' to be found
+                    end = len(values)
+                
+                yield f";{char}!{key}: " + ' '.join(values[start:end])
+                start = end
+        
+
+
     @(Syntax(object, ampy.types.InstructionClass) >> {str})
     def _instruction_str(self, instruction):
         """
@@ -120,9 +146,9 @@ class CFGWriter:
             yield line
         else:
             for var, val in sorted(instruction.meta.items(), key=lambda t:t[0]):
-                if val is None:
-                    continue
-                yield line + f";%!{var}: " + ' '.join(val)
+                for metadata in self._meta_str('%', var, val):
+                    yield line + metadata
+                    line = ' '*self.width
                 line = ' '*self.width
 
     @(Syntax(object, ampy.types.BasicBlock) >> {str})
@@ -137,9 +163,9 @@ class CFGWriter:
             yield line
         else:
             for var, val in sorted(block.meta.items(), key=lambda t:t[0]):
-                if val is None:
-                    continue
-                yield line + f";@!{var}: " + ' '.join(val)
+                for metadata in self._meta_str('@', var, val):
+                    yield line + metadata
+                    line = ' '*self.width
                 line = ' '*self.width
 
         for I in block:
@@ -155,9 +181,8 @@ class CFGWriter:
 
         if self.write_meta:
             for var, val in sorted(cfg.meta.items(), key=lambda t:t[0]):
-                if val is None:
-                    continue
-                yield f";#!{var}: " + ' '.join(val)
+                for metadata in self._meta_str('#', var, val):
+                    yield metadata
 
         for block in sorted(cfg, key=self._block_key):
             for block_str in self._block_str(block):

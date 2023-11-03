@@ -112,6 +112,35 @@ postbranch_nice = """
         """
 test(postbranch_prog, postbranch_nice)
 
+dollar_prog = [
+        ";#!meta: x $ y $ z",
+        "@A: %x = 10 ;%!x: 10 $ 30 $ 50 $",
+        "goto @B ;%!B: 1 2 3 $ $ 1 2 3",
+        "@B: ;@!B: foo $ bar baz $",
+        "exit ;#!exit: $ a b c $ d e $ $ $",
+        ]
+dollar_nice = """
+        ;#!exit: $
+        ;#!exit: a b c $
+        ;#!exit: d e $
+        ;#!exit: $
+        ;#!exit: $
+        ;#!meta: x $
+        ;#!meta: y $
+        ;#!meta: z
+        @A:
+            %x = 10 ;%!x: 10 $
+                    ;%!x: 30 $
+                    ;%!x: 50 $
+            goto @B ;%!B: 1 2 3 $
+                    ;%!B: $
+                    ;%!B: 1 2 3
+        @B:         ;@!B: foo $
+                    ;@!B: bar baz $
+            exit
+        """
+test(dollar_prog, dollar_nice)
+
 
 if __name__ == "__main__":
     ts.print_results()
