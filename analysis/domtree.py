@@ -14,7 +14,6 @@ T. Lengauer, R.E. Tarjan. 1979.
     Vol. 1, No. 1.
     Pages 121--141.
 """
-#TODO: update to new standards
 
 from ampy.ensuretypes import Syntax
 from analysis.tools import Analysis
@@ -28,6 +27,9 @@ class DomTreeAnalysis(Analysis):
 class DomTreeAnalysis(DomTreeAnalysis):
     """
     domtree
+
+    Runs the Lengauer-Tarjan algorithm for computing the dominator
+    tree for a control flow graph.
     """
 
     @DomTreeAnalysis.init("domtree")
