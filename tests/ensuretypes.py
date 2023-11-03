@@ -23,7 +23,7 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
-        @Syntax(([int, float, int],)).returns(([str, float],))
+        @Syntax(((), int, float, int)).returns(((), str, float))
         def foo(t): return str(t[0] + t[2]), t[1]"""),
         "assert foo((1, 2., 3)) == ('4', 2.)",
         ("foo((1, 2, 3))", TypeError),
@@ -166,7 +166,7 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
-        @Syntax(([[int], [str]],), int).returns(([int, int],))
+        @Syntax(((), [int], [str]), int).returns(((), int, int))
         def foo(t, x):
             u = [n for n in t[0]]
             v = [s for s in t[1]] # needed for processing

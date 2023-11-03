@@ -82,13 +82,18 @@ class ExampleAnalysis(ExampleAnalysis):
 
         # block metadata
         for block in self.CFG:
+            self.assign(block, self.var)
+            # it is important to clear the variable before appending
+            # in case a previously invalidated pass still has data stored
             for (i, I) in enumerate(block):
                 if isinstance(I, self.track_type):
                     self.assign(block, self.var, str(i), append=True)
-            # could have equivalently used
+            # we could have equivalently used
             # self.assign(block, self.var,
             #             *(str(i) for i in range(len(block))
             #             if isinstance(block[i], self.track_type)))
+            # in which case clearing the variable is unnecessary
+            # (because we are not appending)
 
         # instruction metadata
         # (not combined with above iteration for the sake of showcasing)

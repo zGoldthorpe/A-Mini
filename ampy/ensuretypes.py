@@ -40,7 +40,7 @@ class Syntax(Syntax):
         - list (after which is asserted to be a list of 5 integers)
         - dict (after which is asserted to be a map from strings to strings)
 
-    ([type0, type1, ...],)
+    ((), type0, type1 [, ...])
         Match to a tuple where each argument has a distinct specified type.
         These types may be elaborate.
 
@@ -127,9 +127,9 @@ class Syntax(Syntax):
 
         if isinstance(ty, tuple):
             # union or tuple
-            if len(ty) == 1 and isinstance(ty[0], list):
+            if len(ty) > 0 and ty[0] == ():
                 # this is a tuple match
-                return ([Syntax._verify_input(t) for t in ty[0]],)
+                return ((),) + tuple(Syntax._verify_input(t) for t in ty[1:])
             
             # otherwise, it is a union
             newty = []
@@ -265,9 +265,9 @@ class Syntax(Syntax):
             return ty.__name__
 
         if isinstance(ty, tuple):
-            if len(ty) == 1 and isinstance(ty[0], list):
-                tp = ", ".join(Syntax._type_name(t) for t in ty[0])
-                return f"([ {tp} ],)"
+            if len(ty) > 0 and ty[0] == ():
+                tp = ", ".join(Syntax._type_name(t) for t in ty[1:])
+                return f"((), {tp})"
 
             union = ", ".join("None" if t is None
                     else t.__name__ if isinstance(t, type)
@@ -382,12 +382,12 @@ class Syntax(Syntax):
             raise TypeError(errmsg + f"\nExpected {ty.__name__}, but received {type(arg).__name__}.")
 
         if isinstance(ty, tuple):
-            if len(ty) == 1 and isinstance(ty[0], list):
+            if len(ty) > 0 and ty[0] == ():
                 # tuple match
-                if len(arg) != len(ty[0]):
-                    raise TypeError(errmsg + f"\nTuple has incorrect length: expected {len(ty[0])}, but got {len(arg)}.")
+                if len(arg) != len(ty)-1:
+                    raise TypeError(errmsg + f"\nTuple has incorrect length: expected {len(ty)-1}, but got {len(arg)}.")
                 return tuple(Syntax._check(a, t, errmsg=errmsg+f"\nElement {i} in tuple of incorrect type.")
-                            for i, (a, t) in enumerate(zip(arg, ty[0])))
+                                for i, (a, t) in enumerate(zip(arg, ty[1:])))
             # or union
             for t in ty:
                 if t is None:

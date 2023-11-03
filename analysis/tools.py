@@ -41,7 +41,7 @@ class Analysis:
         def Analysis_analysis_wrap(self):
             if self.valid:
                 return
-            ampy.debug.print(type(self).__name__, "running analysis")
+            ampy.debug.print(type(self).__name__, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running analysis...")
             func(self)
             self.valid = True
         
@@ -148,7 +148,7 @@ class Analysis(Analysis):
         # this method should be overridden by subclass
         raise NotImplementedError
     
-    @(Syntax(object) >> [set, ([[tuple, str], {str:str}],)])
+    @(Syntax(object) >> [set, ((), [tuple, str], {str:str})])
     def get_validated_inputs(self):
         """
         Checks the metadata to find all input parameter pairs passed to versions
@@ -156,7 +156,7 @@ class Analysis(Analysis):
         """
         meta = self.CFG.meta.get(self.ID, None)
         if meta is None:
-            return []
+            return set()
         index = 0
         outputs = set()
         while index < len(meta):
@@ -165,7 +165,9 @@ class Analysis(Analysis):
             while index < len(meta):
                 if meta[index] == "$":
                     outputs.add((tuple(args), kwargs))
-                elif '=' in meta[index]:
+                    index += 1
+                    break
+                if '=' in meta[index]:
                     key, val = map(lambda s:s.strip(), meta[index].split('=', 1))
                     kwargs[key] = val
                 else:
@@ -220,7 +222,7 @@ class Analysis(Analysis):
         cls._ID = ID
 
     @property
-    @(Syntax(object) >> ([[tuple, str], {str:str}],))
+    @(Syntax(object) >> ((), [tuple, str], {str:str}))
     def inputs(self):
         return self._inputs
 
