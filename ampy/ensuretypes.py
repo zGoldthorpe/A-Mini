@@ -15,6 +15,9 @@ from types import (
         FunctionType,
         )
 
+#TODO: refactor generator type to not use a set
+#      instead, set syntax to [iter, ty, [lo, hi]]
+
 class Syntax:
     # forward declaration
     pass
@@ -683,10 +686,7 @@ class TypedSet(set):
         return f"{repr(set(self))}:{Syntax._type_name(self._ty)}"
     
     def __iter__(self):
-        return Syntax._check(
-                arg=super().__iter__(),
-                ty={self._ty}, # iterator
-                errmsg=self._errmsg)
+        return TypedIterator(super().__iter__(), self._ty, errmsg=self._errmsg)
 
     def pop(self):
         return Syntax._check(
@@ -806,6 +806,9 @@ class TypedDict(dict):
                     ty=self._vty,
                     errmsg=self._errmsg
                     + f" Assigning incorrect type to key {key}."))
+
+    def __hash__(self):
+        return hash(tuple(self.items()))
 
     def get(self, key, default=None):
         return Syntax._check(

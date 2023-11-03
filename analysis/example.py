@@ -42,15 +42,15 @@ class ExampleAnalysis(ExampleAnalysis):
     # every class should have a docstring
 
     # "example" is the ID of the pass
-    # 1 is the max number of positional arguments expected
-    # "count" is a keyword argument
+    # "add" is the default argument for the positional argument
+    # count="blocks" is the default argument for the keywoard argument
     # note: all arguments are necessrily of string type
-    @ExampleAnalysis.init("example", 1, "count")
-    def __init__(self, instr_tracker="add", *, count="blocks"):
-        # the wrapper ensures the number of arguments is correct
-        # but the * is just to be safe (and to make it clear which arguments
-        # are positional). It is strongly recommended that arguments to
-        # Analysis objects are all optional.
+    @ExampleAnalysis.init("example", "add", count="blocks")
+    def __init__(self, instr_tracker, *, count):
+        # the * indicates where the keyword arguments start
+        # note that default arguments are not passed since they are handled
+        # by the wrapper
+
         match instr_tracker:
             case "add":
                 self.track_type = ampy.types.AddInstruction

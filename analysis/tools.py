@@ -14,6 +14,7 @@ from ampy.ensuretypes import (
         Assertion,
         Syntax,
         TypedList,
+        TypedDict,
         )
 from ampy.passmanager import BadArgumentException
 import ampy.debug
@@ -50,18 +51,15 @@ class Analysis:
         return Analysis_analysis_wrap
 
     @classmethod
-    @(Syntax(object, str, int, str, ...)
-      | Syntax(object, str))
-    def init(cls, ID, nargs=0, *kwargnames):
+    @Syntax(object, str, str, ...).set_allow_extra_kwargs(True, str)
+    def init(cls, ID, *def_args, **def_kwargs):
         """
         Wrapper intended for subclass initialisation, with a specific ID.
 
-        nargs
-            specifies the number of positional arguments that are passed
-            to the initialiser after the CFG and the list of existing analyses
-        kwargnames
-            specifies the expected keyword arguments that are passed after the
-            positional arguments
+        def_args
+            default values for positional arguments
+        def_kwargs
+            default values for keyword arguments
 
         NB: this wrapper asserts correctness of arguments on the assumption
         that everything after the CFG and list of existing analyses are optional
@@ -70,22 +68,30 @@ class Analysis:
         def Analysis_init_wrapper(initfunc):
 
             @functools.wraps(initfunc)
-            @(Syntax(object, ampy.types.CFG, ((TypedList, [Analysis]),), str, ...).set_allow_extra_kwargs(True) >> None)
+            @(Syntax(object, ampy.types.CFG, ((TypedList, [Analysis]),), str, ...).set_allow_extra_kwargs(True, str) >> None)
             def Analysis_init_wrap(self, cfg, analyses, *args, **kwargs):
                 self.CFG = cfg
-                if len(args) > nargs:
-                    raise BadArgumentException(f"{cls.__name__} expects at most {nargs} positional arguments; received {len(args)}.")
+                args = list(args)
+                if len(args) > len(def_args):
+                    raise BadArgumentException(f"{cls.__name__} expects at most {len(def_args)} positional arguments; receive {len(args)}.")
+                while len(args) < len(def_args):
+                    args.append(def_args[len(args)])
+                
                 for kw in kwargs:
-                    if kw not in kwargnames:
+                    if kw not in def_kwargs:
                         raise BadArgumentException(f"Unrecognised keyword argument {kw} passed to {cls.__name__}")
+                for kw in def_kwargs:
+                    if kw not in kwargs:
+                        kwargs[kw] = def_kwargs[kw]
 
                 self._analyses = analyses
                 self._analyses.append(self)
                 initfunc(self, *args, **kwargs)
+                self._inputs = (tuple(args), kwargs)
 
             Analysis_init_wrap.__doc__ = ("Expects a CFG, a TypedList of previously-instantiated analyses"
-                        + (f", {nargs} positional argument{'s' if nargs != 1 else ''}" if nargs > 0 else "")
-                        + (f", and keyword argument{'s' if len(kwargnames) > 0 else ''} {', '.join(kwargnames)}" if len(kwargnames) > 0 else "")
+                        + (f", {len(def_args)} positional argument{'s' if len(def_args) != 1 else ''}" if len(def_args) > 0 else "")
+                        + (f", and keyword argument{'s' if len(def_kwargs) > 0 else ''} {', '.join(def_kwargs.keys())}" if len(def_kwargs) > 0 else "")
                         + "."
                         + (f"\n{initfunc.__doc__}" if initfunc.__doc__ is not None else ""))
 
@@ -141,6 +147,31 @@ class Analysis(Analysis):
     def __init__(self, cfg, analyses):
         # this method should be overridden by subclass
         raise NotImplementedError
+    
+    @(Syntax(object) >> [set, ([[tuple, str], {str:str}],)])
+    def get_validated_inputs(self):
+        """
+        Checks the metadata to find all input parameter pairs passed to versions
+        of the analysis that have been validated.
+        """
+        meta = self.CFG.meta.get(self.ID, None)
+        if meta is None:
+            return []
+        index = 0
+        outputs = set()
+        while index < len(meta):
+            args = []
+            kwargs = TypedDict({}, str, str)
+            while index < len(meta):
+                if meta[index] == "$":
+                    outputs.add((tuple(args), kwargs))
+                elif '=' in meta[index]:
+                    key, val = map(lambda s:s.strip(), meta[index].split('=', 1))
+                    kwargs[key] = val
+                else:
+                    args.append(meta[index])
+                index += 1
+        return outputs
 
     @property
     @(Syntax(object) >> bool)
@@ -150,15 +181,31 @@ class Analysis(Analysis):
         (Manipulations to metadata outside of this class needs to invalidate
         its data explicitly.)
         """
-        return self.CFG.meta.get(self.ID, None) is not None
+        return self.inputs in self.get_validated_inputs()
 
     @valid.setter
     @(Syntax(object, bool) >> None)
     def valid(self, value):
+        validated = self.get_validated_inputs()
         if value:
-            self.CFG.meta[self.ID] = []
+            validated.add(self.inputs)
         elif self.valid:
-            del self.CFG.meta[self.ID]
+            validated.remove(self.inputs)
+        
+        # we might have completely invalidated the pass
+        if len(validated) == 0:
+            if self.valid:
+                del self.CFG.meta[self.ID]
+
+        # now store the updated validity list
+        validated_list = []
+        for args, kwargs in validated:
+            for arg in args:
+                validated_list.append(arg)
+            for kw, arg in kwargs.items():
+                validated_list.append(f"{kw}={arg}")
+            validated_list.append("$")
+        self.CFG.meta[self.ID] = validated_list
 
     @property
     @classmethod
@@ -171,6 +218,11 @@ class Analysis(Analysis):
     @(Syntax(object, ID_re) >> None)
     def ID(cls, ID):
         cls._ID = ID
+
+    @property
+    @(Syntax(object) >> ([[tuple, str], {str:str}],))
+    def inputs(self):
+        return self._inputs
 
     @property
     @(Syntax(object) >> [Analysis])
