@@ -23,6 +23,15 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @Syntax(([int, float, int],)).returns(([str, float],))
+        def foo(t): return str(t[0] + t[2]), t[1]"""),
+        "assert foo((1, 2., 3)) == ('4', 2.)",
+        ("foo((1, 2, 3))", TypeError),
+        ("foo(1, 2., 3)", TypeError),
+        ("foo((1., 2., 3.))", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @Syntax([list, int, [2, 5]])
         def foo(ls):
             s = 0
@@ -157,6 +166,17 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
+        @Syntax(([[int], [str]],), int).returns(([int, int],))
+        def foo(t, x):
+            u = [n for n in t[0]]
+            v = [s for s in t[1]] # needed for processing
+            return len(u)+x, len(v)+x"""),
+        "assert foo([[1, 2], ['a', 'b']], 1) == (3, 3)",
+        "assert foo(([], []), 4) == (4, 4)",
+        ("foo([[1, 2.], ['a', 'b']], 1)", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
         @Syntax(lambda:Syntax(int)>>int, int).returns(int)
         def foo(func, x): return func(x)"""),
         "assert foo(lambda x: x+1, 0) == 1",
@@ -178,6 +198,18 @@ ts.exec(tw("""
         "assert g('10') == '2'",
         ("f('10')", TypeError),
         ("g(10)", TypeError),
+        state=dict(Syntax=Syntax))
+
+ts.exec(tw("""
+        @Syntax(int).set_allow_extra_kwargs(True, float).returns(float)
+        def foo(x, **kwargs):
+            y = float(x)
+            for z in kwargs.values():
+                y += z
+            return y"""),
+        "assert foo(3, g=1., h=2.) == 6.",
+        ("foo(3, g=5)", TypeError),
+        ("foo(5, a=2., b='h')", TypeError),
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""

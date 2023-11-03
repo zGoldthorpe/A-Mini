@@ -40,6 +40,10 @@ class Syntax(Syntax):
         - list (after which is asserted to be a list of 5 integers)
         - dict (after which is asserted to be a map from strings to strings)
 
+    ([type0, type1, ...],)
+        Match to a tuple where each argument has a distinct specified type.
+        These types may be elaborate.
+
     [container, type, [lo, hi]]
         Type must be a container-like iterable of entries of specified
         type, where the number of entries is bounded between lo and hi,
@@ -83,8 +87,9 @@ class Syntax(Syntax):
         toggle if function calls with missing kwargs are permissible
         (default: True)
     
-    .set_allow_extra_kwargs(flag):
-        toggle if function calls with unanticipated kwargs are permissible
+    .set_allow_extra_kwargs(flag, ty=object):
+        toggle if function calls with unanticipated kwargs are permissible, and assert
+        they have a specified type ty
         (default: False)
 
     .union(*args, **kwargs)
@@ -121,7 +126,12 @@ class Syntax(Syntax):
             return ty
 
         if isinstance(ty, tuple):
-            # union
+            # union or tuple
+            if len(ty) == 1 and isinstance(ty[0], list):
+                # this is a tuple match
+                return ([Syntax._verify_input(t) for t in ty[0]],)
+            
+            # otherwise, it is a union
             newty = []
             for t in ty:
                 if t is None:
@@ -259,6 +269,10 @@ class Syntax(Syntax):
             return ty.__name__
 
         if isinstance(ty, tuple):
+            if len(ty) == 1 and isinstance(ty[0], list):
+                tp = ", ".join(Syntax._type_name(t) for t in ty[0])
+                return f"([ {tp} ],)"
+
             union = ", ".join("None" if t is None
                     else t.__name__ if isinstance(t, type)
                     else f"( {t[0].__name__} , {Syntax._type_name(t[1])} )"
@@ -312,13 +326,14 @@ class Syntax(Syntax):
         self._allow_undef_kwargs = flag
         return self # allow for chaining modifiers after constructor
     
-    def set_allow_extra_kwargs(self, flag):
+    def set_allow_extra_kwargs(self, flag, ty=object):
         """
         Toggle whether Syntax permits (if True) arguments passed
         to the function that do not have a type assertion provided
         to the Syntax instance
         """
         self._allow_extra_kwargs = flag
+        self._extra_kwarg_ty = Syntax._verify_input(ty)
         return self
 
     def __rshift__(self, ty):
@@ -373,6 +388,13 @@ class Syntax(Syntax):
             raise TypeError(errmsg + f"\nExpected {ty.__name__}, but received {type(arg).__name__}.")
 
         if isinstance(ty, tuple):
+            if len(ty) == 1 and isinstance(ty[0], list):
+                # tuple match
+                if len(arg) != len(ty[0]):
+                    raise TypeError(errmsg + f"\nTuple has incorrect length: expected {len(ty[0])}, but got {len(arg)}.")
+                return tuple(Syntax._check(a, t, errmsg=errmsg+f"\nElement {i} in tuple of incorrect type.")
+                            for i, (a, t) in enumerate(zip(arg, ty[0])))
+            # or union
             for t in ty:
                 if t is None:
                     if arg is None:
@@ -492,7 +514,10 @@ class Syntax(Syntax):
         for kw in kwargs:
             if kw not in self._kwtypes:
                 if self._allow_extra_kwargs:
-                    wrapped_kwargs[kw] = kwargs[kw] # do nothing to argument
+                    wrapped_kwargs[kw] = Syntax._check(
+                            arg=kwargs[kw],
+                            ty=self._extra_kwarg_ty,
+                            errmsg=f"Extra keyword arguments to {func_name} (such as {kw}) must have type {Syntax._type_name(self._extra_kwarg_ty)}; unexpected {Syntax._type_name(type(kwargs[kw]))}")
                     continue
                 raise TypeError(f"{func_name} received unexpected keyword argument {kw}.")
             wrapped_kwargs[kw] = Syntax._check(
