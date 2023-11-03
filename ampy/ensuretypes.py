@@ -15,9 +15,6 @@ from types import (
         FunctionType,
         )
 
-#TODO: refactor generator type to not use a set
-#      instead, set syntax to [iter, ty, [lo, hi]]
-
 class Syntax:
     # forward declaration
     pass
@@ -58,11 +55,11 @@ class Syntax(Syntax):
         [*, type] is shorthand for [*, type, ...] = [*, type, [...,...]]
         [type, *] is shorthand for [list, type, *]
 
+    [iter, type]
+        Type must be an iterator that generates a specified type.
+
     {type0 : type1}
         Type must be a dict from type0 to type1
-
-    {type}
-        Type must be a generator of indicated type
 
     slice(start, stop, step)
         Type is a slice object whose start, stop, and step types are as specified
@@ -171,7 +168,10 @@ class Syntax(Syntax):
                 case 1: # [type] = [list, type, ...]
                     ty.insert(0, list)
                     ty.append(Ellipsis)
-                case 2: # [container, type] or [type, count]
+                case 2: # [container, type] or [type, count] or [iter, type]
+                    if ty[0] == iter:
+                        # [iter, type]
+                        return [iter, Syntax._verify_input(ty[1])]
                     if isinstance(ty[1], (int, EllipsisType, list)):
                         # [type, count] = [list, type, count]
                         ty.insert(0, list)
@@ -198,13 +198,6 @@ class Syntax(Syntax):
 
             # now, ty = [container, type, [lo, hi]]
             return [ty[0], Syntax._verify_input(ty[1]), ty[2]]
-
-        if isinstance(ty, set):
-            # iterator of fixed type
-            if len(ty) != 1:
-                raise SyntaxError("Iterator type must be of the form {type}")
-            gty = list(ty)[0]
-            return {Syntax._verify_input(gty)}
 
         if isinstance(ty, dict):
             # dictionary of fixed key-value type pairing
@@ -292,14 +285,12 @@ class Syntax(Syntax):
             return f"slice({start}, {stop}, {step})"
 
         if isinstance(ty, list):
+            if ty[0] == iter:
+                return f"[ iter, {Syntax._type_name(ty[1])} ]"
             ty0 = ty[0].__name__
             ty1 = Syntax._type_name(ty[1])
             lo, hi = map(lambda t: "..." if t is Ellipsis else t, ty[2])
             return f"[ {ty0}, {ty1}, [ {lo}, {hi} ] ]"
-
-        if isinstance(ty, set):
-            gty = list(ty)[0]
-            return f"{{ {Syntax._type_name(gty)} }}"
 
         if isinstance(ty, dict):
             kty = list(ty)[0]
@@ -427,6 +418,16 @@ class Syntax(Syntax):
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects a slice; received {type(arg).__name__}")
 
         if isinstance(ty, list):
+            if ty[0] == iter:
+                # generator, so treat separately
+                if hasattr(arg, "__next__"):
+                    if isinstance(arg, TypedIterator):
+                        arg._ty = ty[1]
+                        return arg
+                    return TypedIterator(arg, ty[1], errmsg=errmsg)
+                raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects iterator; received {type(arg).__name__}")
+
+            # otherwise, it is an iterable
             if hasattr(arg, "__len__"):
                 lo, hi = ty[2]
                 lo = 0 if lo is Ellipsis else lo
@@ -454,15 +455,6 @@ class Syntax(Syntax):
                         return TypedString(arg, ty[1], errmsg=errmsg)
                 raise TypeError(errmsg + f"\nIterable {arg} does not have appropriate length to match {Syntax._type_name(ty)}")
             raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects an iterable; received {type(arg).__name__}")
-
-        if isinstance(ty, set):
-            gty = list(ty)[0]
-            if hasattr(arg, "__next__"):
-                if isinstance(arg, TypedIterator):
-                    arg._ty = gty
-                    return arg
-                return TypedIterator(arg, gty, errmsg=errmsg)
-            raise TypeError(errmsg + f"\n{Syntax._type_name(ty)} expects iterator; received {type(arg).__name__}")
                 
         if isinstance(ty, dict):
             kty = list(ty)[0]
@@ -648,10 +640,7 @@ class TypedList(list):
         return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
     
     def __iter__(self):
-        return Syntax._check(
-                arg=super().__iter__(),
-                ty={self._ty}, # iterator
-                errmsg=self._errmsg)
+        return TypedIterator(super().__iter__(), self._ty, errmsg=self._errmsg)
 
     def __getitem__(self, index):
         if isinstance(index, slice):
@@ -717,10 +706,7 @@ class TypedTuple(tuple):
         self._errmsg = errmsg
     
     def __iter__(self):
-        return Syntax._check(
-                arg=super().__iter__(),
-                ty={self._ty}, # iterator
-                errmsg=self._errmsg)
+        return TypedIterator(super().__iter__(), self._ty, errmsg=self._errmsg)
 
     def __repr__(self):
         return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
@@ -752,10 +738,7 @@ class TypedString(str):
         self._errmsg = errmsg
 
     def __iter__(self):
-        return Syntax._check(
-                arg=super().__iter__(),
-                ty={self._ty}, # iterator
-                errmsg=self._errmsg)
+        return TypedIterator(super().__iter__(), self._ty, errmsg=self._errmsg)
 
     def __repr__(self):
         return f"{super().__repr__()}:{Syntax._type_name(self._ty)}"
@@ -806,6 +789,9 @@ class TypedDict(dict):
                     ty=self._vty,
                     errmsg=self._errmsg
                     + f" Assigning incorrect type to key {key}."))
+
+    def __iter__(self):
+        return TypedIterator(super().__iter__(), self._kty, errmsg=self._errmsg)
 
     def __hash__(self):
         return hash(tuple(self.items()))

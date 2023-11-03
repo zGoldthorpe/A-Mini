@@ -108,7 +108,7 @@ class CFGWriter:
         self._set_tabwidth()
         self._set_codewidth()
 
-    @(Syntax(object, str, str, [str]) >> {str})
+    @(Syntax(object, str, str, [str]) >> [iter, str])
     def _meta_str(self, char, key, values):
         """
         Generates metadata comment.
@@ -131,10 +131,8 @@ class CFGWriter:
                 
                 yield f";{char}!{key}: " + ' '.join(values[start:end])
                 start = end
-        
 
-
-    @(Syntax(object, ampy.types.InstructionClass) >> {str})
+    @(Syntax(object, ampy.types.InstructionClass) >> [iter, str])
     def _instruction_str(self, instruction):
         """
         Generates plaintext form of instruction to output list
@@ -151,7 +149,7 @@ class CFGWriter:
                     line = ' '*self.width
                 line = ' '*self.width
 
-    @(Syntax(object, ampy.types.BasicBlock) >> {str})
+    @(Syntax(object, ampy.types.BasicBlock) >> [iter, str])
     def _block_str(self, block):
         """
         Generates plaintext form of each instruction of a block
@@ -172,7 +170,7 @@ class CFGWriter:
             for I_str in self._instruction_str(I):
                 yield I_str
 
-    @(Syntax(object, ampy.types.CFG) >> {str})
+    @(Syntax(object, ampy.types.CFG) >> [iter, str])
     def generate(self, cfg):
         """
         Generates plaintext form of entire CFG

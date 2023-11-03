@@ -53,7 +53,7 @@ class PassManager:
 
         self._registered[alias] = cls
 
-    @(Syntax(object) >> {str})
+    @(Syntax(object) >> [iter, str])
     def __iter__(self):
         for alias in self._registered:
             yield alias

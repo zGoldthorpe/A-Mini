@@ -107,7 +107,7 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
-        @(Syntax({int}) >> int)
+        @(Syntax([iter, int]) >> int)
         def foo(gen): return sum(gen)"""),
         "assert foo(i for i in range(5)) == 10",
         state=dict(Syntax=Syntax))
@@ -120,7 +120,7 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
-        @(Syntax(int) >> {int})
+        @(Syntax(int) >> [iter, int])
         def foo(N):
             for i in range(N):
                 yield i"""),
@@ -128,7 +128,7 @@ ts.exec(tw("""
         state=dict(Syntax=Syntax))
 
 ts.exec(tw("""
-        @(Syntax(int) >> {int})
+        @(Syntax(int) >> [iter, int])
         def bad(N):
             for i in range(N):
                 yield i

@@ -42,7 +42,7 @@ class RegDict:
             # ...apologise second
             return False
 
-    @(Syntax(object) >> {str})
+    @(Syntax(object) >> [iter, str])
     def __iter__(self):
         for key in self._dict:
             yield key

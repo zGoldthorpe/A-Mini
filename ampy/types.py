@@ -214,7 +214,7 @@ class BranchTargets(BranchTargets):
                 else 1 if self._target is not None
                 else 0)
 
-    @(Syntax(object) >> {BasicBlock})
+    @(Syntax(object) >> [iter, BasicBlock])
     def __iter__(self):
         if self._cond is not None:
             yield self._iftrue
@@ -292,7 +292,7 @@ class BasicBlock(BasicBlock):
         return len(self._instructions) + 1
         # the + 1 is for the branch instruction
 
-    @(Syntax(object) >> {InstructionClass})
+    @(Syntax(object) >> [iter, InstructionClass])
     def __iter__(self):
         for I in self._instructions:
             yield I
@@ -459,7 +459,7 @@ class CFG:
     def __len__(self):
         return len(self._blocks)
 
-    @(Syntax(object) >> {BasicBlock})
+    @(Syntax(object) >> [iter, BasicBlock])
     def __iter__(self):
         for label in self._blocks:
             yield self._blocks[label]
@@ -476,14 +476,14 @@ class CFG:
         return set(self._blocks.keys())
 
     @property
-    @(Syntax(object) >> {BasicBlock})
+    @(Syntax(object) >> [iter, BasicBlock])
     def blocks(self):
         for label in self._blocks:
             if label not in self._undef_blocks:
                 yield self._blocks[label]
 
     @property
-    @(Syntax(object) >> {BasicBlock})
+    @(Syntax(object) >> [iter, BasicBlock])
     def undefined_blocks(self):
         for label in self._undef_blocks:
             yield self._blocks[label]
