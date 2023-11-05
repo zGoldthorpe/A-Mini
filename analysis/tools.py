@@ -24,7 +24,7 @@ ID_re = r"[a-zA-Z0-9\-_.,;|]+"
 
 class Analysis:
     # forward declaration
-    # also defines wrappers
+    # and define wrappers
     @classmethod
     def analysis(cls, func):
         """
@@ -70,7 +70,6 @@ class Analysis:
             @functools.wraps(initfunc)
             @(Syntax(object, ampy.types.CFG, ((TypedList, [Analysis]),), str, ...).set_allow_extra_kwargs(True, str) >> None)
             def Analysis_init_wrap(self, cfg, analyses, *args, **kwargs):
-                self.CFG = cfg
                 args = list(args)
                 if len(args) > len(def_args):
                     raise BadArgumentException(f"{cls.__name__} expects at most {len(def_args)} positional arguments; receive {len(args)}.")
@@ -84,8 +83,10 @@ class Analysis:
                     if kw not in kwargs:
                         kwargs[kw] = def_kwargs[kw]
 
-                self._analyses = analyses
-                self._analyses.append(self)
+                analyses.append(self) # update analysis list
+                super().__init__(cfg, analyses)
+
+                ampy.debug.print(ID, f"Initialising analysis with arguments {args}, {kwargs}")
                 initfunc(self, *args, **kwargs)
                 self._inputs = (tuple(args), kwargs)
 
@@ -99,7 +100,7 @@ class Analysis:
 
         return Analysis_init_wrapper
 
-    def get(func):
+    def getter(func):
         """
         Wrapper intended for subclass to identify methods
         that require analysis to be valid.
@@ -114,7 +115,7 @@ class Analysis:
 
         return Analysis_get_wrap
 
-    def set(func):
+    def setter(func):
         """
         Wrapper intended for subclass to identify methods
         that modify analysis metadata (thus invalidating
@@ -129,7 +130,60 @@ class Analysis:
 
         return Analysis_set_wrap
 
-class Analysis(Analysis):
+class RequiresAnalysis:
+    """
+    Provides functionality for querying analysis data from analyses handled
+    by an Analysis manager.
+    """
+
+    def __init__(self, cfg, analyses):
+        self.CFG = cfg
+        self._analyses = analyses
+
+    @(Syntax(object, [list, Analysis]) >> None)
+    def pass_analyses(self, ls):
+        """
+        Pass analyses to class instance so that it may query data
+        """
+        self._analyses = ls
+
+    @(Syntax(object, type, (str, type(any)), ...).set_allow_extra_kwargs(True, (str, type(any))) >> Analysis)
+    def require_analysis(self, analysis_cls, *req_args, **req_kwargs):
+        """
+        Fetch data from a required analysis with specified arguments.
+        Set argument to any if it is unimportant.
+        Unspecified or missing arguments are equivalent to passing any.
+        """
+        required = None
+        for analysis in self._analyses:
+            if not isinstance(analysis, analysis_cls):
+                continue
+            args, kwargs = analysis.inputs
+            if len(req_args) > len(args):
+                continue
+            if len(list(filter(lambda k: k not in kwargs, req_kwargs))) > 0:
+                continue
+            if not all(lha == rha or rha is any for lha, rha in zip(args, req_args)):
+                continue
+            if not all(kwargs[k] == req_kwargs[k] or req_kwargs[k] is any for k in req_kwargs):
+                continue
+            # at this point, everything matches up
+            required = analysis
+            break
+
+        if required is None:
+            # analysis cannot be found
+            # so initalise a new analysis
+            # (this will also update analysis list for next time)
+            required = analysis_cls(self.CFG, self._analyses,
+                    *(filter(lambda s: isinstance(s, str), req_args)),
+                    **{key:arg for key, arg in req_kwargs.items() if isinstance(arg, str)})
+            # "any" arguments are given default values
+
+        return required
+
+
+class Analysis(Analysis, RequiresAnalysis):
     """
     Parent class for manipulating metadata in a specific CFG
 
@@ -220,6 +274,18 @@ class Analysis(Analysis):
     @(Syntax(object, ID_re) >> None)
     def ID(cls, ID):
         cls._ID = ID
+        cls._recog = re.compile(f"{cls._ID}/(.*)")
+
+    @classmethod
+    @(Syntax(object) >> ((), int, [set, str]))
+    def arity(cls):
+        """
+        Returns the arity of the analysis as a pair
+        (pos_args_count:int, kwarg_keys:set)
+
+        Determined by init wrapper
+        """
+        return cls._arity
 
     @property
     @(Syntax(object) >> ((), [tuple, str], {str:str}))
@@ -278,7 +344,7 @@ class Analysis(Analysis):
                     if self.owns(arg):
                         del I.meta[arg]
 
-    @Analysis.get
+    @Analysis.getter
     @(Syntax(object, str) # CFG #!var
       | Syntax(object, slice(ampy.types.BasicBlock, str)) # block @!var
       | Syntax(object, slice(ampy.types.BasicBlock, int, str)) # instr %!var
@@ -286,14 +352,14 @@ class Analysis(Analysis):
     def __getitem__(self, arg):
         if isinstance(arg, str):
             # CFG metadata
-            return self.CFG.meta.get(self.tagged(arg), default=None)
+            return self.CFG.meta.get(self.tagged(arg), None)
         if isinstance(arg.stop, str):
             # block metadata
-            return arg.start.meta.get(self.tagged(arg.stop), default=None)
+            return arg.start.meta.get(self.tagged(arg.stop), None)
         # instruction metadata
         return arg.start[arg.stop].meta.get(self.tagged(arg.step), default=None)
 
-    @Analysis.set
+    @Analysis.setter
     @(Syntax(object, str, str, ..., append=bool) # CFG #!var
      | Syntax(object, ampy.types.BasicBlock, str, str, ..., append=bool) # block @!var
      | Syntax(object, ampy.types.BasicBlock, int, str, str, ..., append=bool) # instr %!var

@@ -185,6 +185,7 @@ class Syntax(Syntax):
 
             # now, ty = [container, type, counter]
             if not ty[0] in containers:
+                print(ty)
                 raise SyntaxError(errmsg + " where the container is one of: " + ", ".join(t.__name__ for t in containers))
             if not isinstance(ty[2], list):
                 if not isinstance(ty[2], (int, EllipsisType)):
@@ -393,7 +394,7 @@ class Syntax(Syntax):
                 if t is None:
                     if arg is None:
                         return arg
-                if isinstance(t, type):
+                elif isinstance(t, type):
                     if isinstance(arg, t):
                         return arg
                 else:

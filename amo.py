@@ -154,7 +154,7 @@ except amr.ParseError as e:
 
 ### optimise ###
 
-valid_analyses = AnalysisList()
+passed_analyses = AnalysisList()
 if args.passes is not None:
     for opt in args.passes:
         opt_args = []
@@ -172,7 +172,7 @@ if args.passes is not None:
 
         if opt in AM:
             try:
-                analysis = AM[opt](cfg, valid_analyses, *opt_args, **opt_kwargs)
+                analysis = AM[opt](cfg, passed_analyses, *opt_args, **opt_kwargs)
             except BadArgumentException as e:
                 amp.perror(f"{opt} received invalid argument.\n{e}")
                 exit(-7)

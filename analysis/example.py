@@ -16,7 +16,7 @@ At the instruction level: "index" indicates the index of the instruction in the 
 
 from ampy.ensuretypes import Syntax
 from ampy.passmanager import BadArgumentException
-from analysis.tools import Analysis
+from analysis.tools import Analysis, RequiresAnalysis
 
 import ampy.types
 
@@ -100,3 +100,22 @@ class ExampleAnalysis(ExampleAnalysis):
         for block in self.CFG:
             for (i, I) in enumerate(block):
                 self.assign(block, i, "index", str(i))
+
+class AddLister(RequiresAnalysis):
+    """
+    This is an example of a class that interprets data from an analysis,
+    which may be convenient for other analyses or optimisations
+    """
+
+    @(Syntax(object, str) >> [list, ampy.types.InstructionClass])
+    def list_adds(self, block_label):
+        if block_label not in self.CFG.labels:
+            return []
+        block = self.CFG[block_label]
+        outs = []
+        for i_str in self.require_analysis(ExampleAnalysis, "add", count=any)[block:"add_indices"]:
+            # if the example analysis does not run with the argument "add", then it will trigger
+            # processing of the specified example analysis
+            i = int(i_str)
+            outs.append(block[i])
+        return outs
