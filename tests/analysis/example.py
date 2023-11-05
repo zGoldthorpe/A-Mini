@@ -72,6 +72,17 @@ ts.exec("add_lister = AddLister(cfg, al)",
 
 cfg = CFGBuilder().build(*prog)
 al = AnalysisList()
+ExampleAnalysis(cfg, al, "add", count="instructions")
+ts.exec("add_lister = AddLister(cfg, al)",
+        "assert add_lister.list_adds('@A') == [cfg['@A'][2], cfg['@A'][4]]",
+        "assert len(al) == 1",
+        state=dict(cfg=cfg,
+                    AddLister=AddLister,
+                    prog=prog,
+                    al=al))
+
+cfg = CFGBuilder().build(*prog)
+al = AnalysisList()
 ExampleAnalysis(cfg, al, "mul", count="blocks")
 ExampleAnalysis(cfg, al, "mul", count="instructions")
 ts.exec("add_lister = AddLister(cfg, al)",

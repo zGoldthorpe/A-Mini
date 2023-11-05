@@ -1,3 +1,8 @@
+# Makefile for basic testing
+# Produces a *.vfy file on success
+# NB: run `make clean` before re-testing a module that has passed before
+# (I don't know how to propagate all dependencies so that only necessary *.vfy files get updated)
+
 PY=PYTHONPATH=. python3
 PYI=$(PY) -i
 
