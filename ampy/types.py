@@ -33,9 +33,24 @@ class InstructionClass:
     @(Syntax(object) >> None)
     def __init__(self):
         self.meta = MetaDict()
+        self._registers = set()
 
     def __repr__(self):
         raise NotImplementedError("Every instruction must override this method.")
+
+    @(Syntax(object, str, ...) >> None)
+    def _add_if_register(self, *regs):
+        for reg in regs:
+            if reg.startswith('%'):
+                self._registers.add(reg)
+
+    @property
+    @(Syntax(object) >> [set, str])
+    def registers(self):
+        """
+        Returns set of used registers
+        """
+        return set(self._registers)
 
 ### General instruction classes ###
 
@@ -46,6 +61,7 @@ class ArithInstructionClass(InstructionClass):
         self.op = op
         self.operands = (op1, op2)
         super().__init__()
+        self._add_if_register(res, op1, op2)
 
     def __repr__(self):
         return f"{self.target} = {self.operands[0]} {self.op} {self.operands[1]}"
@@ -57,6 +73,7 @@ class CompInstructionClass(InstructionClass):
         self.cmp = cmp
         self.operands = (op1, op2)
         super().__init__()
+        self._add_if_register(res, op1, op2)
 
     def __repr__(self):
         return f"{self.target} = {self.operands[0]} {self.cmp} {self.operands[1]}"
@@ -75,6 +92,7 @@ class MovInstruction(InstructionClass):
         self.target = lhs
         self.operand = rhs
         super().__init__()
+        self._add_if_register(lhs, rhs)
 
     def __repr__(self):
         return f"{self.target} = {self.operand}"
@@ -85,6 +103,7 @@ class PhiInstruction(InstructionClass):
         self.target = lhs
         self.conds = conds
         super().__init__()
+        self._add_if_register(lhs, *(val for val, _ in conds))
 
     def __repr__(self):
         return f"{self.target} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
@@ -142,6 +161,7 @@ class BranchInstruction(BranchInstructionClass):
         self.iftrue = iftrue
         self.iffalse = iffalse
         super().__init__()
+        self._add_if_register(cond)
 
     def __repr__(self):
         return f"branch {self.cond} ? {self.iftrue} : {self.iffalse}"
@@ -159,6 +179,7 @@ class ReadInstruction(InstructionClass):
     def __init__(self, lhs):
         self.target = lhs
         super().__init__()
+        self._add_if_register(lhs)
 
     def __repr__(self):
         return f"read {self.target}"
@@ -168,6 +189,7 @@ class WriteInstruction(InstructionClass):
     def __init__(self, lhs):
         self.target = lhs
         super().__init__()
+        self._add_if_register(lhs)
 
     def __repr__(self):
         return f"write {self.target}"
@@ -365,6 +387,17 @@ class BasicBlock(BasicBlock):
     def branch_instruction(self):
         return self._branch_targets.instruction
 
+    @property
+    @(Syntax(object) >> [set, str])
+    def registers(self):
+        """
+        Returns set of all registers used or defined in the basic block
+        """
+        regs = set()
+        for I in self:
+            regs |= I.registers
+        return regs
+
     ### Block modification ###
 
     @(Syntax(object, BasicBlock) >> None)
@@ -474,6 +507,18 @@ class CFG:
     @(Syntax(object) >> [set, str])
     def labels(self):
         return set(self._blocks.keys())
+
+    @property
+    @(Syntax(object) >> [set, str])
+    def registers(self):
+        """
+        Returns all registers used in a program.
+        Is potentially expensive, so perhaps only do this occasionally.
+        """
+        regs = set()
+        for block in self:
+            regs |= block.registers
+        return regs
 
     @property
     @(Syntax(object) >> [iter, BasicBlock])
