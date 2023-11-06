@@ -26,6 +26,8 @@ class Analysis:
     # forward declaration
     # and define wrappers
     @classmethod
+    @(Syntax(object, lambda:Syntax(object)>>None)
+     >> (lambda:Syntax(object)>>None))
     def analysis(cls, func):
         """
         Wrapper intended for subclass to identify its
@@ -41,11 +43,11 @@ class Analysis:
         def Analysis_analysis_wrap(self):
             if self.valid:
                 return
-            ampy.debug.print(type(self).__name__, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running analysis...")
+            ampy.debug.print(self.ID, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running analysis...")
             func(self)
             self.valid = True
         
-        Analysis_analysis_wrap.__doc__ = f"{cls.__name__} analysis" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
+        Analysis_analysis_wrap.__doc__ = f"{cls.__name__} analysis method" + (f"\n{func.__doc__}" if func.__doc__ is not None else "")
         cls._analyser_method = Analysis_analysis_wrap
 
         return Analysis_analysis_wrap
@@ -72,13 +74,13 @@ class Analysis:
             def Analysis_init_wrap(self, cfg, analyses, *args, **kwargs):
                 args = list(args)
                 if len(args) > len(def_args):
-                    raise BadArgumentException(f"{cls.__name__} expects at most {len(def_args)} positional arguments; receive {len(args)}.")
+                    raise BadArgumentException(f"{cls.ID} analysis expects at most {len(def_args)} positional argument{'s' if len(def_args) != 1 else ''}; received {len(args)}.")
                 while len(args) < len(def_args):
                     args.append(def_args[len(args)])
                 
                 for kw in kwargs:
                     if kw not in def_kwargs:
-                        raise BadArgumentException(f"Unrecognised keyword argument {kw} passed to {cls.__name__}")
+                        raise BadArgumentException(f"Unrecognised keyword argument {kw} passed to {cls.ID} analysis.")
                 for kw in def_kwargs:
                     if kw not in kwargs:
                         kwargs[kw] = def_kwargs[kw]
@@ -92,7 +94,7 @@ class Analysis:
 
             Analysis_init_wrap.__doc__ = ("Expects a CFG, a TypedList of previously-instantiated analyses"
                         + (f", {len(def_args)} positional argument{'s' if len(def_args) != 1 else ''}" if len(def_args) > 0 else "")
-                        + (f", and keyword argument{'s' if len(def_kwargs) > 0 else ''} {', '.join(def_kwargs.keys())}" if len(def_kwargs) > 0 else "")
+                        + (f", and keyword argument{'s' if len(def_kwargs) != 1 else ''} {', '.join(def_kwargs.keys())}" if len(def_kwargs) > 0 else "")
                         + "."
                         + (f"\n{initfunc.__doc__}" if initfunc.__doc__ is not None else ""))
 
@@ -140,12 +142,13 @@ class RequiresAnalysis:
         self.CFG = cfg
         self._analyses = analyses
 
-    @(Syntax(object, [list, Analysis]) >> None)
-    def pass_analyses(self, ls):
+    @property
+    @(Syntax(object) >> [Analysis])
+    def analyses(self):
         """
-        Pass analyses to class instance so that it may query data
+        Return the list of tracked analyses
         """
-        self._analyses = ls
+        return self._analyses
 
     @(Syntax(object, type, (str, type(any)), ...).set_allow_extra_kwargs(True, (str, type(any))) >> Analysis)
     def require_analysis(self, analysis_cls, *req_args, **req_kwargs):
@@ -155,7 +158,7 @@ class RequiresAnalysis:
         Unspecified or missing arguments are equivalent to passing any.
         """
         required = None
-        for analysis in self._analyses:
+        for analysis in self.analyses:
             if not isinstance(analysis, analysis_cls):
                 continue
             args, kwargs = analysis.inputs
@@ -175,7 +178,7 @@ class RequiresAnalysis:
             # analysis cannot be found
             # so initalise a new analysis
             # (this will also update analysis list for next time)
-            required = analysis_cls(self.CFG, self._analyses,
+            required = analysis_cls(self.CFG, self.analyses,
                     *(filter(lambda s: isinstance(s, str), req_args)),
                     **{key:arg for key, arg in req_kwargs.items() if isinstance(arg, str)})
             # "any" arguments are given default values
@@ -188,19 +191,24 @@ class Analysis(Analysis, RequiresAnalysis):
     Parent class for manipulating metadata in a specific CFG
 
     Analyses are created by subclassing Analysis.
-    The __init__ method is required to be wrapped by Subclass.init(ID)
+    The __init__ method is required to be wrapped by @<subclass>.init(ID, ...)
     Arguments to __init__ (besides "self") are then arguments that will be
-    expected in addition to the required CFG and list of existing analyses.
+    expected in addition to the required CFG and list of existing analyses, and
+    default values for each argument are required to be passed to the wrapper.
 
     The ID of an analysis must match the syntax for metadata arguments,
     EXCLUDING the character "/", which is necessary for the AnalysisManager
 
     Validity of an Analysis is tracked via CFG metadata
     """
-    @(Syntax(object, ampy.types.CFG, [Analysis]) >> None)
-    def __init__(self, cfg, analyses):
+
+    def __init__(self):
         # this method should be overridden by subclass
         raise NotImplementedError
+
+    @(Syntax(object, Analysis) >> bool)
+    def __eq__(self, other):
+        return self.ID == other.ID and self.inputs == other.inputs
     
     @(Syntax(object) >> [set, ((), [tuple, str], {str:str})])
     def get_validated_inputs(self):
@@ -276,26 +284,10 @@ class Analysis(Analysis, RequiresAnalysis):
         cls._ID = ID
         cls._recog = re.compile(f"{cls._ID}/(.*)")
 
-    @classmethod
-    @(Syntax(object) >> ((), int, [set, str]))
-    def arity(cls):
-        """
-        Returns the arity of the analysis as a pair
-        (pos_args_count:int, kwarg_keys:set)
-
-        Determined by init wrapper
-        """
-        return cls._arity
-
     @property
     @(Syntax(object) >> ((), [tuple, str], {str:str}))
     def inputs(self):
         return self._inputs
-
-    @property
-    @(Syntax(object) >> [Analysis])
-    def analyses(self):
-        return self._analyses
 
     @(Syntax(object, str) >> (str, None))
     def extract_arg(self, arg):
@@ -325,7 +317,7 @@ class Analysis(Analysis, RequiresAnalysis):
         Is implicitly called whenever arguments are fetched,
         but this can also be called explicitly
 
-        NOT meant to be overridden: to implement an analysis,
+        NOT meant to be overridden; to implement an analysis,
         use the @<subclass>.analysis decorator
         """
         if not hasattr(type(self), "_analyser_method"):
