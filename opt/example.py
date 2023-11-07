@@ -98,7 +98,7 @@ class ExampleOpt(ExampleOpt):
                     continue
                 changed = True
 
-                num_instrs = len(block)-1 # number of non-branch instructions
+                num_instrs = len(block)
                 new_block_count = num_instrs // (self.max_size-1) + 1
                 # safe to overshoot this count
                 new_labels = self.gen_labels(new_block_count, block.label)
@@ -113,6 +113,10 @@ class ExampleOpt(ExampleOpt):
                 i = 0
                 while idx < num_instrs:
                     top = min(idx + self.max_size - 1, num_instrs)
+                    if top + 1 == num_instrs:
+                        # the +1 is for the next branch instruction
+                        # so this uses the actual intended branch instruction
+                        top = num_instrs
 
                     self.CFG.add_block(new_labels[i],
                             *(block_instructions[i] for i in range(idx, top)))
