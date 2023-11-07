@@ -42,14 +42,14 @@ class ExampleAnalysis(ExampleAnalysis):
     # every class should have a docstring
 
     # "example" is the ID of the pass
-    # "add" is the default argument for the positional argument
-    # count="blocks" is the default argument for the keywoard argument
+    # "add" is the default value for the positional argument
+    # count="blocks" is the default value for the keywoard argument
     # note: all arguments are necessrily of string type
     @ExampleAnalysis.init("example", "add", count="blocks")
     def __init__(self, instr_tracker, *, count):
         # the * indicates where the keyword arguments start
-        # note that default arguments are not passed since they are handled
-        # by the wrapper
+        # note that default arguments are not passed here since they
+        # are handled by the wrapper
 
         match instr_tracker:
             case "add":
@@ -59,19 +59,23 @@ class ExampleAnalysis(ExampleAnalysis):
                 self.track_type = ampy.types.MulInstruction
                 self.var = "mul_indices"
             case _:
-                raise BadArgumentException("Positional argument to ExampleAnalysis must be either \"add\" or \"mul\".")
+                raise BadArgumentException("Positional argument of ExampleAnalysis must be either \"add\" or \"mul\".")
         
         if count in ["blocks", "instructions"]:
             self.count = count
         else:
-            raise BadArgumentException("Keyword argument \"count\" to ExampleAnalysis must be either \"blocks\" or \"instructions\".")
+            raise BadArgumentException("Keyword argument \"count\" of ExampleAnalysis must be either \"blocks\" or \"instructions\".")
 
 
     @ExampleAnalysis.analysis
-    @(Syntax(object) >> None)
     def get_info(self):
+        """
+        Scans the CFG for the number of blocks or instructions,
+        tracks the additions or multiplications,
+        and locally indexes the instructions.
+        """
         # every Analysis must have exactly one analysis method
-        # its name is unimportant, but MUST have the top wrapper
+        # its name is unimportant, but MUST be decorated as above.
 
         # CFG metadata
         # note: metadata must be of string type

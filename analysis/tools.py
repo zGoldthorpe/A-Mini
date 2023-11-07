@@ -16,11 +16,12 @@ from ampy.ensuretypes import (
         TypedList,
         TypedDict,
         )
-from ampy.passmanager import BadArgumentException
+from ampy.passmanager import (
+        BadArgumentException,
+        Pass_ID_re,
+        )
 import ampy.debug
 import ampy.types
-
-ID_re = r"[a-zA-Z0-9\-_.,;|]+"
 
 class Analysis:
     # forward declaration
@@ -43,7 +44,7 @@ class Analysis:
         def Analysis_analysis_wrap(self):
             if self.valid:
                 return
-            ampy.debug.print(self.ID, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running analysis...")
+            ampy.debug.print(self.ID, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "performing analysis")
             func(self)
             self.valid = True
         
@@ -88,7 +89,7 @@ class Analysis:
                 analyses.append(self) # update analysis list
                 super().__init__(cfg, analyses)
 
-                ampy.debug.print(ID, f"Initialising analysis with arguments {args}, {kwargs}")
+                ampy.debug.print(ID, f"initialising analysis with arguments {', '.join(args)}, {', '.join(f'{k}={v}' for k,v in kwargs.items())}")
                 initfunc(self, *args, **kwargs)
                 self._inputs = (tuple(args), kwargs)
 
@@ -259,7 +260,10 @@ class Analysis(Analysis, RequiresAnalysis):
         # we might have completely invalidated the pass
         if len(validated) == 0:
             if self.valid:
+                ampy.debug.print(self.ID, "analysis has been completely invalidated; clearing owned metadata")
+                self.clear()
                 del self.CFG.meta[self.ID]
+            return
 
         # now store the updated validity list
         validated_list = []
@@ -279,7 +283,7 @@ class Analysis(Analysis, RequiresAnalysis):
 
     @ID.setter
     @classmethod
-    @(Syntax(object, ID_re) >> None)
+    @(Syntax(object, Pass_ID_re) >> None)
     def ID(cls, ID):
         cls._ID = ID
         cls._recog = re.compile(f"{cls._ID}/(.*)")
@@ -309,6 +313,13 @@ class Analysis(Analysis, RequiresAnalysis):
         """
         return f"{self.ID}/{arg}"
 
+    @(Syntax(object, str) >> bool)
+    def owns(self, arg):
+        """
+        Checks if metavariable is owned by analysis
+        """
+        return arg.startswith(f"{self.ID}/")
+
     @(Syntax(object) >> None)
     def perform_analysis(self):
         """
@@ -330,9 +341,15 @@ class Analysis(Analysis, RequiresAnalysis):
         """
         Clear all metadata for this analysis
         """
-        for block in self._cfg:
+        for arg in tuple(self.CFG.meta):
+            if self.owns(arg):
+                del self.CFG.meta[arg]
+        for block in self.CFG:
+            for arg in tuple(block.meta):
+                if self.owns(arg):
+                    del block.meta[arg]
             for I in block:
-                for arg in I.meta:
+                for arg in tuple(I.meta):
                     if self.owns(arg):
                         del I.meta[arg]
 
