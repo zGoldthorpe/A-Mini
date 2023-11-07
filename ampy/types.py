@@ -320,6 +320,11 @@ class BasicBlock(BasicBlock):
             yield I
         yield self.branch_instruction
 
+    @property
+    @(Syntax(object) >> [InstructionClass])
+    def instructions(self):
+        return [I for I in self]
+
     @(Syntax(object, int) >> InstructionClass)
     def __getitem__(self, index):
         if index < 0:
@@ -470,6 +475,14 @@ class BasicBlock(BasicBlock):
                 return
         self._branch_targets = BranchTargets(target=kept)
 
+    @(Syntax(object) >> None)
+    def remove_children(self, propagate=True):
+        """
+        Removes all branch targets for current block.
+        """
+        for child in self.children:
+            self.remove_child(child, propagate=propagate)
+
 ### Control flow ###
 
 class CFG:
@@ -534,7 +547,10 @@ class CFG:
             yield self._blocks[label]
 
     @(Syntax(object, str) >> None)
-    def _create_block(self, label):
+    def create_block(self, label):
+        """
+        Create a new block, removing it from the list of "undefined" blocks if necessary
+        """
         if not label.startswith('@'):
             raise ValueError(f"Invalid label {label}: labels must begin with '@'")
         if label in self.labels:
@@ -547,16 +563,24 @@ class CFG:
         # all basic blocks are exit nodes by default
 
     @(Syntax(object, str) >> BasicBlock)
-    def _fetch_or_create_block(self, label):
+    def fetch_or_create_block(self, label):
+        """
+        Grab block if it exists, or else implicitly create a new "undefined" one.
+        """
         if label not in self.labels:
-            self._create_block(label)
+            self.create_block(label)
             self._undef_blocks[label] = self[label]
             # block does not exist, so buffer a new one as "undefined"
         return self[label]
 
     @(Syntax(object, str, InstructionClass, ...) >> None)
-    def _populate_block(self, label, *instructions):
+    def populate_block(self, label, *instructions):
+        """
+        Clears block instructions and populates it with passed instructions
+        """
         block = self[label]
+        block._instructions = []
+        block.remove_children() # empty instruction list
         for (i, I) in enumerate(instructions):
             if isinstance(I, BranchInstructionClass):
                 if i + 1 < len(instructions):
@@ -569,18 +593,18 @@ class CFG:
                 if isinstance(I, ExitInstruction):
                     return
                 if isinstance(I, GotoInstruction):
-                    block.add_child(self._fetch_or_create_block(I.target))
+                    block.add_child(self.fetch_or_create_block(I.target))
                     return
                 if isinstance(I, BranchInstruction):
-                    block.add_child(self._fetch_or_create_block(I.iftrue))
-                    block.add_child(self._fetch_or_create_block(I.iffalse),
+                    block.add_child(self.fetch_or_create_block(I.iftrue))
+                    block.add_child(self.fetch_or_create_block(I.iffalse),
                             cond=I.cond, new_child_if_cond=False)
                     return
             self[label]._instructions.append(I)
 
     @(Syntax(object, str) >> None)
     def set_entrypoint(self, label):
-        self._entrypoint = self._fetch_or_create_block(label)
+        self._entrypoint = self.fetch_or_create_block(label)
 
     @property
     @(Syntax(object) >> (BasicBlock, None))
@@ -595,8 +619,8 @@ class CFG:
         If final instruction is not a branch, then block is assumed to be
         an exit node.
         """
-        self._create_block(label)
-        self._populate_block(label, *instructions)
+        self.create_block(label)
+        self.populate_block(label, *instructions)
 
     @(Syntax(object, str, ignore_keyerror=bool) >> None)
     def remove_block(self, label, ignore_keyerror=False):
