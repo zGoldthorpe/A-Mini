@@ -15,6 +15,10 @@ from ampy.ensuretypes import (
         TypedDict,
         )
 
+Pass_ID_re = r"[a-zA-Z0-9\-_.,;|]+"
+
+global_registry = set()
+
 class PassManager:
     """
     Pass manager
@@ -49,9 +53,12 @@ class PassManager:
             # in case ID is not a variable but a getter method
             alias = alias.fget(cls)
 
-        assert alias not in self._registered # aliases must be unique
+        if alias in global_registry:
+            raise NameError(f"Alias {alias} already registered.")
+        assert alias not in global_registry # aliases must be unique
 
         self._registered[alias] = cls
+        global_registry.add(alias)
 
     @(Syntax(object) >> [iter, str])
     def __iter__(self):
