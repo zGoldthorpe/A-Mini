@@ -239,8 +239,10 @@ class BranchTargets(BranchTargets):
     @(Syntax(object) >> [iter, BasicBlock])
     def __iter__(self):
         if self._cond is not None:
-            yield self._iftrue
+            # the convention to yield the false target first is so that the
+            # true target comes first in a standard DFS construction of RPO
             yield self._iffalse
+            yield self._iftrue
         elif self._target is not None:
             yield self._target
         # empty yield otherwise

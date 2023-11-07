@@ -21,8 +21,9 @@ def lines(s):
 def test(prog, expected):
     ts.exec("builder = CFGBuilder()",
             "cfg = builder.build(*prog)",
-            "writer = CFGWriter(block_key=lambda B: B.label)",
-                # store blocks in alphabetical order, for consistency
+            "writer = CFGWriter()",
+                # by convention, blocks are written in RPO
+                # with true branches coming before false branches
             "out = tuple(writer.generate(cfg))",
             "assert lines(expected) == lines(out)",
             state=dict(

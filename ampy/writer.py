@@ -14,9 +14,8 @@ class CFGWriter:
     """
     Class for formatting the output of a given CFG
     """
-    @(Syntax(object, write_meta=bool, tabwidth=(int,None), codewidth=(int,None),
-        block_key=lambda:Syntax(ampy.types.BasicBlock)>>object) >> None)
-    def __init__(self, write_meta=True, tabwidth=None, codewidth=None, block_key=lambda B:0):
+    @(Syntax(object, write_meta=bool, tabwidth=(int,None), codewidth=(int,None)) >> None)
+    def __init__(self, write_meta=True, tabwidth=None, codewidth=None):
         """
         write_meta
             toggle if metadata should be written to output
@@ -29,13 +28,7 @@ class CFGWriter:
             comments are placed after given tabwidth + codewidth characters
             NB: set to None to be automatically-determined
             (default: None)
-        block_key
-            mapping from ampy.types.BasicBlock instances to comparables for
-            the purpose of sorting
-            (default: no sorting)
-            NB: CFG does not remember order in which blocks were written
-            in source code, so the order by default is completely determined
-            by how the blocks are stored into an unordered set.
+        Blocks are written in reverse post-order
         """
         self._write_meta = write_meta
 
@@ -46,8 +39,6 @@ class CFGWriter:
         self._default_codewidth = codewidth
         self._codewidth = codewidth
         self._autocode = codewidth is None
-
-        self._block_key = block_key
 
         self._cfg = None
 
@@ -170,6 +161,28 @@ class CFGWriter:
             for I_str in self._instruction_str(I):
                 yield I_str
 
+    @(Syntax(object, ampy.types.CFG) >> [iter, ampy.types.BasicBlock])
+    def _traverse_rpo(self, cfg):
+        """
+        Generate blocks of CFG in RPO
+
+        Note: unreachable blocks are automatically eliminated
+        """
+        seen = set()
+        postorder = []
+        
+        def dfs(block):
+            seen.add(block)
+            for child in block.children:
+                if child not in seen:
+                    dfs(child)
+            postorder.append(block)
+
+        dfs(cfg.entrypoint)
+
+        for block in reversed(postorder):
+            yield block
+
     @(Syntax(object, ampy.types.CFG) >> [iter, str])
     def generate(self, cfg):
         """
@@ -182,6 +195,6 @@ class CFGWriter:
                 for metadata in self._meta_str('#', var, val):
                     yield metadata
 
-        for block in sorted(cfg, key=self._block_key):
+        for block in self._traverse_rpo(cfg):
             for block_str in self._block_str(block):
                 yield block_str
