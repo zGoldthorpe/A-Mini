@@ -46,23 +46,21 @@ class CFGWriter:
     def _set_tabwidth(self):
         if self._cfg is None:
             return
-        if not self._autotab:
-            self._tabwidth = self._default_tabwidth
-            return
         self._tabwidth = max(len(lbl) for lbl in self._cfg.labels) + 2
+        if not self._autotab:
+            self._tabwidth = min(self._default_tabwidth, self._tabwidth)
         return
 
     @(Syntax(object) >> None)
     def _set_codewidth(self):
         if self._cfg is None:
             return
-        if not self._autocode:
-            self._codewidth = self._default_codewidth
-            return
         self._codewidth = 0
         for block in self._cfg:
             for I in block:
-                self._codewidth = max(self._codewidth, len(repr(I)) + 1)
+                self._codewidth = max(self._codewidth, len(repr(I)) + 2)
+        if not self._autocode:
+            self._codewidth = min(self._default_codewidth, self._codewidth)
 
     @property
     @(Syntax(object) >> int)
@@ -134,6 +132,9 @@ class CFGWriter:
         if not self.write_meta or len(instruction.meta) == 0:
             yield line
         else:
+            if not line.endswith(' '): # not enough space for metadata
+                yield line
+                line = ' '*self.width
             for var, val in sorted(instruction.meta.items(), key=lambda t:t[0]):
                 for metadata in self._meta_str('%', var, val):
                     yield line + metadata
@@ -151,6 +152,9 @@ class CFGWriter:
         if not self.write_meta or len(block.meta) == 0:
             yield line
         else:
+            if not line.endswith(' '):
+                yield line
+                line = ' '*self.width
             for var, val in sorted(block.meta.items(), key=lambda t:t[0]):
                 for metadata in self._meta_str('@', var, val):
                     yield line + metadata

@@ -58,6 +58,18 @@ argparser.add_argument("-A", "--ban-anonymous-blocks",
             action="store_false",
             help="Assert that all basic blocks in code must be explicitly labelled.")
 
+# managing metadata
+argparser.add_argument("-M", "--omit-metadata",
+            dest="meta",
+            action="store_false",
+            help="Do not write metadata to output code.")
+argparser.add_argument("-f", "--frame",
+            dest="frame",
+            action="store",
+            metavar='"L;W"',
+            help="Specify the left margin charwidth and the code window for spacing. "
+                 "Use '*' for either dimension to make it automatic.")
+
 # managing optimisations
 argparser.add_argument("-o", "--output",
             dest="output",
@@ -65,10 +77,6 @@ argparser.add_argument("-o", "--output",
             type=str,
             help="""Specify destination file for optimised A-Mi code.
                     If omitted, will be printed to STDOUT.""")
-argparser.add_argument("-M", "--omit-metadata",
-            dest="meta",
-            action="store_false",
-            help="Do not write metadata to output code.")
 argparser.add_argument("-p", "--add-pass",
             dest="passes",
             action="append",
@@ -213,7 +221,27 @@ if args.passes is not None:
         exit(-9)
 
 ### output ###
-writer = amw.CFGWriter(write_meta=args.meta)
+if args.frame is None:
+    tab, code = 4, 96
+else:
+    try:
+        tab, code = args.frame.split(';')
+    except:
+        tab = '*'
+        code = '*'
+    try:
+        tab = int(tab)
+        assert tab >= 0
+    except:
+        tab = None
+    try:
+        code = int(code)
+        assert code >= 0
+    except:
+        code = None
+
+writer = amw.CFGWriter(write_meta=args.meta,
+        tabwidth=tab, codewidth=code)
 
 if args.output is not None:
     with open(args.output, 'w') as file:
