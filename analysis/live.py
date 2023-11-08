@@ -148,6 +148,6 @@ class LiveAnalysis(LiveAnalysis):
         if isinstance(I, ampy.types.ReadInstruction):
             return {I.target}, set()
         if isinstance(I, ampy.types.WriteInstruction):
-            return set(), reg_set(I.target)
+            return set(), reg_set(I.operand)
         # remaining: GotoInstruction, ExitInstruction, BrkInstruction
         return set(), set()
