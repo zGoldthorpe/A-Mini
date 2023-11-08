@@ -1,10 +1,10 @@
 """
-Example analysis
+Example opt
 ==================
 Goldthorpe
 
-This simple analysis is meant to serve as a template for the current analysis
-system. This analysis gives three pieces of data:
+This simple opt is meant to serve as a template for the current opt
+system. This opt gives three pieces of data:
 
 At the CFG level: you can pass a keyword argument "count=instructions" or
                   "count=blocks" to track either the number of blocks or the
@@ -16,19 +16,19 @@ At the instruction level: "index" indicates the index of the instruction in the 
 
 from ampy.ensuretypes import Syntax
 from ampy.passmanager import BadArgumentException
-from analysis.tools import Analysis, RequiresAnalysis
+from opt.tools import Opt, RequiresOpt
 
 import ampy.types
 
-class ExampleAnalysis(Analysis):
+class ExampleAnalysis(Opt):
     # forward declaration
     pass
 
 class ExampleAnalysis(ExampleAnalysis):
     """
-    example(track, *, count)
+    example_analysis(track, *, count)
 
-    Example pass to demonstrate analysis functionality.
+    Example analysis pass to demonstrate some opt functionality.
     Locally indexes every instruction in each block.
 
     track: "add" or "mul"
@@ -41,11 +41,11 @@ class ExampleAnalysis(ExampleAnalysis):
     """
     # every class should have a docstring
 
-    # "example" is the ID of the pass
+    # "example_analysis" is the ID of the pass
     # "add" is the default value for the positional argument
     # count="blocks" is the default value for the keywoard argument
     # note: all arguments are necessrily of string type
-    @ExampleAnalysis.init("example", "add", count="blocks")
+    @ExampleAnalysis.init("example_analysis", "add", count="blocks")
     def __init__(self, instr_tracker, *, count):
         # the * indicates where the keyword arguments start
         # note that default arguments are not passed here since they
@@ -67,14 +67,14 @@ class ExampleAnalysis(ExampleAnalysis):
             raise BadArgumentException("Keyword argument \"count\" of ExampleAnalysis must be either \"blocks\" or \"instructions\".")
 
 
-    @ExampleAnalysis.analysis
+    @ExampleAnalysis.opt_pass
     def get_info(self):
         """
         Scans the CFG for the number of blocks or instructions,
         tracks the additions or multiplications,
         and locally indexes the instructions.
         """
-        # every Analysis must have exactly one analysis method
+        # every Opt must have exactly one opt method
         # its name is unimportant, but MUST be decorated as above.
 
         # CFG metadata
@@ -105,10 +105,14 @@ class ExampleAnalysis(ExampleAnalysis):
             for (i, I) in enumerate(block):
                 self.assign(block, i, "index", str(i))
 
-class AddLister(RequiresAnalysis):
+        # since this is an analysis pass, it does not affect the CFG
+        # therefore, return all opts as "preserved"
+        return self.opts
+
+class AddLister(RequiresOpt):
     """
-    This is an example of a class that interprets data from an analysis,
-    which may be convenient for other analyses or optimisations
+    This is an example of a class that interprets data from an opt,
+    which may be convenient for other opts or optimisations
     """
 
     @(Syntax(object, str) >> [list, ampy.types.InstructionClass])
@@ -117,9 +121,9 @@ class AddLister(RequiresAnalysis):
             return []
         block = self.CFG[block_label]
         outs = []
-        for i_str in self.require_analysis(ExampleAnalysis, "add", count=any)[block:"add_indices"]:
-            # if the example analysis does not run with the argument "add", then it will trigger
-            # processing of the specified example analysis
+        for i_str in self.require(ExampleAnalysis, "add", count=any)[block:"add_indices"]:
+            # if the example opt does not run with the argument "add", then it will trigger
+            # processing of the specified example opt
             i = int(i_str)
             outs.append(block[i])
         return outs

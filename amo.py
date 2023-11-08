@@ -22,10 +22,8 @@ from ampy.passmanager import (
         Pass_ID_re,
         )
 
-from analysis import AnalysisManager as AM
-from analysis.tools import AnalysisList, AMError
-
 from opt import OptManager as OM
+from opt.tools import OptList, OptError
 
 ### command-line argument handling ###
 
@@ -102,7 +100,7 @@ amp.Printing.can_format &= args.format
 #TODO: make modular
 
 if args.ls:
-    amp.psubtle("Analysis passes:")
+    amp.psubtle("Opt passes:")
     for opt in sorted(AM):
         amp.pquery(f"\t{opt}")
     amp.psubtle("Optimisation passes:")
@@ -111,15 +109,9 @@ if args.ls:
     exit(0)
 
 if args.explain is not None:
-    if args.explain in AM:
-        amp.pquery(f"{args.explain} ({AM[args.explain].__module__}.{AM[args.explain].__name__})")
-        amp.psubtle("Analysis pass")
-        if AM[args.explain].__doc__ is not None:
-            amp.pquery(AM[args.explain].__doc__)
-        exit(0)
     if args.explain in OM:
-        amp.pquery(f"{args.explain} ({OM[args.explain].__module__}.{OM[args.explain].__name__})")
-        amp.psubtle("Optimisation pass")
+        amp.psubtle(f"{args.explain} ", end='')
+        amp.phidden(f"({OM[args.explain].__module__}.{OM[args.explain].__name__})")
         if OM[args.explain].__doc__ is not None:
             amp.pquery(OM[args.explain].__doc__)
         exit(0)
@@ -178,7 +170,7 @@ except amr.ParseError as e:
 
 ### optimise ###
 
-passed_analyses = AnalysisList()
+passed_analyses = OptList()
 if args.passes is not None:
     for opt in args.passes:
         opt_args = []
@@ -194,27 +186,19 @@ if args.passes is not None:
                     kw, arg = arg.split('=', 1)
                     opt_kwargs[kw] = arg
 
-        if opt in AM:
-            try:
-                analysis = AM[opt](cfg, passed_analyses, *opt_args, **opt_kwargs)
-            except BadArgumentException as e:
-                amp.perror(f"Analysis {opt} received invalid argument.\n{e}")
-                exit(-7)
-
-            try:
-                analysis.perform_analysis()
-            except AMError as e:
-                amp.perror(f"Analysis {opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
-                exit(-8)
-            continue
-
         if opt in OM:
             try:
                 opter = OM[opt](cfg, passed_analyses, *opt_args, **opt_kwargs)
             except BadArgumentException as e:
                 amp.perror(f"Optimisation {opt} received invalid argument.\n{e}")
                 exit(-7)
-            opter.perform_opt()
+            
+            try:
+                opter.perform_opt()
+            except OptError as e:
+                amp.perror(f"{opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
+                exit(-8)
+
             continue
 
         amp.perror(f"Unrecognised pass {opt}")

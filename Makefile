@@ -22,16 +22,16 @@ EXEC=$(patsubst %,execution/%,\
 		phi.py \
 		io.py)
 
-ANALYSIS=$(patsubst %,analysis/%,\
-		 example.py)
+OPT=$(patsubst %,opt/%,\
+		 example_analysis.py)
 
 TESTS=ensuretypes.py \
 	  $(CFG) \
 	  $(PARSING) \
 	  $(EXEC) \
-	  $(ANALYSIS)
+	  $(OPT)
 
-FOLDERS=CFG parsing execution analysis
+FOLDERS=CFG parsing execution opt
 
 RUNTESTS=$(TESTS:%=tests/%.vfy)
 FOLDERTESTS=$(FOLDERS:%=tests/%.vfy)
@@ -51,7 +51,7 @@ tests/parsing.vfy: $(PARSING:%=tests/%.vfy)
 tests/execution.vfy: $(EXEC:%=tests/%.vfy)
 	@touch $@
 
-tests/analysis.vfy: $(VERIFY:%=tests/%.vfy)
+tests/opt.vfy: $(VERIFY:%=tests/%.vfy)
 	@touch $@
 
 $(filter %.py.vfy,$(RUNTESTS)): %.py.vfy: %.py

@@ -20,8 +20,8 @@ from opt.tools import Opt
 
 import ampy.types
 
-### required analyses ###
-from analysis.example import ExampleAnalysis
+### required opts ###
+from opt.example_analysis import ExampleAnalysis
 
 class ExampleOpt(Opt):
     # forward declaration
@@ -67,25 +67,25 @@ class ExampleOpt(ExampleOpt):
         if self.max_size < 2 and self.max_size != -1:
             raise BadArgumentException("Keyword argument \"max_block_size\" of ExampleOpt must be at least 2, or equal to -1.")
 
-    @ExampleOpt.opt
+    @ExampleOpt.opt_pass
     def swap_and_trim(self):
         """
-        Swap operands of either additions or multiplications, and trims
+        Swap operands of either additions or multiplications, and trim
         basic blocks down to size.
         """
         # every Opt must have exactly one opt method
         # its name is unimportant, but MUST be decorated as above.
         
         for block in list(self.CFG):
-            swaps = self.require_analysis(ExampleAnalysis, self.swap, count=any)[block:f"{self.swap}_indices"]
+            swaps = self.require(ExampleAnalysis, self.swap, count=any)[block:f"{self.swap}_indices"]
             # fetch results from the example analysis (can also omit the count kwarg)
             for i_str in swaps:
                 i = int(i_str)
                 (op1, op2) = block[i].operands
                 block[i].operands = (op2, op1)
 
-        preserved = tuple(analysis for analysis in self.analyses
-                        if isinstance(analysis, ExampleAnalysis))
+        preserved = tuple(opt for opt in self.opts
+                        if isinstance(opt, (ExampleAnalysis, ExampleOpt)))
 
         if self.max_size != -1:
             # time to trim basic blocks
@@ -131,12 +131,43 @@ class ExampleOpt(ExampleOpt):
             if changed:
                 # this action is quite destructive, so it's unlikely any
                 # analysis survives it
-                preserved = ()
+                preserved = tuple(opt for opt in self.opts
+                            if isinstance(opt, ExampleOpt))
 
-        # opt method MUST return list or tuple of all preserved analyses
+        # opt method MUST return list or tuple of all preserved opts
         # it is strongly recommended that this list is made CONSERVATIVELY
         # for instance, I know that swapping does not affect the example
         # analysis, but I am not sure about other ones since I don't know
-        # what other analyses may exist.
+        # what other opts may exist.
         return preserved
+
+    @(Syntax(object, int)
+      | Syntax(object, int, r"@?[.\w]+")
+      >> [str])
+    def gen_labels(self, count, prefix=None, /):
+        """
+        Generate available block labels.
+        If prefix not set, label is prefixed with the optimisation ID.
+        """
+        counter = 0
+        prefix = self.ID if prefix is None else f"{prefix}." if len(prefix) > 0 else ""
+        if not prefix.startswith('@'):
+            prefix = '@' + prefix
+
+        labels = self.CFG.labels
+        out = []
+
+        while len(out) < count:
+            label = prefix + str(counter)
+            if label not in labels:
+                out.append(label)
+            counter += 1
+
+        return out
+
+    @(Syntax(object)
+      | Syntax(object, r"@?[.\w]+")
+      >> str)
+    def gen_label(self, prefix=None, /):
+        return self.gen_labels(1, prefix)[0]
 

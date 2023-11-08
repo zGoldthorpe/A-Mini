@@ -2,12 +2,12 @@ import sys
 
 from ampy.reader import CFGBuilder
 
-from analysis.tools import AnalysisList
-from analysis.example import ExampleAnalysis, AddLister
+from opt.tools import OptList
+from opt.example_analysis import ExampleAnalysis, AddLister
 
-from tests.analysis.tools import MetaTestSuite
+from tests.opt.tools import MetaTestSuite
 
-ts = MetaTestSuite("analysis/example")
+ts = MetaTestSuite("opt/example")
 
 ts.analyse_meta(ExampleAnalysis,
         ("add",), dict(count="instructions"),
@@ -57,10 +57,10 @@ ts.exec("cfg = CFGBuilder().build(*prog)",
         state=dict(CFGBuilder=CFGBuilder,
                     AddLister=AddLister,
                     prog=prog,
-                    al=AnalysisList()))
+                    al=OptList()))
 
 cfg = CFGBuilder().build(*prog)
-al = AnalysisList()
+al = OptList()
 ExampleAnalysis(cfg, al, "add", count="blocks")
 ts.exec("add_lister = AddLister(cfg, al)",
         "assert add_lister.list_adds('@A') == [cfg['@A'][2], cfg['@A'][4]]",
@@ -71,7 +71,7 @@ ts.exec("add_lister = AddLister(cfg, al)",
                     al=al))
 
 cfg = CFGBuilder().build(*prog)
-al = AnalysisList()
+al = OptList()
 ExampleAnalysis(cfg, al, "add", count="instructions")
 ts.exec("add_lister = AddLister(cfg, al)",
         "assert add_lister.list_adds('@A') == [cfg['@A'][2], cfg['@A'][4]]",
@@ -82,7 +82,7 @@ ts.exec("add_lister = AddLister(cfg, al)",
                     al=al))
 
 cfg = CFGBuilder().build(*prog)
-al = AnalysisList()
+al = OptList()
 ExampleAnalysis(cfg, al, "mul", count="blocks")
 ExampleAnalysis(cfg, al, "mul", count="instructions")
 ts.exec("add_lister = AddLister(cfg, al)",

@@ -3,16 +3,16 @@ Liveness
 ==========
 Goldthorpe
 
-This module performs liveness analysis on a CFG.
+This module performs liveness opt on a CFG.
 """
 
 from ampy.ensuretypes import Syntax
-from analysis.tools import Analysis, AMError
+from opt.tools import Opt, OptError
 
 import ampy.types
 import ampy.debug
 
-class LiveAnalysis(Analysis):
+class LiveAnalysis(Opt):
     # forward declaration
     pass
 
@@ -35,10 +35,10 @@ class LiveAnalysis(LiveAnalysis):
     def __init__(self, /):
         pass
 
-    @LiveAnalysis.analysis
-    def flow_analysis(self):
+    @LiveAnalysis.opt_pass
+    def flow_opt(self):
         """
-        Liveness is a backward-propagation flow analysis, using the rules
+        Liveness is a backward-propagation flow opt, using the rules
 
         live_out[I] = union(live_in[I'] for successors I' of I)
         live_in[I] = (live_out[I] - defs[I]) + use[I]
@@ -63,13 +63,13 @@ class LiveAnalysis(LiveAnalysis):
 
         changed = True
         while changed:
-            ampy.debug.print(self.ID, "running flow analysis")
+            ampy.debug.print(self.ID, "running flow opt")
             self._visited = set()
             changed = self._back_propagate(self.CFG.entrypoint)
 
         # check for undefined variables:
         if len(self._in[self.CFG.entrypoint]) > 0:
-            raise AMError(self.CFG.entrypoint, 0, f"The following variables were uninitialised: {', '.join(self._in[self.CFG.entrypoint])}")
+            raise OptError(self.CFG.entrypoint, 0, f"The following variables were uninitialised: {', '.join(self._in[self.CFG.entrypoint])}")
 
         # now, write results to metadata
         for block in self.CFG:
@@ -81,6 +81,8 @@ class LiveAnalysis(LiveAnalysis):
             for i in range(len(block)):
                 self.assign(block, i, "in", *sorted(self._in[block, i]))
                 self.assign(block, i, "out", *sorted(self._out[block, i]))
+
+        return self.opts
 
     @(Syntax(object, ampy.types.BasicBlock) >> bool)
     def _back_propagate(self, block):

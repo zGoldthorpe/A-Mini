@@ -8,11 +8,11 @@ the variables in the CFG
 """
 
 from ampy.ensuretypes import Syntax
-from analysis.tools import Analysis
+from opt.tools import Opt
 
 import ampy.types
 
-class DefAnalysis(Analysis):
+class DefAnalysis(Opt):
     # forward declaration
     pass
 
@@ -32,7 +32,7 @@ class DefAnalysis(DefAnalysis):
     def __init__(self, /):
         pass
 
-    @DefAnalysis.analysis
+    @DefAnalysis.opt_pass
     def find_defs(self):
         defs = {}
 
@@ -55,3 +55,5 @@ class DefAnalysis(DefAnalysis):
         self.assign("vars", *sorted(defs.keys()))
         for var in defs:
             self.assign(var, *sorted(defs[var]))
+
+        return self.opts

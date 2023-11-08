@@ -17,9 +17,9 @@ R. Cytron, J. Ferrante, B.K. Rosen, M.N. Wegman, F.K. Zadeck. 1991.
 """
 
 from ampy.ensuretypes import Syntax
-from analysis.domtree import DomTreeAnalysis
-from analysis.defs import DefAnalysis
-from analysis.live import LiveAnalysis
+from opt.domtree import DomTreeAnalysis
+from opt.defs import DefAnalysis
+from opt.live import LiveAnalysis
 from opt.tools import Opt
 
 import ampy.types
@@ -40,7 +40,7 @@ class SSA(SSA):
     def __init__(self, /):
         pass
 
-    @SSA.opt
+    @SSA.opt_pass
     def cytron_ferrante(self):
         """
         Cytron-Ferrante SSA form pass
@@ -84,7 +84,7 @@ class SSA(SSA):
         # definitions of each variable x in the CFG
         # idf[var]: iterated dominance frontier of a variable
         self._idf = dict()
-        defs = self.require_analysis(DefAnalysis)
+        defs = self.require(DefAnalysis)
 
         for var in defs["vars"]:
             if len(defs[var]) == 1:
@@ -109,7 +109,7 @@ class SSA(SSA):
         #
         # live_in[block]: list of all variables that are live coming in
         
-        live = self.require_analysis(LiveAnalysis)
+        live = self.require(LiveAnalysis)
         self._live_in = {
                 block : set(live.get(block, "in", default=[]))
                 for block in self.CFG
@@ -142,8 +142,9 @@ class SSA(SSA):
 
         if changed:
             # I don't have any analyses on the CFG shape, which is the only thing that gets preserved
-            return ()
-        return self.analyses
+            return tuple(opt for opt in self.opts
+                        if isinstance(opt, SSA))
+        return self.opts
 
     @(Syntax(object, str) >> int)
     def _gen_register(self, var):
@@ -152,7 +153,7 @@ class SSA(SSA):
         and stores them in SSA_vars
         Returns index of new register
         """
-        defs = self.require_analysis(DefAnalysis)
+        defs = self.require(DefAnalysis)
 
         while True:
             self._ssa_counter += 1
@@ -245,7 +246,7 @@ class SSA(SSA):
 
         block = blocks[0]
         if self._df[block] is None:
-            domtree = self.require_analysis(DomTreeAnalysis)
+            domtree = self.require(DomTreeAnalysis)
 
             # DF[B] = LDF[B] + Union(PDF[B'], B' domtree children of B)
             if self._ldf[block] is None:

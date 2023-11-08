@@ -1,7 +1,7 @@
 from ampy.types import CFG
 from ampy.reader import CFGBuilder
 
-from analysis.tools import AnalysisList
+from opt.tools import OptList
 
 from tests.tools import PythonExecutionTestSuite
 
@@ -11,12 +11,12 @@ class MetaTestSuite(PythonExecutionTestSuite):
         return f"MetaTestSuite({self.name})"
 
     @PythonExecutionTestSuite.test
-    def analyse_meta(self, analysis_cls, args, kwargs, code, meta):
+    def analyse_meta(self, opt_cls, args, kwargs, code, meta):
         """
-        analysis_cls
-            Analysis class
+        opt_cls
+            Opt class
         args, kwargs
-            initialisation parameters for analysis
+            initialisation parameters for opt
         code
             list of strings of A-Mi code (one line per element)
         meta
@@ -28,20 +28,20 @@ class MetaTestSuite(PythonExecutionTestSuite):
         metadata not included in meta variable are not tested
         """
         cfg = CFGBuilder().build(*code)
-        analysis = analysis_cls(cfg, AnalysisList(), *args, **kwargs)
+        opt = opt_cls(cfg, OptList(), *args, **kwargs)
         for key in meta:
             if isinstance(key, tuple):
                 slicekey = slice(cfg[key[0]], key[1], key[2] if len(key) > 2 else None)
             else:
                 slicekey = key
-            if analysis[slicekey] != meta[key]:
-                self._error(f"{analysis_cls.ID} analysis expected to produce value {meta[key]} for key {key}, but instead produces {analysis[key]}.")
+            if opt[slicekey] != meta[key]:
+                self._error(f"{opt_cls.ID} opt expected to produce value {meta[key]} for key {key}, but instead produces {opt[key]}.")
                 return False, dict(
                         type="key-not-found",
                         cfg=cfg,
-                        analysis=analysis,
+                        opt=opt,
                         key=key,
                         expected=meta[key],
-                        received=analysis[key])
+                        received=opt[key])
 
-        return True, dict(cfg=cfg, analysis=analysis, meta=meta)
+        return True, dict(cfg=cfg, opt=opt, meta=meta)

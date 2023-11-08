@@ -3,7 +3,7 @@ Dominator tree
 ================
 Goldthorpe
 
-This module provides an analysis class for computing
+This module provides an opt class for computing
 the dominator tree of the given CFG.
 
 The algorithm used is that of the paper
@@ -16,11 +16,11 @@ T. Lengauer, R.E. Tarjan. 1979.
 """
 
 from ampy.ensuretypes import Syntax
-from analysis.tools import Analysis
+from opt.tools import Opt
 
 import ampy.types
 
-class DomTreeAnalysis(Analysis):
+class DomTreeAnalysis(Opt):
     # forward declaration
     pass
 
@@ -50,12 +50,12 @@ class DomTreeAnalysis(DomTreeAnalysis):
                 return False
             B = self.CFG[ls[0]]
 
-    @DomTreeAnalysis.analysis
+    @DomTreeAnalysis.opt_pass
     def lengauer_tarjan(self):
         """
         Lengauer-Tarjan dominator tree constructor
         """
-        self.clear() # clear metadata prior to running analysis
+        self.clear() # clear metadata prior to running opt
 
         # Step 1. DFS
         # -----------
@@ -162,6 +162,8 @@ class DomTreeAnalysis(DomTreeAnalysis):
             else:
                 self.assign(block, "idom", self._idom[block].label)
                 self.assign(self._idom[block], "children", block.label, append=True)
+
+        return self.opts
 
     @(Syntax(object, ampy.types.BasicBlock) >> None)
     def _DFS(self, block):
