@@ -14,3 +14,5 @@ import opt.tools
 OptManager = ampy.passmanager.PassManager(opt.tools.Opt)
 
 OptManager.register("opt.example.ExampleOpt")
+OptManager.register("opt.ssa.SSA")
+#TODO: combine analysis and optimisation passes

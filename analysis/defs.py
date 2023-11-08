@@ -18,13 +18,17 @@ class DefAnalysis(Analysis):
 
 class DefAnalysis(DefAnalysis):
     """
-    def
+    defs
 
     Records the definitions and uses of all variables,
     recording the result in global metadata.
+
+    Repeated definitions in a block will lead to repeated
+    appearances of the block label in list of variable
+    definition locations.
     """
 
-    @DefAnalysis.init("def")
+    @DefAnalysis.init("defs")
     def __init__(self, /):
         pass
 

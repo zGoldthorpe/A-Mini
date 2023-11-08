@@ -15,3 +15,5 @@ AnalysisManager = ampy.passmanager.PassManager(analysis.tools.Analysis)
 
 AnalysisManager.register("analysis.example.ExampleAnalysis")
 AnalysisManager.register("analysis.domtree.DomTreeAnalysis")
+AnalysisManager.register("analysis.defs.DefAnalysis")
+AnalysisManager.register("analysis.live.LiveAnalysis")

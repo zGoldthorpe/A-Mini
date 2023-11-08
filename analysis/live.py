@@ -21,6 +21,14 @@ class LiveAnalysis(LiveAnalysis):
     live
 
     Determines the live-in and live-out sets for every block and instruction.
+    Note: liveness of a variable in a phi node is fuzzy. If a block @A has
+    a phi node
+    @A:
+        %0 = phi [ %1, @B ], ...
+        ...
+    then the variable %1 will be declared live coming out of @B, but will *not*
+    be declared live coming into @A, because liveness is conditional on arriving
+    through @B.
     """
 
     @LiveAnalysis.init("live")
