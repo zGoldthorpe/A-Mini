@@ -5,54 +5,54 @@ from tests.tools import PythonExecutionTestSuite
 
 ts = PythonExecutionTestSuite("CFG/basicblocks")
 
-ts.exec("A = BasicBlock('@A')",
-        "B = BasicBlock('@B')",
+ts.exec("cfg = CFG()",
+        "A = cfg.fetch_or_create_block('@A')",
+        "B = cfg.fetch_or_create_block('@B')",
         "A.add_child(B)",
-        "C = BasicBlock('@C')",
+        "C = cfg.fetch_or_create_block('@C')",
         "B.add_child(A)",
         "B.add_child(C, cond='%cond')",
         "C.add_child(C)",
         "C.add_child(A, cond='%cond.2', new_child_if_cond=False)",
-        "assert(A.children == BranchTargets(target=B))",
-        "assert(B.children == BranchTargets(cond='%cond', iftrue=C, iffalse=A))",
-        "assert(C.children == BranchTargets(cond='%cond.2', iftrue=C, iffalse=A))",
+        "assert(A.children == (B,))",
+        "assert(B.children == (A, C))", # iffalse, then iftrue
+        "assert(C.children == (A, C))",
         "assert(A.parents == {B, C})",
         "assert(B.parents == {A})",
         "assert(C.parents == {B, C})",
-        state=dict(BasicBlock=amt.BasicBlock,
-            BranchTargets=amt.BranchTargets))
+        state=dict(CFG=amt.CFG))
 
-ts.exec("A = BasicBlock('@A')",
-        "B = BasicBlock('@B')",
-        "C = BasicBlock('@C')",
+ts.exec("cfg = CFG()",
+        "A = cfg.fetch_or_create_block('@A')",
+        "B = cfg.fetch_or_create_block('@B')",
+        "C = cfg.fetch_or_create_block('@C')",
         "A.add_child(B)",
         "A.add_child(C, cond='%c')",
         "A.remove_child(B)",
-        "assert(A.children == BranchTargets(target=C))",
+        "assert(A.children == (C,))",
         "assert(B.parents == set())",
         "assert(C.parents == {A})",
-        state=dict(BasicBlock=amt.BasicBlock,
-            BranchTargets=amt.BranchTargets))
+        state=dict(CFG=amt.CFG))
 
-ts.exec("A = BasicBlock('@A')",
-        "B = BasicBlock('@B')",
+ts.exec("cfg = CFG()",
+        "A = cfg.fetch_or_create_block('@A')",
+        "B = cfg.fetch_or_create_block('@B')",
         "A.add_child(B)",
         "A.add_child(B, cond='%c')",
         "A.remove_child(B)",
-        "assert(A.children == BranchTargets())",
+        "assert(A.children == ())",
         "assert(B.parents == set())",
-        state=dict(BasicBlock=amt.BasicBlock,
-            BranchTargets=amt.BranchTargets))
+        state=dict(CFG=amt.CFG))
 
-ts.exec("A = BasicBlock('@A')",
-        "B = BasicBlock('@B')",
+ts.exec("cfg = CFG()",
+        "A = cfg.fetch_or_create_block('@A')",
+        "B = cfg.fetch_or_create_block('@B')",
         "A.add_child(B)",
         "A.add_child(B, cond='%c')",
         "A.remove_child(B, keep_duplicate=True)",
-        "assert(A.children == BranchTargets(target=B))",
+        "assert(A.children == (B,))",
         "assert(B.parents == {A})",
-        state=dict(BasicBlock=amt.BasicBlock,
-            BranchTargets=amt.BranchTargets))
+        state=dict(CFG=amt.CFG))
 
 if __name__ == "__main__":
     ts.print_results()

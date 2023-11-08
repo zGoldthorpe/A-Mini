@@ -185,104 +185,23 @@ class BrkInstruction(InstructionClass):
 # forward declarations
 class BasicBlock:
     pass
-class BranchTargets:
+class CFG:
     pass
-
-class BranchTargets(BranchTargets):
-    @(Syntax(object) # exit note; no children
-      | Syntax(object, BasicBlock) # goto
-      | Syntax(object, target=BasicBlock) # goto with kwarg
-      | Syntax(object, cond=str, iftrue=BasicBlock, iffalse=BasicBlock) # branch
-      >> None)
-    def __init__(self, target=None, cond=None, iftrue=None, iffalse=None):
-        self._target = target
-        self._cond = cond
-        self._iftrue = iftrue
-        self._iffalse = iffalse
-        self.meta = MetaDict() # metadata for the corresponding branch instruction
-
-    @(Syntax(object, BranchTargets) >> bool)
-    def __eq__(self, other):
-        return (self._target == other._target
-                and self._cond == other._cond
-                and self._iftrue == other._iftrue
-                and self._iffalse == other._iffalse)
-
-    def __len__(self):
-        return (2 if self._cond is not None
-                else 1 if self._target is not None
-                else 0)
-
-    @(Syntax(object) >> [iter, BasicBlock])
-    def __iter__(self):
-        if self._cond is not None:
-            # the convention to yield the false target first is so that the
-            # true target comes first in a standard DFS construction of RPO
-            yield self._iffalse
-            yield self._iftrue
-        elif self._target is not None:
-            yield self._target
-        # empty yield otherwise
-
-    @(Syntax(object, BasicBlock) >> bool)
-    def __in__(self, block):
-        return block in self.tuple
-
-    @(Syntax(object, int) >> BasicBlock)
-    def __getitem__(self, idx):
-        return self.tuple[idx]
-    
-    def __repr__(self):
-        if self._cond is not None:
-            return f"BranchTargets({self._iftrue.name} if {self._cond} else {self._iffalse.name})"
-        if self._target is not None:
-            return f"BranchTargets({self._target.name})"
-        return "BranchTargets()"
-    
-    @property
-    @(Syntax(object) >> [tuple, BasicBlock, [0, 2]])
-    def tuple(self):
-        if self._cond is not None:
-            return (self._iftrue, self._iffalse)
-        if self._target is not None:
-            return (self._target,)
-        return ()
-
-    @property
-    @(Syntax(object) >> (str, None))
-    def branch_condition(self):
-        return self._cond
-
-    @property
-    @(Syntax(object) >> InstructionClass)
-    def instruction(self):
-        if self._cond is not None:
-            I = BranchInstruction(cond=self._cond, iftrue=self._iftrue.label, iffalse=self._iffalse.label)
-        elif self._target is not None:
-            I = GotoInstruction(self._target.label)
-        else:
-            I = ExitInstruction()
-        I.meta = self.meta # copy reference for meta modifications
-        return I
 
 class BasicBlock(BasicBlock):
 
-    @(Syntax(object, str, InstructionClass, ...) >> None)
-    def __init__(self, label:str, *instructions):
+    @(Syntax(object, CFG, str, InstructionClass, ...) >> None)
+    def __init__(self, cfg, label:str, *instructions):
         """
         label: string @label indicating block's "name"
         instructions: list of Instruction objects, EXCLUDING the branch at the end
         (children / parents determined after initialisation)
         """
+        self._cfg = cfg
         self._label = label
         self._instructions = list(instructions)
-        self.__branch_targets = BranchTargets()
         self._parents = set()
         self.meta = MetaDict()
-        self.__branch_meta = MetaDict()
-        # every instruction has its own metadata, but branch instructions at the
-        # end of a basic block are treated differently, so the metadata needs to be
-        # carried by the basic block itself
 
     def __repr__(self):
         return (f"{self.name}\n{'':->{len(self.name)}}\n"
@@ -290,14 +209,13 @@ class BasicBlock(BasicBlock):
                 + '\n' + '\n'.join(repr(I) for I in self))
 
     def __len__(self):
-        return len(self._instructions) + 1
-        # the + 1 is for the branch instruction
+        self.branch_instruction
+        return len(self._instructions)
 
     @(Syntax(object) >> [iter, InstructionClass])
     def __iter__(self):
         for I in self._instructions:
             yield I
-        yield self.branch_instruction
 
     @property
     @(Syntax(object) >> [InstructionClass])
@@ -306,12 +224,11 @@ class BasicBlock(BasicBlock):
 
     @(Syntax(object, int) >> InstructionClass)
     def __getitem__(self, index):
+        self.branch_instruction # ensure the branch instruction exists
         if index < 0:
-            index += len(self._instructions) + 1
-        if index > len(self._instructions) or index < 0:
+            index += len(self._instructions)
+        if index >= len(self._instructions) or index < 0:
             raise IndexError
-        if index == len(self._instructions):
-            return self.branch_instruction
         return self._instructions[index]
 
     def __hash__(self):
@@ -335,9 +252,13 @@ class BasicBlock(BasicBlock):
         return f"Block{self.label}"
 
     @property
-    @(Syntax(object) >> BranchTargets)
+    @(Syntax(object) >> [tuple, BasicBlock])
     def children(self):
-        return self.__branch_targets
+        if isinstance(self.branch_instruction, ExitInstruction):
+            return ()
+        if isinstance(self.branch_instruction, GotoInstruction):
+            return (self._cfg[self.branch_instruction.target],)
+        return (self._cfg[self.branch_instruction.iffalse], self._cfg[self.branch_instruction.iftrue])
 
     @property
     @(Syntax(object) >> [set, BasicBlock])
@@ -345,31 +266,11 @@ class BasicBlock(BasicBlock):
         return set(self._parents)
 
     @property
-    @(Syntax(object) >> MetaDict)
-    def _branch_meta(self):
-        return self.__branch_meta
-
-    @_branch_meta.setter
-    @(Syntax(object, MetaDict) >> None)
-    def _branch_meta(self, dc):
-        self.__branch_meta = dc
-        self.__branch_targets.meta = self.__branch_meta
-
-    @property
-    @(Syntax(object) >> BranchTargets)
-    def _branch_targets(self):
-        return self.__branch_targets
-
-    @_branch_targets.setter
-    @(Syntax(object, BranchTargets) >> None)
-    def _branch_targets(self, targets):
-        self.__branch_targets = targets
-        self.__branch_targets.meta = self._branch_meta
-
-    @property
     @(Syntax(object) >> InstructionClass)
     def branch_instruction(self):
-        return self._branch_targets.instruction
+        if len(self._instructions) == 0 or not isinstance(self._instructions[-1], BranchInstructionClass):
+            self._instructions.append(ExitInstruction())
+        return self._instructions[-1]
 
     ### Block modification ###
 
@@ -392,29 +293,32 @@ class BasicBlock(BasicBlock):
       | Syntax(object, BasicBlock, cond=str, new_child_if_cond=bool)
       >> None)
     def add_child(self, child, cond=None, new_child_if_cond=True):
-        num_children = len(self.children)
-        if num_children == 0:
+        children = self.children
+        branch = self._instructions.pop()
+        if len(children) == 0:
             if cond is not None:
                 raise BranchError(self.label, f"Added branch condition {cond} to unconditional branch out of {self.name}")
-            self._branch_targets = BranchTargets(target=child)
+            self._instructions.append(GotoInstruction(child.label))
+            self._instructions[-1].meta = branch.meta
             child.add_parent(self)
             return
-        if num_children == 1:
+        if len(children) == 1:
             if cond is None:
                 raise BranchError(self.label, f"Condition required for new branch out of {self.name}")
-            first = self.children[0]
+            first = children[0]
             if new_child_if_cond:
-                self._branch_targets = BranchTargets(cond=cond,
-                        iftrue=child,
-                        iffalse=first)
+                self._instructions.append(BranchInstruction(cond=cond,
+                            iftrue=child.label,
+                            iffalse=first.label))
             else:
-                self._branch_targets = BranchTargets(cond=cond,
-                        iftrue=first,
-                        iffalse=child)
+                self._instructions.append(BranchInstruction(cond=cond,
+                            iftrue=first.label,
+                            iffalse=child.label))
 
+            self._instructions[-1].meta = branch.meta
             child.add_parent(self)
             return
-        # num_children == 2
+        # len(children) == 2
         raise BranchError(self.label, f"Cannot have three branch targets out of {self.name}")
     
     @(Syntax(object, BasicBlock, ignore_keyerror=bool, propagate=bool, keep_duplicate=bool) >> None)
@@ -428,32 +332,39 @@ class BasicBlock(BasicBlock):
             raise KeyError(f"{self.name} does not have {child.label} as child")
         if propagate:
             child.remove_parent(self, ignore_keyerror=True, propagate=False)
-        if len(self.children) == 1:
-            self._branch_targets = BranchTargets()
+        children = self.children
+        branch = self._instructions.pop()
+
+        if len(children) == 1:
+            self._instructions.append(ExitInstruction())
+            self._instructions[-1].meta = branch.meta
             return
         # branch has two children at this point
-        kept = self.children[0] if child == self.children[1] else self.children[1]
+        kept = children[0] if child == children[1] else children[1]
         if kept == child:
             if keep_duplicate:
                 kept.add_parent(self)
                 # since kept == child, its parent was deleted already
             else:
-                self._branch_targets = BranchTargets()
+                self._instructions.append(ExitInstruction())
+                self._instructions[-1].meta = branch.meta
                 # remove both child and duplicate
                 return
-        self._branch_targets = BranchTargets(target=kept)
+        self._instructions.append(GotoInstruction(kept.label))
+        self._instructions[-1].meta = branch.meta
 
     @(Syntax(object) >> None)
     def remove_children(self, propagate=True):
         """
         Removes all branch targets for current block.
         """
-        for child in self.children:
+        children = self.children
+        for child in children:
             self.remove_child(child, propagate=propagate)
 
 ### Control flow ###
 
-class CFG:
+class CFG(CFG):
 
     @(Syntax(object) >> None)
     def __init__(self):
@@ -515,7 +426,7 @@ class CFG:
                 del self._undef_blocks[label]
                 return
             raise LabelConflictError(f"{label} cannot be assigned to multiple blocks")
-        self._blocks[label] = BasicBlock(label)
+        self._blocks[label] = BasicBlock(self, label)
         # all basic blocks are exit nodes by default
 
     @(Syntax(object, str) >> BasicBlock)
@@ -535,16 +446,13 @@ class CFG:
         Clears block instructions and populates it with passed instructions
         """
         block = self[label]
-        block._instructions = []
-        block.remove_children() # empty instruction list
+        block._instructions = [] # empty instructions
         for (i, I) in enumerate(instructions):
             if isinstance(I, BranchInstructionClass):
                 if i + 1 < len(instructions):
                     raise BranchInBlockException(f"Intermediate instruction {i+1} of block {label} is a branch ({repr(I)})")
-
-                # since branch instructions are treated differently from other instructions,
-                # its metadata must be handled by the basic block
-                block._branch_meta = I.meta
+                # pass metadata before interpreting branch
+                block.branch_instruction.meta = I.meta
 
                 if isinstance(I, ExitInstruction):
                     return
@@ -556,7 +464,7 @@ class CFG:
                     block.add_child(self.fetch_or_create_block(I.iffalse),
                             cond=I.cond, new_child_if_cond=False)
                     return
-            self[label]._instructions.append(I)
+            block._instructions.append(I)
 
     @(Syntax(object, str) >> None)
     def set_entrypoint(self, label):

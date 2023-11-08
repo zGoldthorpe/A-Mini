@@ -192,7 +192,7 @@ class CFGBuilder:
 
         self._fallthrough_parent = None
         # if current block comes from fallthrough (previous instruction
-        # is a branch), then this stores ampy.types.BasicBlock of parent
+        # is not a branch), then this stores ampy.types.BasicBlock of parent
         self._anon = 0
         # counter for anonymous block labels
         # besides first block, I don't think it's possible to create
@@ -204,7 +204,7 @@ class CFGBuilder:
         # tracks the line of the block being built
 
         self._last_instruction = None
-        # tracks the previous decoded instruction, in case we can append metadata
+        # tracks the previous decoded instruction, in case we append metadata
 
         cfg = ampy.types.CFG()
         for (i, instruction) in enumerate(instructions):
