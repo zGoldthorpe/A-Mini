@@ -3,7 +3,7 @@ import sys
 from ampy.reader import CFGBuilder
 
 from opt.tools import OptList
-from opt.example_analysis import ExampleAnalysis, AddLister
+from opt.analysis.example_analysis import ExampleAnalysis, AddLister
 
 from tests.opt.tools import MetaTestSuite
 

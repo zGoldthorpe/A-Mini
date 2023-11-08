@@ -13,10 +13,10 @@ import opt.tools
 
 OptManager = ampy.passmanager.PassManager(opt.tools.Opt)
 
-OptManager.register("opt.example_analysis.ExampleAnalysis")
-OptManager.register("opt.domtree.DomTreeAnalysis")
-OptManager.register("opt.defs.DefAnalysis")
-OptManager.register("opt.live.LiveAnalysis")
+OptManager.register("opt.analysis.example_analysis.ExampleAnalysis")
+OptManager.register("opt.analysis.domtree.DomTreeAnalysis")
+OptManager.register("opt.analysis.defs.DefAnalysis")
+OptManager.register("opt.analysis.live.LiveAnalysis")
 
 OptManager.register("opt.example_opt.ExampleOpt")
 OptManager.register("opt.ssa.SSA")

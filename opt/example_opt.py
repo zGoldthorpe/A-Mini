@@ -21,7 +21,7 @@ from opt.tools import Opt
 import ampy.types
 
 ### required opts ###
-from opt.example_analysis import ExampleAnalysis
+from opt.analysis.example_analysis import ExampleAnalysis
 
 class ExampleOpt(Opt):
     # forward declaration

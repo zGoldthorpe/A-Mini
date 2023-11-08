@@ -100,12 +100,10 @@ amp.Printing.can_format &= args.format
 #TODO: make modular
 
 if args.ls:
-    amp.psubtle("Opt passes:")
-    for opt in sorted(AM):
-        amp.pquery(f"\t{opt}")
     amp.psubtle("Optimisation passes:")
     for opt in sorted(OM):
-        amp.pquery(f"\t{opt}")
+        amp.pquery(f"\t{opt} ", end='')
+        amp.phidden(f"({OM[opt].__module__}.{OM[opt].__name__})")
     exit(0)
 
 if args.explain is not None:
