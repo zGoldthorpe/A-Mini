@@ -366,7 +366,22 @@ class Analysis(Analysis, RequiresAnalysis):
             # block metadata
             return arg.start.meta.get(self.tagged(arg.stop), None)
         # instruction metadata
-        return arg.start[arg.stop].meta.get(self.tagged(arg.step), default=None)
+        return arg.start[arg.stop].meta.get(self.tagged(arg.step), None)
+
+    @Analysis.getter
+    @(Syntax(object, str, default=((list, [str]), None)) # CFG #!var
+      | Syntax(object, ampy.types.BasicBlock, str, default=((list, [str]), None)) # block @!var
+      | Syntax(object, ampy.types.BasicBlock, int, str, default=((list, [str]), None)) # instr %!var
+      >> ((list, [str]), None))
+    def get(self, *args, default=None):
+        """
+        Get metavariable for CFG, block, or instruction
+        If meta does is None, return default value
+        """
+        ret = (self[args[0]] if len(args) == 1 else
+               self[args[0]:args[1]] if len(args) == 2 else
+               self[args[0]:args[1]:args[2]])
+        return default if ret is None else ret
 
     @Analysis.setter
     @(Syntax(object, str, str, ..., append=bool) # CFG #!var
