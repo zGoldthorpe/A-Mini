@@ -217,7 +217,7 @@ class Interpreter:
             raise ReadInterrupt(instruction.target)
 
         if isinstance(instruction, ampy.types.WriteInstruction):
-            raise WriteInterrupt(instruction.target)
+            raise WriteInterrupt(instruction.operand)
 
         if isinstance(instruction, ampy.types.BrkInstruction):
             raise BreakpointInterrupt(instruction.name)

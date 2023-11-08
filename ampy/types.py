@@ -164,12 +164,12 @@ class ReadInstruction(InstructionClass):
 
 class WriteInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
-    def __init__(self, lhs):
-        self.target = lhs
+    def __init__(self, rhs):
+        self.operand = rhs
         super().__init__()
 
     def __repr__(self):
-        return f"write {self.target}"
+        return f"write {self.operand}"
 
 class BrkInstruction(InstructionClass):
     @(Syntax(object, str) >> None)
