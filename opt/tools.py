@@ -181,38 +181,8 @@ class Opt(Opt):
 
         return out
 
-    @(Syntax(object, int)
-      | Syntax(object, int, r"%?[.\w]+")
-      >> [str]) 
-    def gen_registers(self, count, prefix=None, /):
-        """
-        Generate an available register name.
-        If prefix not set, register is prefixed with the optimisation ID.
-        """
-        counter = 0
-        prefix = self.ID if prefix is None else f"{prefix}." if len(prefix) > 0 else ""
-        if not prefix.startswith('%'):
-            prefix = '%' + prefix
-
-        registers = self.CFG.registers
-        out = []
-
-        while len(out) < count:
-            reg = prefix + str(count)
-            if reg not in self.CFG.registers:
-                out.append(reg)
-            counter += 1
-
-        return reg
-
     @(Syntax(object)
       | Syntax(object, r"@?[.\w]+")
       >> str)
     def gen_label(self, prefix=None, /):
         return self.gen_labels(1, prefix)[0]
-
-    @(Syntax(object)
-      | Syntax(object, r"%?[.\w+]")
-      >> str)
-    def gen_register(self, prefix=None, /):
-        return self.gen_registers(1, prefix)[0]
