@@ -23,7 +23,7 @@ from ampy.passmanager import (
         )
 
 from analysis import AnalysisManager as AM
-from analysis.tools import AnalysisList
+from analysis.tools import AnalysisList, AMError
 
 from opt import OptManager as OM
 
@@ -192,7 +192,12 @@ if args.passes is not None:
             except BadArgumentException as e:
                 amp.perror(f"Analysis {opt} received invalid argument.\n{e}")
                 exit(-7)
-            analysis.perform_analysis()
+
+            try:
+                analysis.perform_analysis()
+            except AMError as e:
+                amp.perror(f"Analysis {opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
+                exit(-8)
             continue
 
         if opt in OM:
@@ -205,7 +210,7 @@ if args.passes is not None:
             continue
 
         amp.perror(f"Unrecognised pass {opt}")
-        exit(-8)
+        exit(-9)
 
 ### output ###
 writer = amw.CFGWriter(write_meta=args.meta)

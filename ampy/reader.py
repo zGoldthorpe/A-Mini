@@ -61,7 +61,7 @@ _var = rf"({_reg})"
 _op  = rf"({_ron})"
 _lbl = rf"({_tgt})"
 
-_meta = r"([a-zA-Z0-9\-_.,;/|]+)"
+_meta = r"([^:\s]+)"
 
 ### Parsing information ###
 

@@ -89,7 +89,7 @@ class Analysis:
                 analyses.append(self) # update analysis list
                 super().__init__(cfg, analyses)
 
-                ampy.debug.print(ID, f"initialising analysis with arguments {', '.join(args)}, {', '.join(f'{k}={v}' for k,v in kwargs.items())}")
+                ampy.debug.print(ID, f"initialising analysis with arguments {list(args)}, {dict(kwargs)}")
                 initfunc(self, *args, **kwargs)
                 self._inputs = (tuple(args), kwargs)
 
@@ -413,3 +413,15 @@ class AnalysisList(TypedList):
       >> None)
     def __init__(self, ls=[]):
         super().__init__(ls, Analysis)
+
+
+class AMError(Exception):
+    """
+    Throw if analysis discovers an error in the source code
+    """
+    def __init__(self, block:ampy.types.BasicBlock, index:int, message=""):
+        self.block = block
+        self.index = index
+        self.message = message
+        super().__init__(f"[{block.label}:{index}] {message}")
+

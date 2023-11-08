@@ -36,12 +36,26 @@ class DomTreeAnalysis(DomTreeAnalysis):
     def __init__(self, /):
         pass
 
+    @DomTreeAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> bool)
+    def dominates(self, A, B):
+        """
+        Determines if the block A dominates the block B
+        """
+        while True:
+            if B == A:
+                return True
+            ls = self[B:"idom"]
+            if ls is None or len(ls) == 0:
+                return False
+            B = self.CFG[ls[0]]
+
     @DomTreeAnalysis.analysis
-    @(Syntax(object) >> None)
     def lengauer_tarjan(self):
         """
         Lengauer-Tarjan dominator tree constructor
         """
+        self.clear() # clear metadata prior to running analysis
 
         # Step 1. DFS
         # -----------
@@ -147,6 +161,7 @@ class DomTreeAnalysis(DomTreeAnalysis):
                 self.assign(block, "idom")
             else:
                 self.assign(block, "idom", self._idom[block].label)
+                self.assign(self._idom[block], "children", block.label, append=True)
 
     @(Syntax(object, ampy.types.BasicBlock) >> None)
     def _DFS(self, block):
@@ -209,3 +224,4 @@ class DomTreeAnalysis(DomTreeAnalysis):
                 self._label[block] = self._label[self._ancestor[block]]
 
             self._ancestor[block] = self._ancestor[self._ancestor[block]]
+
