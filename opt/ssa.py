@@ -87,6 +87,9 @@ class SSA(SSA):
         defs = self.require_analysis(DefAnalysis)
 
         for var in defs["vars"]:
+            if len(defs[var]) == 1:
+                # phi nodes are unnecessary if there is only a single assignment to begin with
+                continue
             S = {self.CFG[lbl] for lbl in defs[var]}
             self._idf[var] = S
             while True:
@@ -112,6 +115,7 @@ class SSA(SSA):
                 for block in self.CFG
                 }
 
+        changed = False
         for var, blocks in self._idf.items():
             # SSA_vars: list of new variables for substituting var
             # SSA_counter: key for uniqueness of variable
@@ -131,11 +135,15 @@ class SSA(SSA):
                 if len(conds) == 0:
                     # there is no phi node
                     continue
+                changed = True
                 newvar = self._ssa_vars[self._phi_idx[block]]
                 block._instructions.insert(0,
                         ampy.types.PhiInstruction(newvar, *conds))
 
-        return () # I don't have any analyses on the CFG shape, which is the only thing that gets preserved
+        if changed:
+            # I don't have any analyses on the CFG shape, which is the only thing that gets preserved
+            return ()
+        return self.analyses
 
     @(Syntax(object, str) >> int)
     def _gen_register(self, var):
@@ -145,6 +153,7 @@ class SSA(SSA):
         Returns index of new register
         """
         defs = self.require_analysis(DefAnalysis)
+
         while True:
             self._ssa_counter += 1
             reg = f"{var}.{self._ssa_counter}"
