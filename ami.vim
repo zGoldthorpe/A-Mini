@@ -1,6 +1,12 @@
 " Vim syntax for A-Mi
 "
-"$ source ami.vim
+" To load syntax manually:
+" :source ami.vim
+"
+" To load syntax automatically:
+" - copy ami.vim into folder ~/.vim/syntax/
+" - create a file ~/.vim/ftdetect/ami.vim containing the line
+"       autocmd BufNewFile,BufRead *.ami setf ami
 
 if exists("b:current_syntax")
     finish
