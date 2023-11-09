@@ -20,3 +20,4 @@ OptManager.register("opt.analysis.live.LiveAnalysis")
 
 OptManager.register("opt.example_opt.ExampleOpt")
 OptManager.register("opt.ssa.SSA")
+OptManager.register("opt.gvn.rpo_simple.RPO")
