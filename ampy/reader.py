@@ -211,6 +211,7 @@ class CFGBuilder:
             if ';' in instruction:
                 # ignore comment
                 instruction, comment = instruction.split(';', 1)
+                comment = comment.strip()
             else:
                 comment = ""
             
