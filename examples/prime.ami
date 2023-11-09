@@ -1,0 +1,67 @@
+; Given an integer N, finds the first divisor of N
+; that is larger than 1
+
+    read %N
+    %negative = %N < 0
+    branch %negative ? @rescale_N : @check_validity
+
+@rescale_N:
+    %N = %N * -1
+
+@check_validity:
+    %invalid = %N <= 1
+    branch %invalid ? @invalid : @find_div
+
+@invalid:
+    write -1
+    exit
+
+@find_div:
+    %div = 2
+
+@main_loop:
+    %d_sq = %div * %div
+    %prime = %N < %d_sq
+    branch %prime ? @prime : @divide
+
+@prime:
+    write %N
+    exit
+
+@divide:
+    %q = 0
+    %r = %N
+
+@division_loop:
+    %done_div = %r < %div
+    %msd = %div
+    %msv = 1
+    branch %done_div ? @check_rem : @shave
+
+@check_rem:
+    %divisor = %r == 0
+    branch %divisor ? @found_divisor : @keep_looking
+
+@found_divisor:
+    write %div
+    exit
+
+@keep_looking:
+    %div = %div + 1
+    goto @main_loop
+
+@shave:
+    %scaled = %msd * %div
+    %overshoot = %N < %scaled
+    branch %overshoot ? @commit : @continue_div
+
+@commit:
+    %q = %q + %msv
+    %prod = %msv * %div
+    %r = %r - %prod
+    goto @division_loop
+
+@continue_div:
+    %msd = %scaled
+    %msv = %msv * %div
+    goto @shave

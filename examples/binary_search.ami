@@ -1,0 +1,84 @@
+; Binary search
+;
+; You are asked to pick a number in [0, 1023].
+; The program has 10 guesses to find your number.
+; The program will guess numbers, and expect an answer of
+;  1: guess is too high
+; -1: guess is too low
+;  0: guess is correct
+;
+; If the program outputs -1, it means that your input makes no sense
+
+    %countdown = 11
+    %lo = 0
+    %hi = 1024 ; lo <= answer < hi
+
+@main_loop:
+    %countdown = %countdown - 1
+    %lose = %countdown == 0
+    branch %lose ? @lose : @find_guess
+
+@find_guess:
+    write %countdown
+    %diff = %hi - %lo
+    ; we need to divide the difference by 2
+    %half = 0
+    %rem = %diff
+
+@division_loop:
+    %done = %rem < 2
+    %msd = 2
+    %msv = 1
+    branch %done ? @make_guess : @get_top_bit
+
+@get_top_bit:
+    %doubled = %msd + %msd
+    %overshoot = %diff < %doubled
+    branch %overshoot ? @commit_bit : @continue_division
+
+@commit_bit:
+    %half = %half + %msv
+    %prod = %msv + %msv
+    %rem = %rem - %prod
+    goto @division_loop
+
+@continue_division:
+    %msd = %doubled
+    %msv = %msv + %msv
+    goto @get_top_bit
+
+@make_guess:
+    ; half = diff / 2
+    %guess = %lo + %half
+    write %guess
+    read %response
+    %win = %response == 0
+    branch %win ? @win : @learn
+
+@learn:
+    %too_big = %response == 1
+    branch %too_big ? @too_big : @not_too_big
+
+@too_big:
+    %hi = %guess
+    goto @main_loop
+
+@not_too_big:
+    %too_small = %response == -1
+    branch %too_small ? @too_small : @invalid
+
+@too_small:
+    %lo = %guess
+    goto @main_loop
+
+@invalid:
+    write -1
+    goto @make_guess ; no need to recompute guess
+
+@win:
+    write 88 ; bye-bye
+    exit
+
+@lose:
+    write 99 ; gg
+    exit

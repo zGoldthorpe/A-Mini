@@ -1,0 +1,50 @@
+; Division 
+;
+; Given *positive* N and M, the program spits out
+; q = N / M (integer division)
+; r = N % M
+; so that q * M + r = N and 0 <= r < M
+
+    read %N
+    read %M
+    %neg = %N < 0
+    branch %neg ? @invalid : @check_M
+
+@check_M:
+    %neg = %M < 0
+    branch %neg ? @invalid : @begin
+
+@begin:
+    %q = 0
+    %r = %N
+
+@main_loop:
+    %done = %r < %M
+    %msd = %M
+    %msv = 1
+    branch %done ? @done : @shave
+
+@shave:
+    %scaled = %msd * %M
+    %overshoot = %N < %scaled
+    branch %overshoot ? @save : @continue
+
+@save:
+    %q = %q + %msv
+    %prod = %msv * %M
+    %r = %r - %prod
+    goto @main_loop
+
+@continue:
+    %msd = %scaled
+    %msv = %msv * %M
+    goto @shave
+
+@done:
+    write %q
+    write %r
+    exit
+
+@invalid:
+    write -1
+    exit
