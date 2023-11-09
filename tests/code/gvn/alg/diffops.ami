@@ -1,0 +1,7 @@
+
+@diffops:
+    read %a
+    %p = %a + %a
+    %q = %a * 2
+    write %p        ;%!/: p = a + a
+    write %q        ;%!/: q = a * 2

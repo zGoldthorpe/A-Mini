@@ -1,0 +1,16 @@
+@associativity:
+    read %a
+    read %b
+    read %c
+    %0 = %a + %b
+    %p.a = %0 + %c
+    %1 = %b + %c
+    %q.a = %a + %1
+    write %p.a      ;%!/: p.a = (a + b) + c = a + b + c
+    write %q.a      ;%!/: q.a = a + (b + c) = a + b + c
+    %2 = %a * %b
+    %p.m = %2 * %c
+    %3 = %b * %c
+    %q.m = %a * %3
+    write %p.m      ;%!/: p.m = (a * b) * c = a * b * c
+    write %q.m      ;%!/: q.m = a * (b * c) = a * b * c

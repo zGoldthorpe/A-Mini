@@ -1,0 +1,11 @@
+@commutativity:
+    read %a
+    read %b
+    %p.a = %a + %b
+    %q.a = %b + %a
+    write %p.a      ;%!/: p.a = a + b
+    write %q.a      ;%!/: q.a = b + a
+    %p.m = %a * %b
+    %q.m = %b * %a
+    write %p.m      ;%!/: p.m = a * b
+    write %q.m      ;%!/: q.m = b * a

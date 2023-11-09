@@ -1,0 +1,12 @@
+
+@distributivity:
+    read %a
+    read %b
+    read %c
+    %0 = %a + %b
+    %p = %0 * %c
+    %1 = %a * %c
+    %2 = %b * %c
+    %q = %1 + %2
+    write %p        ;%!/: p = (a + b)*c
+    write %q        ;%!/: q = a*c + b*c

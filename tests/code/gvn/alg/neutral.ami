@@ -1,0 +1,6 @@
+@neutral:
+    read %a
+    %p = %a + 0
+    %q = %a * 1
+    write %p    ;%!/: p = a + 0 = a
+    write %q    ;%!/: q = a * 1 = a

@@ -1,0 +1,6 @@
+@annihilate:
+    read %a
+    %p = %a * 0
+    %q = %a - %a
+    write %p ;%!/: p = a * 0 = 0
+    write %q ;%!/: q = a - a = 0

@@ -3,8 +3,8 @@ Simple RPO GVN
 ================
 Goldthorpe
 
-This implements a simple version of the RPO algorithm found
-in figure 4.3 of
+This implements a simplified version of the RPO algorithm found
+in figure 4.3 Simpson's PhD Thesis.
 
 L.T. Simpson. 1996
     "Value-Driven Redundancy Elimination"
@@ -12,8 +12,10 @@ L.T. Simpson. 1996
 """
 
 from ampy.ensuretypes import Syntax
+from ampy.passmanager import BadArgumentException
 from opt.ssa import SSA
 from opt.tools import Opt
+from opt.gvn.simple_poly import Polynomial
 
 import ampy.types
 import ampy.debug
@@ -22,117 +24,22 @@ class RPO(Opt):
     # forward declaration
     pass
 
-class Polynomial:
-    # forward declaration
-    pass
-
-class Polynomial(Polynomial):
-    """
-    Formal polynomial of registers
-
-    Monomials are sorted in lexicographical order
-    """
-    @(Syntax(object, str, ...) >> None)
-    def __init__(self, primitive='0', /):
-        self._dict = {}
-        if primitive.startswith('%'):
-            self._dict[primitive,] = 1
-        elif (prim_int := int(primitive)) != 0:
-            self._dict[()] = prim_int # constant coef
-
-    def __repr__(self):
-        s = ""
-        for mon, coef in sorted(self._dict.items(), key=lambda p: p[0]):
-            if coef < 0:
-                s += " - "
-                coef *= -1
-            else:
-                s += " + "
-
-            if coef != 1:
-                s += str(coef)
-
-            if mon != ():
-                s += f"({'*'.join(mon)})"
-
-            if mon == () and coef == 1:
-                s += "1"
-        return s.strip()
-
-    @(Syntax(object) >> None)
-    def reduce(self):
-        """
-        Remove zero coefficients
-        """
-        for mon, coef in list(self._dict.items()):
-            if coef == 0:
-                del self._dict[mon]
-
-    @(Syntax(object) >> bool)
-    def is_constant(self):
-        return len(self._dict) == 0 or len(self._dict) == 1 and () in self._dict
-
-    @(Syntax(object) >> int)
-    def constant(self):
-        return self._dict.get((), 0)
-
-    @(Syntax(object, Polynomial) >> Polynomial)
-    def __mul__(self, other):
-        res = Polynomial()
-        for smon, scoef in self._dict.items():
-            for omon, ocoef in other._dict.items():
-                mon = tuple(sorted(smon + omon))
-                res._dict[mon] = res._dict.get(mon, 0) + scoef * ocoef
-        res.reduce()
-        return res
-
-    @(Syntax(object, Polynomial) >> Polynomial)
-    def __add__(self, other):
-        res = Polynomial()
-        for smon, scoef in self._dict.items():
-            res._dict[smon] = scoef
-        for omon, ocoef in other._dict.items():
-            res._dict[omon] = res._dict.get(omon, 0) + ocoef
-        res.reduce()
-        return res
-
-    @(Syntax(object, Polynomial) >> Polynomial)
-    def __sub__(self, other):
-        res = Polynomial()
-        for smon, scoef in self._dict.items():
-            res._dict[smon] = scoef
-        for omon, ocoef in other._dict.items():
-            res._dict[omon] = res._dict.get(omon, 0) - ocoef
-        res.reduce()
-        return res
-
-    @(Syntax(object, (Polynomial, None)) >> bool)
-    def __eq__(self, other):
-        if other is None:
-            return False
-        for mon, coef in self._dict.items():
-            if other._dict.get(mon, 0) != coef:
-                return False
-        for mon, coef in other._dict.items():
-            if self._dict.get(mon, 0) != coef:
-                return False
-        return True
-    
-    def __hash__(self):
-        # lazy hash
-        return hash(tuple(sorted(self._dict.items(), key=lambda v:v[0])))
-
-
 class RPO(RPO):
     """
-    rpo-gvn
+    gvn-simple(mode)
 
     Runs a simple version of Simpson's RPO GVN algorithm
+
+    mode: "simple" or "poly"
+        In simple mode, value numbers are given by registers or constants.
+        In poly mode, value numbers are given by polynomial expressions.
     """
 
-    @RPO.init("rpo-gvn")
-    def __init__(self, /):
-        pass
+    @RPO.init("gvn-simple", "simple")
+    def __init__(self, mode, /):
+        if mode not in ["simple", "poly"]:
+            raise BadArgumentException("Mode must be one of \"simple\" or \"poly\".")
+        self._mode = mode
 
     @RPO.opt_pass
     def rpo_pass(self):
@@ -145,19 +52,17 @@ class RPO(RPO):
 
         # Step 1. Get blocks in reverse post-order
         # ----------------------------------------
-        # RPO[i]: ith block in reverse post-order
-        rpo = []
+        postorder = []
         
         seen = set()
-        def postorder(block):
+        def build_postorder(block):
             seen.add(block)
             for child in block.children:
                 if child not in seen:
-                    postorder(child)
-            rpo.append(block)
+                    build_postorder(child)
+            postorder.append(block)
         
-        postorder(self.CFG.entrypoint)
-        rpo.reverse()
+        build_postorder(self.CFG.entrypoint)
 
         # Step 2. Value numbering
         # -----------------------
@@ -169,47 +74,54 @@ class RPO(RPO):
             return Polynomial(op)
 
         while True:
+            ampy.debug.print(self.ID, "Updating value numbers")
             lookup = {}
             changed = False
-            for block in rpo:
+            for block in reversed(postorder):
                 for I in block:
-                    if isinstance(I, ampy.types.PhiInstruction):
-                        if len(set(vnpoly(val) for val, _ in I.conds)) == 1:
-                            vn[I.target] = vnpoly(I.conds[0][0])
-                        else:
-                            vn[I.target] = Polynomial(I.target)
-                    if isinstance(I, ampy.types.ReadInstruction):
-                        # reads cannot be handled optimistically
-                        vn[I.target] = Polynomial(I.target)
 
                     if isinstance(I, ampy.types.MovInstruction):
-                        vn[I.target] = vnpoly(I.operand)
+                        expr = vnpoly(I.operand)
 
-                    if not isinstance(I, ampy.types.ArithInstructionClass):
-                        # we do not process non-arithmetic instructions
+                    elif isinstance(I, ampy.types.PhiInstruction):
+                        if len(set(vnpoly(val) for val, _ in I.conds)) == 1:
+                            expr = vnpoly(I.conds[0][0])
+                        else:
+                            expr = Polynomial(I.target)
+
+                    elif isinstance(I, ampy.types.ArithInstructionClass):
+                        op1, op2 = map(vnpoly, I.operands)
+                        if isinstance(I, ampy.types.AddInstruction):
+                            expr = op1 + op2
+                        elif isinstance(I, ampy.types.SubInstruction):
+                            expr = op1 - op2
+                        else: # multiplication
+                            expr = op1 * op2
+                    
+                    elif isinstance(I, ampy.types.ReadInstruction):
+                        expr = Polynomial(I.target)
+
+                    else:
+                        # other instructions are not considered / handled
                         continue
-                    op1, op2 = map(vnpoly, I.operands)
-                    if isinstance(I, ampy.types.AddInstruction):
-                        expr = op1 + op2
-                    elif isinstance(I, ampy.types.SubInstruction):
-                        expr = op1 - op2
-                    else: # multiplication
-                        expr = op1 * op2
 
-                    if expr.is_constant():
-                        value = expr
+                    if self._mode == "poly" or expr.is_constant():
+                        value = lookup.setdefault(expr, expr)
                     else:
                         value = lookup.setdefault(expr, Polynomial(I.target))
+
                     if value != vn.get(I.target, None):
                         changed = True
                         vn[I.target] = value
+                        ampy.debug.print(self.ID, f"{I.target} updated to {value}")
             
             if not changed:
                 break
 
-        # Step 3. 
-        # -----------------------------------------------
+        # Step 3. Collapse value number classes
+        # -------------------------------------
         # vnrep[value]: representative variable for value number
+        ampy.debug.print(self.ID, "Value numbering complete")
         vnrep = {}
         for var, val in vn.items():
             ampy.debug.print(self.ID, var, "=", val)
@@ -218,8 +130,8 @@ class RPO(RPO):
             else:
                 vnrep.setdefault(val, var)
 
-        defined = set() # SSA
-        for block in rpo:
+        defined = set() # ensure variables are only defined once
+        for block in reversed(postorder):
             to_delete = []
             for i, I in enumerate(block):
                 if self._replace_or_elim(I, vn, vnrep, defined):
@@ -227,7 +139,7 @@ class RPO(RPO):
             for i in reversed(to_delete):
                 block._instructions.pop(i)
 
-        return tuple(opt for opt in self.opts if isinstance(opt, RPO))
+        return tuple(opt for opt in self.opts if isinstance(opt, (RPO, SSA)))
 
     @(Syntax(object, ampy.types.InstructionClass, dict, dict, set) >> bool)
     def _replace_or_elim(self, I, vn, vnrep, defined):
