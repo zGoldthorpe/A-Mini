@@ -101,8 +101,9 @@ amp.Printing.can_format &= args.format
 
 if args.ls:
     amp.psubtle("Optimisation passes:")
+    spaces = max(len(opt) for opt in OM)
     for opt in sorted(OM):
-        amp.pquery(f"\t{opt} ", end='')
+        amp.pquery(f"\t{opt: <{spaces}} ", end='')
         amp.phidden(f"({OM[opt].__module__}.{OM[opt].__name__})")
     exit(0)
 
