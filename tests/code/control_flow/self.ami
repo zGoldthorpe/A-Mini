@@ -1,0 +1,14 @@
+
+@A:
+    read %x
+    branch %x ? @B : @C
+
+@B:
+    %y = phi [ %x, @A ], [ %z, @B ]
+    %z = %y + 10
+    branch %z ? @B : @C
+
+@C:
+    %w = phi [ %z, @B ], [ -1, @A ]
+    write %w
+    exit

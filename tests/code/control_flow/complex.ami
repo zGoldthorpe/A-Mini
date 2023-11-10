@@ -1,0 +1,24 @@
+
+@A:
+    read %x
+    branch %x ? @B : @C
+
+@B: goto @C
+
+@C:
+    read %y
+    branch %y ? @E : @F
+
+@E:
+    write 10
+    goto @H
+
+@F: goto @G
+@G: goto @H
+
+@H:
+    read %z
+    branch %z ? @B : @I
+
+@I:
+    exit

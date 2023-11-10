@@ -502,9 +502,9 @@ class CFG(CFG):
             raise KeyError(f"Attempting to remove non-existing block at {label}")
         block = self[label]
         for parent in block.parents:
-            parent.remove_child(block)
+            parent.remove_child(block, ignore_keyerror=ignore_keyerror)
         for child in block.children:
-            child.remove_parent(block)
+            child.remove_parent(block, ignore_keyerror=ignore_keyerror)
 
         if self._entrypoint == block:
             self._entrypoint = None
@@ -530,12 +530,12 @@ class CFG(CFG):
         dfs(self.entrypoint)
 
         for block in untouched:
-            self.remove_block(block.label)
+            self.remove_block(block.label, ignore_keyerror=True)
 
         for block in self:
             for parent in block.parents:
                 if block not in parent.children:
-                    raise LostChildError(f"{parent.label} does not know of child block {child.label}")
+                    raise LostChildError(f"{parent.label} does not know of child block {block.label}")
 
             parent_labels = {parent.label for parent in block.parents}
             instructions = enumerate(block)

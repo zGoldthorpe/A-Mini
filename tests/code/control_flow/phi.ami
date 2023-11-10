@@ -1,0 +1,9 @@
+
+@A:
+    read %x
+    branch %x ? @B : @C
+
+@B: goto @C
+
+@C: %y = phi [ %x, @A ], [ -1, @B ]
+    write %y

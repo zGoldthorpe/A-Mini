@@ -1,0 +1,17 @@
+@A:
+    read %x
+    branch 1 ? @B : @C
+
+@B:
+    read %y
+    goto @D
+
+@C:
+    read %z
+    goto @D
+
+@D:
+    %p = phi [ %y, @B ], [ %z, @C ]
+    %q = %x + %p
+    write %q
+    exit

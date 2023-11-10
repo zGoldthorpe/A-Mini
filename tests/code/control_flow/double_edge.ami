@@ -1,0 +1,8 @@
+@A:
+    read %x
+    %irrelevant = %x == 0
+    branch %irrelevant ? @B : @B
+
+@B:
+    write %y
+    exit

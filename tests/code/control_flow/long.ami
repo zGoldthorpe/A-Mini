@@ -1,0 +1,14 @@
+
+@0:
+    read %x
+    goto @1
+@1:
+    %y = %x + 1
+    goto @2
+@2:
+    read %z
+    %z = %z + %y
+    goto @3
+@3:
+    write %z
+    exit
