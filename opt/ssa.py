@@ -129,7 +129,7 @@ class SSA(SSA):
             self._phi = {block : [] for block in blocks}
             self._phi_idx = {}
 
-            self._prepare_phi_nodes(var, -1, self.CFG.entrypoint)
+            changed |= self._prepare_phi_nodes(var, -1, self.CFG.entrypoint)
 
             # now that the phi nodes are prepared, we can actually add them
             for block, conds in self._phi.items():
@@ -164,12 +164,15 @@ class SSA(SSA):
                 return len(self._ssa_vars)-1
 
 
-    @(Syntax(object, str, int, ampy.types.BasicBlock, src=ampy.types.BasicBlock) >> None)
+    @(Syntax(object, str, int, ampy.types.BasicBlock, src=ampy.types.BasicBlock) >> bool)
     def _prepare_phi_nodes(self, var, cur_idx, block, *, src=None):
         """
         Performs a DFS to build phi nodes and update variable names
-        However, does not insert phi nodes yet
+        However, does not insert phi nodes yet.
+
+        Returns True if preparation changes the CFG
         """
+        changed = False
         if block in self._idf[var]:
             if var in self._live_in[block]:
                 # variable is actually used
@@ -180,14 +183,16 @@ class SSA(SSA):
                     self._phi_idx[block] = self._gen_register(var)
                     ampy.debug.print(self.ID, f"Inserting new phi variable {self._ssa_vars[self._phi_idx[block]]} in {block.label}")
 
-        cur_idx = self._phi_idx.get(block, cur_idx)
+        prev = (cur_idx := self._phi_idx.get(block, cur_idx))
         for I in block:
             cur_idx = self._replace_and_update(I, var, cur_idx, src=src)
+            changed |= prev != (prev := cur_idx)
 
         if block not in self._visited:
             self._visited.add(block)
             for child in block.children:
-                self._prepare_phi_nodes(var, cur_idx, child, src=block)
+                changed |= self._prepare_phi_nodes(var, cur_idx, child, src=block)
+        return changed
 
     @(Syntax(object, ampy.types.InstructionClass, str, int, src=(ampy.types.BasicBlock, None)) >> int)
     def _replace_and_update(self, I, var, idx, src=None):

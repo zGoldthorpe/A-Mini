@@ -22,6 +22,9 @@ class DefAnalysis(DefAnalysis):
 
     Records the definitions and uses of all variables,
     recording the result in global metadata.
+
+    If a block defines a variable %0 multiple times, then the block
+    will appear in defs/%0 multiple times as well.
     """
 
     @DefAnalysis.init("defs")
@@ -39,7 +42,7 @@ class DefAnalysis(DefAnalysis):
                     continue
 
                 var = instr.target
-                defs.setdefault(var, set()).add(block.label)
+                defs.setdefault(var, []).append(block.label)
                 self.assign(block, var, str(i), append=True)
 
         # record results
