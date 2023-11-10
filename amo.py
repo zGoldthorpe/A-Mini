@@ -105,7 +105,7 @@ if args.ls:
     for opt in sorted(OM):
         amp.pquery(f"\t{opt: <{spaces}} ", end='')
         amp.phidden(f"({OM[opt].__module__}.{OM[opt].__name__})")
-    exit(0)
+    exit()
 
 if args.explain is not None:
     if args.explain in OM:
@@ -113,17 +113,17 @@ if args.explain is not None:
         amp.phidden(f"({OM[args.explain].__module__}.{OM[args.explain].__name__})")
         if OM[args.explain].__doc__ is not None:
             amp.pquery(OM[args.explain].__doc__)
-        exit(0)
+        exit()
     amp.perror(f"Unrecognised pass {args.explain}.")
-    exit(-8)
+    exit(99)
 
 if args.fname is not None:
     if not os.path.exists(args.fname):
         amp.perror(f"Source file {args.fname} does not exist.", file=sys.stderr)
-        exit(-1)
+        exit(99)
     if not os.path.isfile(args.fname):
         amp.perror(f"{args.fname} does not point to a file!", file=sys.stderr)
-        exit(-2)
+        exit(99)
     with open(args.fname) as file:
         instructions = file.readlines()
 else:
@@ -153,18 +153,21 @@ try:
     cfg = builder.build(*instructions)
 except amr.EmptyCFGError:
     amp.perror("Program is empty!", file=sys.stderr)
-    exit(-3)
+    exit(99)
 except amr.NoEntryPointError as e:
     amp.perror(e.message, file=sys.stderr)
-    exit(-4)
+    exit(99)
 except amr.AnonymousBlockError as e:
     amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
     amp.perror("All basic blocks must be explicitly labelled.", file=sys.stderr)
-    exit(-5)
+    exit(99)
 except amr.ParseError as e:
     amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
     amp.perror(e.message, file=sys.stderr)
-    exit(-6)
+    exit(99)
+except amt.BadPhiError as e:
+    amp.perror(f"{args.fname}:", e.message)
+    exit(99)
 
 
 ### optimise ###
@@ -190,18 +193,18 @@ if args.passes is not None:
                 opter = OM[opt](cfg, passed_analyses, *opt_args, **opt_kwargs)
             except BadArgumentException as e:
                 amp.perror(f"Optimisation {opt} received invalid argument.\n{e}")
-                exit(-7)
+                exit(99)
             
             try:
                 opter.perform_opt()
             except OptError as e:
                 amp.perror(f"{opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
-                exit(-8)
+                exit(99)
 
             continue
 
         amp.perror(f"Unrecognised pass {opt}")
-        exit(-9)
+        exit(99)
 
 ### output ###
 if args.frame is None:

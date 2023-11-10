@@ -77,10 +77,10 @@ if args.entrypoint is not None and not args.entrypoint.startswith('@'):
 if args.fname is not None:
     if not os.path.exists(args.fname):
         amp.perror(f"Source file {args.fname} does not exist.", file=sys.stderr)
-        exit(-1)
+        exit(99)
     if not os.path.isfile(args.fname):
         amp.perror(f"{args.fname} does not point to a file!", file=sys.stderr)
-        exit(-2)
+        exit(99)
     with open(args.fname) as file:
         instructions = file.readlines()
 else:
@@ -110,18 +110,21 @@ try:
     cfg = builder.build(*instructions)
 except amr.EmptyCFGError:
     amp.perror("Program is empty!", file=sys.stderr)
-    exit(-3)
+    exit(99)
 except amr.NoEntryPointError as e:
     amp.perror(e.message, file=sys.stderr)
-    exit(-4)
+    exit(99)
 except amr.AnonymousBlockError as e:
     amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
     amp.perror("All basic blocks must be explicitly labelled.", file=sys.stderr)
-    exit(-5)
+    exit(99)
 except amr.ParseError as e:
     amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
     amp.perror(e.message, file=sys.stderr)
-    exit(-6)
+    exit(99)
+except amt.BadPhiError as e:
+    amp.perror(f"{args.fname}:", e.message)
+    exit(99)
 
 ### run program ###
 
@@ -142,7 +145,7 @@ while interpreter.is_executing:
         exit()
     except KeyError as e:
         amp.perror("Undefined register:", e, file=sys.stderr)
-        exit(-7)
+        exit(99)
     except ami.ReadInterrupt as e:
         val = None
         while True:
@@ -159,14 +162,14 @@ while interpreter.is_executing:
                 exit()
             except Exception as e:
                 amp.perror(f"Unexpected {type(e).__name__}: {e}", file=sys.stderr)
-                exit(-8)
+                exit(99)
         interpreter.write(e.register, val)
     except ami.WriteInterrupt as e:
         try:
             val = interpreter.read(e.register)
         except KeyError as e:
             amp.perror(e.message)
-            exit(-9)
+            exit(99)
         if args.prompt:
             amp.pprompt(e.register, "= ", end='')
         print(val)
@@ -186,7 +189,7 @@ while interpreter.is_executing:
             try:
                 q = input().lower().strip()
             except:
-                exit(0)
+                exit()
             if len(q) == 0:
                 break
 
@@ -195,7 +198,7 @@ while interpreter.is_executing:
                 amp.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
                 amp.pquery("Enter \"exit\" to terminate execution and quit.")
             if q == "exit":
-                exit(0)
+                exit()
 
             queries = set()
             for qre in q.split():

@@ -275,7 +275,7 @@ class CFGBuilder:
 
 
         # Now, CFG should be completed
-        cfg.assert_completeness()
+        cfg.tidy()
         return cfg
 
     @(Syntax(object, ampy.types.CFG, fallthrough=bool) >> None)

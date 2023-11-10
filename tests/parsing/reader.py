@@ -76,18 +76,17 @@ ts.exec("builder = CFGBuilder()",
 
 anon_block_prog = [
         "goto @A",
-        "goto @B",
+        "goto @B", # dead code
         "@A: goto @C",
-        "@B: goto @C",
+        "@B: goto @C", # dead code
         "branch %c ? @A : @C", # dead code
         "@C: exit",
         ]
 ts.exec("builder = CFGBuilder()",
         "cfg = builder.build(*prog)",
-        "assert len(cfg) == 6",
-        "assert len(cfg['@A'].parents) == 2",
-        "assert len(cfg['@B'].parents) == 1",
-        "assert len(cfg['@C'].parents) == 3",
+        "assert len(cfg) == 3", # 6 - 3 = 3
+        "assert len(cfg['@A'].parents) == 1",
+        "assert len(cfg['@C'].parents) == 1",
         state=dict(CFGBuilder=CFGBuilder,
                 prog=anon_block_prog))
 ts.exec("builder = CFGBuilder(allow_anon_blocks=False)",
@@ -98,14 +97,15 @@ ts.exec("builder = CFGBuilder(allow_anon_blocks=False)",
 phi_prog = [
         "@A: %x.A = 5",
         "goto @C",
-        "@B: %x.B = 10",
+        "@B: %x.B = 10", # dead code
         "goto @C",
         "@C: %x = phi [ %x.A, @A ], [ %x.B, @B ]",
+        "%y = phi [ %y.A, @A ]",
         "exit"
         ]
 ts.exec("builder = CFGBuilder()",
         "cfg = builder.build(*prog)",
-        "assert cfg['@C'].parents == {cfg['@A'], cfg['@B']}",
+        "assert cfg['@C'].parents == {cfg['@A']}",
         state=dict(CFGBuilder=CFGBuilder,
                 prog=phi_prog))
 

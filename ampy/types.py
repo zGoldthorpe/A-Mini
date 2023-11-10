@@ -288,7 +288,7 @@ class BasicBlock(BasicBlock):
         if parent not in self._parents:
             if ignore_keyerror:
                 return
-            raise KeyError(f"{self.name} does not have a parent at {parent}")
+            raise KeyError(f"{self.name} does not have a parent {parent.name}")
         self._parents.remove(parent)
         if propagate:
             parent.remove_child(self, ignore_keyerror=True, propagate=False)
@@ -496,7 +496,7 @@ class CFG(CFG):
         """
         Remove block of given label from CFG
         """
-        if label not in self:
+        if label not in self.labels:
             if ignore_keyerror:
                 return
             raise KeyError(f"Attempting to remove non-existing block at {label}")
@@ -504,28 +504,57 @@ class CFG(CFG):
         for parent in block.parents:
             parent.remove_child(block)
         for child in block.children:
-            child.remove_parent(child)
+            child.remove_parent(block)
 
         if self._entrypoint == block:
             self._entrypoint = None
 
         del self._blocks[label]
 
-    @(Syntax(object, fix_lost_parents=bool) >> None)
-    def assert_completeness(self, fix_lost_parents=False):
+    @(Syntax(object) >> None)
+    def tidy(self):
         """
-        Assert that all children know their parents and vice versa
+        Clean up CFG.
+        Remove unreachable blocks, test phi nodes, and ensure all
+        children know all parents
         """
-        for block in self:
+        untouched = {block for block in self}
+        def dfs(block):
+            untouched.remove(block)
             for child in block.children:
                 if block not in child.parents:
-                    if fix_lost_parents:
-                        child.add_parent(block)
-                        continue
-                    raise LostParentError(f"{child.label} does not know of parent block {parent.label}")
+                    child.add_parent(block)
+                if child in untouched:
+                    dfs(child)
+
+        dfs(self.entrypoint)
+
+        for block in untouched:
+            self.remove_block(block.label)
+
+        for block in self:
             for parent in block.parents:
                 if block not in parent.children:
                     raise LostChildError(f"{parent.label} does not know of child block {child.label}")
+
+            parent_labels = {parent.label for parent in block.parents}
+            instructions = enumerate(block)
+            for i, I in instructions:
+                if isinstance(I, PhiInstruction):
+                    # we will just passively clean up phi nodes
+                    I.conds = tuple(filter(
+                        lambda p: p[1] in parent_labels,
+                        I.conds))
+                    lbls = {lbl for _, lbl in I.conds}
+                    if len(lbls) < len(I.conds):
+                        raise BadPhiError(block, i, f"Phi node in {block.label}:{i} has repeated labels.")
+                    if len(diff := parent_labels - {lbl for _, lbl in I.conds}) > 0:
+                        raise BadPhiError(block, i, f"Phi node in {block.label}:{i} missing a value for {', '.join(sorted(diff))}")
+                    if len(I.conds) == 1:
+                        block._instructions[i] = MovInstruction(I.target, I.conds[0][0])
+                        block[i].meta = I.meta
+
+
 
 ### Error classes ###
 
@@ -545,12 +574,12 @@ class MultipleEntrypointsError(Exception):
         self.message = message
         super().__init__(message)
 
-class LostParentError(Exception):
+class LostChildError(Exception):
     def __init__(self, message=""):
         self.message = message
         super().__init__(message)
 
-class LostChildError(Exception):
-    def __init__(self, message=""):
+class BadPhiError(Exception):
+    def __init__(self, block, index, message=""):
         self.message = message
         super().__init__(message)
