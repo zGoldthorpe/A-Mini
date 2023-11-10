@@ -95,8 +95,10 @@ class RPO(RPO):
                             expr = op1 + op2
                         elif isinstance(I, ampy.types.SubInstruction):
                             expr = op1 - op2
-                        else: # multiplication
+                        elif isinstance(I, ampy.types.MulInstruction):
                             expr = op1 * op2
+                        else: # new, unhandled operation
+                            expr = Polynomial(I.target)
                     
                     elif isinstance(I, ampy.types.ReadInstruction):
                         expr = Polynomial(I.target)
