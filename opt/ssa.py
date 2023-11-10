@@ -3,7 +3,7 @@ Static single assignment
 ==========================
 Goldthorpe
 
-This module converts code into SSA form (that is, every variable is only
+This pass converts code into SSA form (that is, every variable is only
 defined once).
 
 The algorithm used is that of
@@ -17,10 +17,11 @@ R. Cytron, J. Ferrante, B.K. Rosen, M.N. Wegman, F.K. Zadeck. 1991.
 """
 
 from ampy.ensuretypes import Syntax
+from opt.tools import Opt
+
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.live import LiveAnalysis
-from opt.tools import Opt
 
 import ampy.types
 
@@ -203,29 +204,23 @@ class SSA(SSA):
                 raise IndexError(f"Did not prepare enough substitutes for {var} (requesting index {idx})")
             return self._ssa_vars[idx]
 
-        is_def = False
-        if isinstance(I, (ampy.types.ArithInstructionClass, ampy.types.CompInstructionClass)):
+        if isinstance(I, ampy.types.BinaryInstructionClass):
             I.operands = tuple(map(sub, I.operands))
-            is_def = True
         elif isinstance(I, ampy.types.MovInstruction):
             I.operand = sub(I.operand)
-            is_def = True
         elif isinstance(I, ampy.types.PhiInstruction):
             label = "" if src is None else src.label
             I.conds = tuple(map(
                 lambda t: (sub(t[0]) if t[1] == label else t[0],
                     t[1]), I.conds))
-            is_def = True
         elif isinstance(I, ampy.types.BranchInstruction):
             I.cond = sub(I.cond)
-        elif isinstance(I, ampy.types.ReadInstruction):
-            is_def = True
         elif isinstance(I, ampy.types.WriteInstruction):
             I.operand = sub(I.operand)
-        else: # GotoInstruction, ExitInstruction, BrkInstruction
+        else: # read, goto, exit, brkpt
             pass
 
-        if is_def and I.target == var:
+        if isinstance(I, ampy.types.DefInstructionClass) and I.target == var:
             # redefinition needs a new variable
             idx = self._gen_register(var)
             I.target = sub(I.target)

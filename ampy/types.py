@@ -39,27 +39,35 @@ class InstructionClass:
 
 ### General instruction classes ###
 
-class ArithInstructionClass(InstructionClass):
+class DefInstructionClass(InstructionClass):
+    """
+    Instruction class for all instructions that assign a value
+    to a register
+    """
+    @(Syntax(object, str) >> None)
+    def __init__(self, target):
+        self.target = target
+        super().__init__()
+
+class BinaryInstructionClass(DefInstructionClass):
+    """
+    Instruction class for all instructions that compute
+    a binary operation
+    """
     @(Syntax(object, str, str, str, str) >> None)
     def __init__(self, op, res, op1, op2):
-        self.target = res
         self.op = op
         self.operands = (op1, op2)
-        super().__init__()
+        super().__init__(res)
 
     def __repr__(self):
         return f"{self.target} = {self.operands[0]} {self.op} {self.operands[1]}"
 
-class CompInstructionClass(InstructionClass):
-    @(Syntax(object, str, str, str, str) >> None)
-    def __init__(self, cmp, res, op1, op2):
-        self.target = res
-        self.cmp = cmp
-        self.operands = (op1, op2)
-        super().__init__()
+class ArithInstructionClass(BinaryInstructionClass):
+    pass
 
-    def __repr__(self):
-        return f"{self.target} = {self.operands[0]} {self.cmp} {self.operands[1]}"
+class CompInstructionClass(BinaryInstructionClass):
+    pass
 
 class BranchInstructionClass(InstructionClass):
     @(Syntax(object) >> None)
@@ -68,22 +76,20 @@ class BranchInstructionClass(InstructionClass):
 
 ### Instruction types ###
 
-class MovInstruction(InstructionClass):
+class MovInstruction(DefInstructionClass):
     @(Syntax(object, str, str) >> None)
     def __init__(self, lhs, rhs):
-        self.target = lhs
         self.operand = rhs
-        super().__init__()
+        super().__init__(lhs)
 
     def __repr__(self):
         return f"{self.target} = {self.operand}"
 
-class PhiInstruction(InstructionClass):
+class PhiInstruction(DefInstructionClass):
     @(Syntax(object, str, [str, 2], ...) >> None)
     def __init__(self, lhs, *conds):
-        self.target = lhs
         self.conds = conds
-        super().__init__()
+        super().__init__(lhs)
 
     def __repr__(self):
         return f"{self.target} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
@@ -153,11 +159,10 @@ class ExitInstruction(BranchInstructionClass):
     def __repr__(self):
         return "exit"
 
-class ReadInstruction(InstructionClass):
+class ReadInstruction(DefInstructionClass):
     @(Syntax(object, str) >> None)
     def __init__(self, lhs):
-        self.target = lhs
-        super().__init__()
+        super().__init__(lhs)
 
     def __repr__(self):
         return f"read {self.target}"

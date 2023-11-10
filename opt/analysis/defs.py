@@ -22,10 +22,6 @@ class DefAnalysis(DefAnalysis):
 
     Records the definitions and uses of all variables,
     recording the result in global metadata.
-
-    Repeated definitions in a block will lead to repeated
-    appearances of the block label in list of variable
-    definition locations.
     """
 
     @DefAnalysis.init("defs")
@@ -39,12 +35,7 @@ class DefAnalysis(DefAnalysis):
         for block in self.CFG:
             for (i, instr) in enumerate(block):
                 # check if instruction defines a variable
-                if not isinstance(instr, (
-                        ampy.types.ArithInstructionClass,
-                        ampy.types.CompInstructionClass,
-                        ampy.types.MovInstruction,
-                        ampy.types.PhiInstruction,
-                        ampy.types.ReadInstruction)):
+                if not isinstance(instr, ampy.types.DefInstructionClass):
                     continue
 
                 var = instr.target
