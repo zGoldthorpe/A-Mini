@@ -6,7 +6,8 @@
 @B:
     %y = phi [ %x, @A ], [ %z, @B ]
     %z = %y + 10
-    branch %z ? @B : @C
+    %0 = 100 < %z
+    branch %0 ? @B : @C
 
 @C:
     %w = phi [ %z, @B ], [ -1, @A ]

@@ -11,6 +11,7 @@ import argparse
 import os
 import shutil
 import subprocess
+import time
 
 if not os.path.exists("amo.py"):
     print("Please run script from folder containing amo.py")
@@ -58,6 +59,8 @@ if args.clean:
 pass_ext = '.'.join("".join(opt.split()) for opt in [''] + args.passes + ["ami"])
 
 amo_args = []
+amo_args.append("--plain") # always make output plain
+
 for opt in args.passes:
     amo_args.append("--add-pass")
     amo_args.append(opt)
@@ -81,7 +84,7 @@ for path, _, files in os.walk("tests/code"):
 width = max(len(os.path.relpath(ami, 'tests/code')) for ami in amis) + 2
 
 for ami in amis:
-    print(f"{os.path.relpath(ami, 'tests/code'): <{width}}", end='\n' if args.debug else "", flush=True)
+    print(f"{os.path.relpath(ami, 'tests/code'): <{width}}", end='', flush=True)
     path, fname = os.path.split(ami)
     path = path.replace("tests/code", "tests/code.vfy")
 
@@ -90,16 +93,21 @@ for ami in amis:
 
     fname = os.path.splitext(fname)[0] + pass_ext
     output = os.path.join(path, fname)
-    try:
-        subprocess.run(["python3", "amo.py", ami, "--output", output] + amo_args,
-            capture_output=not args.debug,
-            timeout=args.timeout,
-            check=True, # check exit code
-            )
-    except subprocess.TimeoutExpired:
-        print(f"\033[31mTLE({args.timeout:.3f}s)\033[m")
-        continue
-    except subprocess.CalledProcessError as e:
-        print(f"\033[31mERR({e.returncode})\033[m")
-        continue
-    print("\033[32mOPT\033[m")
+    with open(os.path.splitext(output)[0] + ".stdout", 'w') as stdout:
+        with open(os.path.splitext(output)[0] + ".stderr", 'w') as stderr:
+            try:
+                start_time = time.time()
+                subprocess.run(["python3", "amo.py", ami, "--output", output] + amo_args,
+                    stdout=stdout,
+                    stderr=stderr,
+                    timeout=args.timeout,
+                    check=True, # check exit code
+                    )
+                end_time = time.time()
+            except subprocess.TimeoutExpired:
+                print(f"\033[31mTLE({args.timeout:.3f}s)\033[m")
+                continue
+            except subprocess.CalledProcessError as e:
+                print(f"\033[31mERR({e.returncode})\033[m")
+                continue
+            print(f"\033[32mDONE({end_time-start_time:.3f}s)\033[m")

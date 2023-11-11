@@ -4,5 +4,5 @@
     branch %irrelevant ? @B : @B
 
 @B:
-    write %y
+    write %x
     exit

@@ -114,7 +114,7 @@ if args.explain is not None:
         if OM[args.explain].__doc__ is not None:
             amp.pquery(OM[args.explain].__doc__)
         exit()
-    amp.perror(f"Unrecognised pass {args.explain}.")
+    amp.perror(f"Unrecognised pass {args.explain}.", file=sys.stderr)
     exit(99)
 
 if args.fname is not None:
@@ -166,7 +166,7 @@ except amr.ParseError as e:
     amp.perror(e.message, file=sys.stderr)
     exit(99)
 except amt.BadPhiError as e:
-    amp.perror(f"{args.fname}:", e.message)
+    amp.perror(f"{args.fname}:", e.message, file=sys.stderr)
     exit(99)
 
 
@@ -192,18 +192,18 @@ if args.passes is not None:
             try:
                 opter = OM[opt](cfg, passed_analyses, *opt_args, **opt_kwargs)
             except BadArgumentException as e:
-                amp.perror(f"Optimisation {opt} received invalid argument.\n{e}")
+                amp.perror(f"Optimisation {opt} received invalid argument.\n{e}", file=sys.stderr)
                 exit(99)
             
             try:
                 opter.perform_opt()
             except OptError as e:
-                amp.perror(f"{opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
+                amp.perror(f"{opt} discovered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}", file=sys.stderr)
                 exit(99)
 
             continue
 
-        amp.perror(f"Unrecognised pass {opt}")
+        amp.perror(f"Unrecognised pass {opt}", file=sys.stderr)
         exit(99)
 
 ### output ###

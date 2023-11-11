@@ -99,10 +99,11 @@ class RPO(RPO):
                             expr = op1 * op2
                         else: # new, unhandled operation
                             expr = Polynomial(I.target)
-                    
-                    elif isinstance(I, ampy.types.ReadInstruction):
-                        expr = Polynomial(I.target)
 
+                    elif isinstance(I, ampy.types.DefInstructionClass):
+                        # cannot be optimistic about unhandled definition
+                        # instructions (such as reads)
+                        expr = Polynomial(I.target)
                     else:
                         # other instructions are not considered / handled
                         continue
@@ -120,69 +121,19 @@ class RPO(RPO):
             if not changed:
                 break
 
-        # Step 3. Collapse value number classes
-        # -------------------------------------
-        # vnrep[value]: representative variable for value number
+        # Step 3. Print value number classes
+        # ----------------------------------
         ampy.debug.print(self.ID, "Value numbering complete")
-        vnrep = {}
+        vnclasses = {}
         for var, val in vn.items():
-            ampy.debug.print(self.ID, var, "=", val)
+            vnclasses.setdefault(val, set()).add(var)
             if val.is_constant():
-                vnrep[val] = str(val.constant())
-            else:
-                vnrep.setdefault(val, var)
+                vnclasses[val].add(str(val.constant())) # include constant if known
 
-        defined = set() # ensure variables are only defined once
-        for block in reversed(postorder):
-            to_delete = []
-            for i, I in enumerate(block):
-                if self._replace_or_elim(I, vn, vnrep, defined):
-                    to_delete.append(i)
-            for i in reversed(to_delete):
-                block._instructions.pop(i)
+        self.assign("classes")
+        for _, vnclass in vnclasses.items():
+            self.assign("classes", *sorted(vnclass), append=True)
+            self.assign("classes", '$', append=True)
 
-        return tuple(opt for opt in self.opts if isinstance(opt, (RPO, SSA)))
-
-    @(Syntax(object, ampy.types.InstructionClass, dict, dict, set) >> bool)
-    def _replace_or_elim(self, I, vn, vnrep, defined):
-        """
-        Replaces variables with their value class representative.
-        If the instruction attempts to redefine a variable, or
-        attempts to define a constant, then return True to indicate
-        that instruction should be deleted
-        """
-        def sub(v):
-            if v in vn:
-                return vnrep[vn[v]]
-            return v
-
-        is_def = False
-        if isinstance(I, (ampy.types.ArithInstructionClass, ampy.types.CompInstructionClass)):
-            I.operands = tuple(map(sub, I.operands))
-            is_def = True
-        elif isinstance(I, ampy.types.MovInstruction):
-            I.operand = sub(I.operand)
-            is_def = True
-        elif isinstance(I, ampy.types.PhiInstruction):
-            I.conds = tuple(map(
-                lambda t: (sub(t[0]), t[1]), I.conds))
-            is_def = True
-        elif isinstance(I, ampy.types.BranchInstruction):
-            I.cond = sub(I.cond)
-        elif isinstance(I, ampy.types.ReadInstruction):
-            is_def = True
-        elif isinstance(I, ampy.types.WriteInstruction):
-            I.operand = sub(I.operand)
-        else: # Goto, Exit, Brk
-            pass
-
-        if is_def:
-            I.target = sub(I.target)
-            if not I.target.startswith('%') or I.target in defined:
-                return True
-            defined.add(I.target)
-
-        return False
-
-
+        return self.opts
 
