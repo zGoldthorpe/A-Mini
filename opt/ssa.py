@@ -87,11 +87,12 @@ class SSA(SSA):
         self._idf = dict()
         defs = self.require(DefAnalysis)
 
-        for var in defs["vars"]:
-            if len(defs[var]) == 1:
+        for var in defs.vars:
+            blocks = defs.defs(var)
+            if len(blocks) == 1:
                 # phi nodes are unnecessary if there is only a single assignment to begin with
                 continue
-            S = {self.CFG[lbl] for lbl in defs[var]}
+            S = set(blocks)
             self._idf[var] = S
             while True:
                 new = self.dominance_frontier(*(S | self._idf[var]))
@@ -108,11 +109,11 @@ class SSA(SSA):
         # the CFG via DFS to track which definition of each variable
         # is "last used"
         #
-        # live_in[block]: list of all variables that are live coming in
+        # live_in[block]: set of all variables that are live coming in
         
         live = self.require(LiveAnalysis)
         self._live_in = {
-                block : set(live.get(block, "in", default=[]))
+                block : set(live.live_in(block))
                 for block in self.CFG
                 }
 
@@ -159,7 +160,7 @@ class SSA(SSA):
         while True:
             self._ssa_counter += 1
             reg = f"{var}.{self._ssa_counter}"
-            if reg not in defs["vars"]:
+            if reg not in defs.vars:
                 self._ssa_vars.append(reg)
                 return len(self._ssa_vars)-1
 
@@ -258,15 +259,13 @@ class SSA(SSA):
                         self._ldf[block].add(child)
             
             self._df[block] = set(self._ldf[block])
-            for dtchildlabel in domtree.get(block, "children", default=[]):
-                dtchild = self.CFG[dtchildlabel]
+            for dtchild in domtree.children(block):
                 if self._pdf[dtchild] is None:
                     # PDF[B] = {B' in DF[B] | B' not strictly dominated by idom[B]}
                     self._pdf[dtchild] = set()
-                    idom_ls = domtree[dtchild:"idom"]
-                    cidom = self.CFG[idom_ls[0]] if len(idom_ls) > 0 else None
+                    idom = domtree.idom(dtchild)
                     for dfblock in self.dominance_frontier(dtchild):
-                        if cidom is None or cidom == dfblock or not domtree.dominates(cidom, dfblock):
+                        if idom is None or idom == dfblock or not domtree.dominates(idom, dfblock):
                             self._pdf[dtchild].add(dfblock)
 
                 self._df[block] |= self._pdf[dtchild]

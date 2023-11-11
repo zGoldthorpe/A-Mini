@@ -11,11 +11,8 @@ from collections import deque
 
 from ampy.ensuretypes import Syntax
 
-from opt.analysis.defs import DefAnalysis
 from opt.analysis.domtree import DomTreeAnalysis
-
 from opt.gvn.rpo_simple import RPO
-
 from opt.tools import Opt
 
 import ampy.types
@@ -73,7 +70,7 @@ class NaiveSimplify(NaiveSimplify):
         # value number remain distinct in the final product.
 
         self._changed = False
-        self._dommem = {}
+        self._dommem = {} # memoisation
         self._dfs_and_sub(self.CFG.entrypoint)
 
         # Step 2. Correct phi nodes
@@ -111,8 +108,7 @@ class NaiveSimplify(NaiveSimplify):
                 self._dommem[block][vn] = None
             else:
                 # walk up dominating tree until you find its definition
-                domtree = self.require(DomTreeAnalysis)
-                idom = self.CFG[domtree[block:"idom"][0]]
+                idom = self.require(DomTreeAnalysis).idom(block)
                 self._dommem[block][vn] = self._get_dominating_var(var, idom)
 
         return self._dommem[block][vn]
@@ -159,6 +155,5 @@ class NaiveSimplify(NaiveSimplify):
         for i in reversed(to_delete):
             block._instructions.pop(i)
 
-        children = self.require(DomTreeAnalysis)[block:"children"]
-        for child in map(lambda lbl: self.CFG[lbl], self.require(DomTreeAnalysis).get(block,"children",default=[])):
+        for child in self.require(DomTreeAnalysis).children(block):
             self._dfs_and_sub(child)

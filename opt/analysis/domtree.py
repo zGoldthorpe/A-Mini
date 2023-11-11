@@ -37,18 +37,35 @@ class DomTreeAnalysis(DomTreeAnalysis):
         pass
 
     @DomTreeAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock) >> (ampy.types.BasicBlock, None))
+    def idom(self, B):
+        """
+        Returns the immediate dominator of the block B
+        """
+        ls = self[B:"idom"]
+        if ls is None or len(ls) == 0:
+            return None
+        return self.CFG[ls[0]]
+
+    @DomTreeAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> bool)
     def dominates(self, A, B):
         """
         Determines if the block A dominates the block B
         """
-        while True:
+        while B is not None:
             if B == A:
                 return True
-            ls = self[B:"idom"]
-            if ls is None or len(ls) == 0:
-                return False
-            B = self.CFG[ls[0]]
+            B = self.idom(B)
+        return False
+
+    @DomTreeAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock) >> [tuple, ampy.types.BasicBlock])
+    def children(self, B):
+        """
+        Returns the tuple of children in the dominator tree
+        """
+        return tuple(map(lambda lbl: self.CFG[lbl], self.get(B, "children", default=[])))
 
     @DomTreeAnalysis.opt_pass
     def lengauer_tarjan(self):

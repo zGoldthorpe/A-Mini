@@ -89,6 +89,17 @@ class BranchElim(BranchElim):
 
                     for I in child:
                         if isinstance(I, ampy.types.PhiInstruction):
+                            # A phi node in child is non-problematic if it does not
+                            # depend inconsistently on block and block's parents;
+                            # in this case, we can replace the phi condition on block
+                            # with a copy of this phi condition on each of the block's
+                            # parents.
+                            # This only fails if a block has no parents (that is, if
+                            # the block is the entrypoint).
+                            if len(block.parents) == 0:
+                                can_merge = False
+                                break
+
                             block_value = None
                             for value, label in I.conds:
                                 if label == block.label or self.CFG[label] in block.parents:
@@ -97,6 +108,7 @@ class BranchElim(BranchElim):
                                     elif block_value != value:
                                         can_merge = False
                                         break
+                                    print(value, block_value)
                             if not can_merge:
                                 break
 
@@ -104,6 +116,7 @@ class BranchElim(BranchElim):
                         continue
 
                     ampy.debug.print(self.ID, f"Merging {block.label} into only child {child.label}")
+                    reduced = True
                     block_parents = block.parents
                     for parent in block_parents:
                         if isinstance(parent[-1], ampy.types.GotoInstruction):
@@ -133,6 +146,8 @@ class BranchElim(BranchElim):
                                     new_conds.append((val, label))
                             I.conds = tuple(new_conds)
 
+                    if block == self.CFG.entrypoint:
+                        self.CFG.set_entrypoint(child.label)
                     self.CFG.remove_block(block.label, ignore_keyerror=True)
 
             if not reduced:

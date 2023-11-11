@@ -35,6 +35,22 @@ class LiveAnalysis(LiveAnalysis):
     def __init__(self, /):
         pass
 
+    @LiveAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock)
+      | Syntax(object, ampy.types.BasicBlock, int) >> [tuple, str])
+    def live_in(self, block, idx=None, /):
+        if idx is None:
+            return tuple(self.get(block, "in", default=[]))
+        return tuple(self.get(block, idx, "in", default=[]))
+
+    @LiveAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock)
+      | Syntax(object, ampy.types.BasicBlock, int) >> [tuple, str])
+    def live_out(self, block, idx=None, /):
+        if idx is None:
+            return tuple(self.get(block, "out", default=[]))
+        return tuple(self.get(block, idx, "out", default=[]))
+
     @LiveAnalysis.opt_pass
     def flow_opt(self):
         """

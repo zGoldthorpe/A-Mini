@@ -51,3 +51,14 @@ class DefAnalysis(DefAnalysis):
             self.assign(var, *sorted(defs[var]))
 
         return self.opts
+
+    @DefAnalysis.getter
+    @(Syntax(object, str) >> [tuple, ampy.types.BasicBlock])
+    def defs(self, var):
+        return tuple(self.CFG[label] for label in self.get(var, default=[]))
+
+    @property
+    @DefAnalysis.getter
+    @(Syntax(object) >> [tuple, str])
+    def vars(self):
+        return tuple(self["vars"])
