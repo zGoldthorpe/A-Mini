@@ -161,7 +161,7 @@ class LiveAnalysis(LiveAnalysis):
         def reg_set(*ins):
             return set(filter(lambda s: s.startswith('%'), ins))
 
-        if isinstance(I, (ampy.types.BinaryInstructionClass)):
+        if isinstance(I, ampy.types.BinaryInstructionClass):
             return {I.target}, reg_set(*I.operands)
         if isinstance(I, ampy.types.MovInstruction):
             return {I.target}, reg_set(I.operand)
