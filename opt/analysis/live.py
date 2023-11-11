@@ -54,7 +54,7 @@ class LiveAnalysis(LiveAnalysis):
     @LiveAnalysis.opt_pass
     def flow_opt(self):
         """
-        Liveness is a backward-propagation flow opt, using the rules
+        Liveness is a backward flow analysis, using the rules
 
         live_out[I] = union(live_in[I'] for successors I' of I)
         live_in[I] = (live_out[I] - defs[I]) + use[I]
@@ -79,9 +79,9 @@ class LiveAnalysis(LiveAnalysis):
 
         changed = True
         while changed:
-            ampy.debug.print(self.ID, "running flow opt")
+            ampy.debug.print(self.ID, "running flow analysis")
             self._visited = set()
-            changed = self._back_propagate(self.CFG.entrypoint)
+            changed = self._back_flow(self.CFG.entrypoint)
 
         # check for undefined variables:
         if len(self._in[self.CFG.entrypoint]) > 0:
@@ -101,9 +101,9 @@ class LiveAnalysis(LiveAnalysis):
         return self.opts
 
     @(Syntax(object, ampy.types.BasicBlock) >> bool)
-    def _back_propagate(self, block):
+    def _back_flow(self, block):
         """
-        Perform back propagation until a fixedpoint is reached
+        Perform backward flow analysis until a fixedpoint is reached
         Returns True if the propagation causes an update
         """
         changed = False
@@ -113,7 +113,7 @@ class LiveAnalysis(LiveAnalysis):
             # back propagation, so recurse first, and then propagate
             if child in self._visited:
                 continue
-            changed |= self._back_propagate(child)
+            changed |= self._back_flow(child)
 
         # now, process instructions in reverse
         # branch instruction gets special treatment
