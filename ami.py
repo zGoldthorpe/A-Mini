@@ -132,11 +132,40 @@ interpreter = ami.Interpreter()
 interpreter.load(cfg)
 qhist = dict() # tracker for old breakpoint queries
 
+if args.trace:
+    # some precomputing for prettier output
+    instr_len = 0
+    for block in cfg:
+        for I in block:
+            instr_len = max(instr_len, len(repr(I)))
+
+    cur_label = None
+
 while interpreter.is_executing:
-    I = interpreter.current_instruction
     brkpt = None
     if args.trace:
-        amp.psubtle(repr(I), file=sys.stderr)
+        if interpreter.block_label != cur_label:
+            cur_label = interpreter.block_label
+            amp.psubtle(f"{cur_label+':': <{instr_len}}", '|', f"{cur_label}:", file=sys.stderr)
+        I = interpreter.current_instruction
+        def sub(var):
+            try:
+                return str(interpreter.read(var))
+            except KeyError:
+                return var
+        if isinstance(I, amt.BinaryInstructionClass):
+            trI = type(I)(I.target, *map(sub, I.operands))
+        elif isinstance(I, amt.MovInstruction):
+            trI = amt.MovInstruction(I.target, sub(I.operand))
+        elif isinstance(I, amt.PhiInstruction):
+            trI = amt.PhiInstruction(I.target, *filter(lambda t: t[1] == interpreter._prev_label, I.conds))
+        elif isinstance(I, amt.BranchInstruction):
+            trI = amt.BranchInstruction(sub(I.cond), I.iftrue, I.iffalse)
+        elif isinstance(I, amt.WriteInstruction):
+            trI = amt.WriteInstruction(sub(I.operand))
+        else: # do nothing
+            trI = I
+        amp.psubtle(f"{repr(I): <{instr_len}}", '|', repr(trI), file=sys.stderr)
 
     try:
         interpreter.run_step()
@@ -189,6 +218,7 @@ while interpreter.is_executing:
             try:
                 q = input().lower().strip()
             except:
+                print()
                 exit()
             if len(q) == 0:
                 break
