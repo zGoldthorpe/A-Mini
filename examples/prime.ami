@@ -52,7 +52,7 @@
 
 @shave:
     %scaled = %msd * %div
-    %overshoot = %N < %scaled
+    %overshoot = %r < %scaled
     branch %overshoot ? @commit : @continue_div
 
 @commit:

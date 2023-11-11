@@ -26,7 +26,7 @@
 
 @shave:
     %scaled = %msd * %M
-    %overshoot = %N < %scaled
+    %overshoot = %r < %scaled
     branch %overshoot ? @save : @continue
 
 @save:

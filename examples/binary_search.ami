@@ -33,7 +33,7 @@
 
 @get_top_bit:
     %doubled = %msd + %msd
-    %overshoot = %diff < %doubled
+    %overshoot = %rem < %doubled
     branch %overshoot ? @commit_bit : @continue_division
 
 @commit_bit:
