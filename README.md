@@ -3,7 +3,7 @@
 
 1. [About the language](#about-the-language)
 1. [Running A-Mi code](#running-a-mi-code)
-1. [A-Mi code analysis and optimisation](#a-mi-code-analysis-and-optimisation)
+1. [A-Mi optimisation](#a-mi-optimisation)
 
 ## About the language
 
@@ -14,7 +14,7 @@ A-Mi branches are all necessarily direct, and branch labels are prefixed with a 
 
 Comments are prefixed by a semicolon `;`, and span until the end of the line.
 
-Sample code can be found in `examples/`.
+Sample code can be found in `code/examples/`.
 
 ### Arithmetic operations
 
@@ -93,7 +93,7 @@ For a list of all options for the A-Mi interpreter, just run
 python3 ami.py --help
 ```
 
-## A-Mi code analysis and optimisation
+## A-Mi code optimisation
 
 A-Mi analyses and optimisations are managed with `amo.py`.
 A generic call to the optimiser may look like
