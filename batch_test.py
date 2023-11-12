@@ -44,7 +44,7 @@ for folder in args.folders:
 
 ### Determine interpreter arguments ###
 
-ami_args = ["--suppress-breakpoint", "--trace"]
+ami_args = ["--suppress-breakpoint", "--trace", "--plain"]
 
 ### Compute output for expected files ###
 
@@ -117,6 +117,10 @@ for folder in args.folders:
                 if orig not in testcases:
                     continue
                 opts[os.path.join(path, file)] = orig
+
+if len(opts) == 0:
+    print("No optimisations to test.")
+    exit()
 
 width = max(test_width, max(len(opt) for opt in opts) + 2)
 for opt, orig in opts.items():

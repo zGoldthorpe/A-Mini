@@ -188,7 +188,7 @@ class InterpreterUI:
         if isinstance(I, ampy.types.MovInstruction):
             return ampy.types.MovInstruction(I.target, sub(I.operand))
         if isinstance(I, ampy.types.PhiInstruction):
-            return ampy.types.PhiInstruction(I.target, *filter(lambda t: t[1] == interpreter._prev_label, I.conds))
+            return ampy.types.PhiInstruction(I.target, *filter(lambda t: t[1] == self._interpreter._prev_label, I.conds))
         if isinstance(I, ampy.types.BranchInstruction):
             return ampy.types.BranchInstruction(sub(I.cond), I.iftrue, I.iffalse)
         if isinstance(I, ampy.types.WriteInstruction):

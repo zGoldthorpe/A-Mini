@@ -14,7 +14,17 @@
 
 @check_M:
     %neg = %M <= 0
-    branch %neg ? @invalid : @begin
+    branch %neg ? @invalid : @check_trivial
+
+@check_trivial:
+    ; given the nature of the algorithm, 1 leads to an infinite loop
+    %one = %M == 1
+    branch %one ? @trivial : @begin
+
+@trivial:
+    write %N ; N / 1
+    write 0  ; N % 1
+    exit
 
 @begin:
     %q = 0
