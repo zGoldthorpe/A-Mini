@@ -193,12 +193,6 @@ class CFGBuilder:
         self._fallthrough_parent = None
         # if current block comes from fallthrough (previous instruction
         # is not a branch), then this stores ampy.types.BasicBlock of parent
-        self._anon = 0
-        # counter for anonymous block labels
-        # besides first block, I don't think it's possible to create
-        # anonymous blocks that don't consist of dead code, but if the
-        # instruction after a branch is not labelled, then this is necessary
-        # (alternatively, the language syntax could be more strict)
 
         self._block_start = 0
         # tracks the line of the block being built
@@ -289,10 +283,7 @@ class CFGBuilder:
                 # there is no block to commit
                 return
             # otherwise, this is an anonymous block
-            if not self.allow_anon_blocks:
-                raise AnonymousBlockError(self._block_start)
-            self._block_label = f"@.__{self._anon}"
-            self._anon += 1
+            raise AnonymousBlockError(self._block_start)
 
         if self._block_label == self._entrypoint_label:
             # explicit entrypoint was found!

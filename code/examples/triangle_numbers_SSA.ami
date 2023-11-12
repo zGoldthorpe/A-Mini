@@ -2,13 +2,13 @@
 ; from the input to zero
 ; but this time in SSA form
 
-@0:
+@main:
     read %N.0
     %sum.0 = 0
 
 @loop:
-    %N.l = phi [%N.0, @0], [%N.i, @increment], [%N.d, @decrement]
-    %sum.l = phi [%sum.0, @0], [%sum.a, @increment], [%sum.a, @decrement]
+    %N.l = phi [%N.0, @main], [%N.i, @increment], [%N.d, @decrement]
+    %sum.l = phi [%sum.0, @main], [%sum.a, @increment], [%sum.a, @decrement]
     %done = %N.l == 0
     branch %done ? @print : @add
 

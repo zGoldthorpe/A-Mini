@@ -2,6 +2,7 @@
 ; from the input to zero
 ; I'm not bothering with SSA
 
+@main:
     read %N
     %sum = 0
 

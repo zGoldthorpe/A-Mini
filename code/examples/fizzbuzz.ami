@@ -8,6 +8,7 @@
 ; Fizz = 5122
 ; Buzz = 8422
 
+@main:
     read %N
     %Fizz = 5122
     %Buzz = 8422

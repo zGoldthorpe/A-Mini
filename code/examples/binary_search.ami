@@ -9,6 +9,7 @@
 ;
 ; If the program outputs -1, it means that your input makes no sense
 
+@main:
     %countdown = 11
     %lo = 0
     %hi = 1024 ; lo <= answer < hi

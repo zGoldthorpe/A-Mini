@@ -3,6 +3,7 @@
 ; Otherwise, will print -1
 ; Runtime: O(N)
 
+@main:
     read %N
     %a = -1
     goto @inc_a

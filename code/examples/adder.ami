@@ -2,7 +2,8 @@
 ; takes two integer inputs
 ; and spits out their sum
 
-read %input.1
-read %input.2
-%output = %input.1 + %input.2
-write %output
+@main:
+    read %input.1
+    read %input.2
+    %output = %input.1 + %input.2
+    write %output
