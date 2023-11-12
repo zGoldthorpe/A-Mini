@@ -17,247 +17,70 @@ import ampy.printing  as amp
 import ampy.reader    as amr
 import ampy.types     as amt
 
-### command-line argument handling ###
+from ui.reader import ReaderUI
+from ui.interpreter import InterpreterUI
 
-argparser = argparse.ArgumentParser(
-                description="Proof-of-concept interpreter for A-Mi")
+if __name__ == "__main__":
 
-argparser.add_argument("--plain",
-            dest="format",
-            action="store_false",
-            help="Print output in plaintext (without ANSI colouring)")
-argparser.add_argument("-D", "--debug",
-            dest="debug",
-            action="store_true",
-            help="Enable debug messages")
-argparser.add_argument("fname",
-            metavar="<prog.ami>",
-            nargs="?",
-            help="""File containing plaintext A-Mi instructions.
-                    If omitted, code will be read through STDIN.""")
-argparser.add_argument("-e", "--entrypoint",
-            dest="entrypoint",
-            action="store",
-            type=str,
-            help="Specify the entrypoint label")
-argparser.add_argument("-A", "--ban-anonymous-blocks",
-            dest="anon_blocks",
-            action="store_false",
-            help="Assert that all basic blocks in code must be explicitly labelled.")
-argparser.add_argument("-i", "--prompt",
-            dest="prompt",
-            action="store_true",
-            help="Enable prompt messages when A-Mi code calls a 'read' or a 'write'.")
-argparser.add_argument("-t", "--trace",
-            dest="trace",
-            action="store_true",
-            help="Output execution trace to STDERR")
-argparser.add_argument("-B", "--suppress-breakpoint",
-            dest="brkpt",
-            action="store_false",
-            help="Ignore breakpoints in code")
-argparser.add_argument("--interrupt",
-            dest="step",
-            choices=("never", "instructions", "blocks"),
-            const="blocks",
-            default="never",
-            nargs="?",
-            help="Insert breakpoint at specified frequency (default: never)")
+    ### command-line argument handling ###
 
-args = argparser.parse_args()
+    argparser = argparse.ArgumentParser(
+                    description="Proof-of-concept interpreter for A-Mi")
 
-amd.enabled = args.debug
-amp.Printing.can_format &= args.format
+    argparser.add_argument("--plain",
+                dest="format",
+                action="store_false",
+                help="Print output in plaintext (without ANSI colouring)")
+    argparser.add_argument("-D", "--debug",
+                dest="debug",
+                action="store_true",
+                help="Enable debug messages")
+    argparser.add_argument("fname",
+                metavar="<prog.ami>",
+                nargs="?",
+                help="""File containing plaintext A-Mi instructions.
+                        If omitted, code will be read through STDIN.""")
+    argparser.add_argument("-e", "--entrypoint",
+                dest="entrypoint",
+                action="store",
+                type=str,
+                help="Specify the entrypoint label")
+    argparser.add_argument("-A", "--ban-anonymous-blocks",
+                dest="anon_blocks",
+                action="store_false",
+                help="Assert that all basic blocks in code must be explicitly labelled.")
+    argparser.add_argument("-i", "--prompt",
+                dest="prompt",
+                action="store_true",
+                help="Enable prompt messages when A-Mi code calls a 'read' or a 'write'.")
+    argparser.add_argument("-t", "--trace",
+                dest="trace",
+                action="store_true",
+                help="Output execution trace to STDERR")
+    argparser.add_argument("-B", "--suppress-breakpoint",
+                dest="brkpt",
+                action="store_false",
+                help="Ignore breakpoints in code")
+    argparser.add_argument("--interrupt",
+                dest="step",
+                choices=("never", "instructions", "blocks"),
+                const="blocks",
+                default="never",
+                nargs="?",
+                help="Insert breakpoint at specified frequency (default: never)")
 
-if args.entrypoint is not None and not args.entrypoint.startswith('@'):
-    args.entrypoint = f"@{args.entrypoint}"
+    args = argparser.parse_args()
 
-### get source code ###
+    amd.enabled = args.debug
+    amp.Printing.can_format &= args.format
 
-if args.fname is not None:
-    if not os.path.exists(args.fname):
-        amp.perror(f"Source file {args.fname} does not exist.", file=sys.stderr)
-        exit(99)
-    if not os.path.isfile(args.fname):
-        amp.perror(f"{args.fname} does not point to a file!", file=sys.stderr)
-        exit(99)
-    with open(args.fname) as file:
-        instructions = file.readlines()
-else:
-    args.fname = "@"
-    amp.pprompt(amp.tame_whitespace("""
-        Enter A-Mi instructions below.
-        Press Ctrl-D to end input, and Ctrl-C to cancel."""))
-    instructions = []
-    while True:
-        amp.pprompt(f"{len(instructions)+1: >4d} | ", end='', flush=True)
-        try:
-            instructions.append(input())
-        except KeyboardInterrupt:
-            # ^C
-            print()
-            exit()
-        except EOFError:
-            # ^D
-            print()
-            break
 
-### parse source ###
+    ### parse source or stdin ###
 
-builder = amr.CFGBuilder(allow_anon_blocks=args.anon_blocks,
-                         entrypoint_label=args.entrypoint)
-try:
-    cfg = builder.build(*instructions)
-except amr.EmptyCFGError:
-    amp.perror("Program is empty!", file=sys.stderr)
-    exit(99)
-except amr.NoEntryPointError as e:
-    amp.perror(e.message, file=sys.stderr)
-    exit(99)
-except amr.AnonymousBlockError as e:
-    amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
-    amp.perror("All basic blocks must be explicitly labelled.", file=sys.stderr)
-    exit(99)
-except amr.ParseError as e:
-    amp.perror(f"{args.fname}::{e.line+1}:", instructions[e.line], file=sys.stderr)
-    amp.perror(e.message, file=sys.stderr)
-    exit(99)
-except amt.BadPhiError as e:
-    amp.perror(f"{args.fname}:", e.message)
-    exit(99)
+    cfg = ReaderUI(args.fname).build_cfg()
 
-### run program ###
 
-interpreter = ami.Interpreter()
-interpreter.load(cfg)
-qhist = dict() # tracker for old breakpoint queries
+    ### run program ###
 
-if args.trace:
-    # some precomputing for prettier output
-    instr_len = 0
-    for block in cfg:
-        for I in block:
-            instr_len = max(instr_len, len(repr(I)))
+    InterpreterUI(cfg, args.trace, args.prompt, args.step, args.brkpt).run()
 
-    cur_label = None
-
-while interpreter.is_executing:
-    brkpt = None
-    if args.trace:
-        if interpreter.block_label != cur_label:
-            cur_label = interpreter.block_label
-            amp.psubtle(f"{cur_label+':': <{instr_len}}", '|', f"{cur_label}:", file=sys.stderr)
-        I = interpreter.current_instruction
-        def sub(var):
-            try:
-                return str(interpreter.read(var))
-            except KeyError:
-                return var
-        if isinstance(I, amt.BinaryInstructionClass):
-            trI = type(I)(I.target, *map(sub, I.operands))
-        elif isinstance(I, amt.MovInstruction):
-            trI = amt.MovInstruction(I.target, sub(I.operand))
-        elif isinstance(I, amt.PhiInstruction):
-            trI = amt.PhiInstruction(I.target, *filter(lambda t: t[1] == interpreter._prev_label, I.conds))
-        elif isinstance(I, amt.BranchInstruction):
-            trI = amt.BranchInstruction(sub(I.cond), I.iftrue, I.iffalse)
-        elif isinstance(I, amt.WriteInstruction):
-            trI = amt.WriteInstruction(sub(I.operand))
-        else: # do nothing
-            trI = I
-        amp.psubtle(f"{repr(I): <{instr_len}}", '|', repr(trI), file=sys.stderr)
-
-    try:
-        interpreter.run_step()
-    except KeyboardInterrupt:
-        print()
-        exit()
-    except KeyError as e:
-        amp.perror("Undefined register:", e, file=sys.stderr)
-        exit(99)
-    except ami.ReadInterrupt as e:
-        val = None
-        while True:
-            if args.prompt:
-                amp.pprompt(e.register, "= ", end='', flush=True)
-            try:
-                val = int(input())
-                break
-            except ValueError:
-                amp.perror("Please enter a single decimal integer.", file=sys.stderr)
-                val = None
-            except KeyboardInterrupt:
-                print()
-                exit()
-            except Exception as e:
-                amp.perror(f"Unexpected {type(e).__name__}: {e}", file=sys.stderr)
-                exit(99)
-        interpreter.write(e.register, val)
-    except ami.WriteInterrupt as e:
-        try:
-            val = interpreter.read(e.register)
-        except KeyError as e:
-            amp.perror(e.message)
-            exit(99)
-        if args.prompt:
-            amp.pprompt(e.register, "= ", end='')
-        print(val)
-    except ami.BreakpointInterrupt as e:
-        brkpt = e.name
-
-    if brkpt is None:
-        if (args.step == "instructions"
-                or (args.step == "blocks" and isinstance(I, amt.BranchInstructionClass))):
-            brkpt = f"<{repr(I)}>"
-
-    if args.brkpt and brkpt is not None:
-        amp.pprompt(f"Reached breakpoint {brkpt}")
-
-        while True:
-            amp.pprompt("(ami-db) ", end='', flush=True)
-            try:
-                q = input().lower().strip()
-            except:
-                print()
-                exit()
-            if len(q) == 0:
-                break
-
-            if q.startswith('h'):
-                amp.pquery("Press <enter> to resume execution.")
-                amp.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
-                amp.pquery("Enter \"exit\" to terminate execution and quit.")
-            if q == "exit":
-                exit()
-
-            queries = set()
-            for qre in q.split():
-                try:
-                    pat = re.compile(qre)
-                except Exception as ce:
-                    amp.perror(f"Cannot parse expression {qre}: {ce}")
-                    continue
-                for reg in interpreter.registers:
-                    if pat.fullmatch(reg):
-                        queries.add(reg)
-
-            if len(queries) == 0:
-                amp.perror("No registers match query patterns")
-                continue
-
-            maxllen = max(len(reg) for reg in queries)
-            maxrlen = max(len(str(interpreter.read(reg))) for reg in queries)
-
-            response = dict()
-            for reg in queries:
-                val = interpreter.read(reg)
-                response[reg] = f"{val: >{maxrlen}}"
-                if reg not in qhist:
-                    response[reg] += " (new)"
-                    qhist[reg] = val
-                elif val != qhist[reg]:
-                    response[reg] += f" (changed from {qhist[reg]})"
-                    qhist[reg] = val
-
-            for reg in sorted(queries):
-                amp.pquery(f"{reg: >{maxllen}} = {response[reg]}")
