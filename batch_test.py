@@ -65,11 +65,13 @@ for folder in args.folders:
                     exit(-1)
                 testcases[ami] = sorted(filter(lambda t: t.endswith(".in"), os.listdir(testins)))
 
-test_width = max(max(len(ami), max(4+len(test) for test in testcase))
+test_width = max(max(len(test) for test in testcase)
                 for ami, testcase in testcases.items()) + 2
 
+runtime = {}
 for ami, testcase in testcases.items():
     print(ami)
+    runtime[ami] = {}
     testouts = os.path.splitext(ami)[0] + ".out"
     testins = os.path.splitext(ami)[0] + ".in"
     if not os.path.exists(testouts):
@@ -80,7 +82,7 @@ for ami, testcase in testcases.items():
     for testin in testcase:
         testout = os.path.splitext(testin)[0] + ".out"
         trace = os.path.splitext(testin)[0] + ".trace"
-        print(f"    {testin: <{test_width-4}}", end='', flush=True)
+        print(f"\t{testin: <{test_width}}", end='', flush=True)
         with (open(os.path.join(testins, testin), 'r') as stdin,
                 open(os.path.join(testouts, testout), 'w') as stdout,
                 open(os.path.join(testouts, trace), 'w') as stderr):
@@ -93,14 +95,14 @@ for ami, testcase in testcases.items():
                         timeout=args.timeout,
                         check=True, # check exit code
                         )
-                end_time = time.time()
+                runtime[ami][testin] = time.time() - start_time
             except subprocess.TimeoutExpired as e:
                 print(f"\033[31mTLE({e.timeout:.3f}s)\033[m")
                 continue
             except subprocess.CalledProcessError as e:
                 print(f"\033[31mERR({e.returncode})\033[m")
                 continue
-            print(f"\033[32mDONE({end_time-start_time:.3f}s)\033[m")
+            print(f"\033[32mDONE({runtime[ami][testin]:.3f}s)\033[m")
 
 ### Test optimisations ###
 print("Testing optimisations...")
@@ -122,7 +124,6 @@ if len(opts) == 0:
     print("No optimisations to test.")
     exit()
 
-width = max(test_width, max(len(opt) for opt in opts) + 2)
 for opt, orig in opts.items():
     print(opt)
     testins = os.path.splitext(orig)[0] + ".in"
@@ -132,7 +133,7 @@ for opt, orig in opts.items():
         shutil.os.makedirs(optouts)
 
     for testin in testcases[orig]:
-        print(f"    {testin: <{width-4}}", end='', flush=True)
+        print(f"\t{testin: <{test_width}}", end='', flush=True)
         optout = os.path.splitext(testin)[0] + ".out"
         trace = os.path.splitext(testin)[0] + ".trace"
         with (open(os.path.join(testins, testin), 'r') as stdin,
@@ -147,7 +148,7 @@ for opt, orig in opts.items():
                         timeout=args.timeout,
                         check=True,
                         )
-                end_time = time.time()
+                delta = time.time() - start_time
             except subprocess.TimeoutExpired as e:
                 print(f"\033[31mTLE({e.timeout:.3f}s)\033[m")
                 continue
@@ -167,6 +168,9 @@ for opt, orig in opts.items():
             diff = os.path.splitext(testin)[0] + ".diff"
             with open(os.path.join(optouts, diff), 'w') as stdout:
                 subprocess.run(["diff", expected_f, received_f], stdout=stdout)
-            print(f"\033[31mDIFF({end_time-start_time:.3f}s)\033[m")
+            print(f"\033[31mDIFF({delta:.3f}s)\033[m")
             continue
-        print(f"\033[32mACC({end_time-start_time:.3f}s)\033[m")
+        print(f"\033[32mACC({delta:.3f}s)\033[m", end=' ')
+        up = delta - runtime[orig][testin]
+        col = "\033[31m" if up > 0.1 else "\033[32m" if up < -0.1 else ""
+        print(f"({col}{up:+.3f}\033[m)")
