@@ -108,7 +108,6 @@ class BranchElim(BranchElim):
                                     elif block_value != value:
                                         can_merge = False
                                         break
-                                    print(value, block_value)
                             if not can_merge:
                                 break
 
