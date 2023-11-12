@@ -100,7 +100,7 @@ class SSA(SSA):
                     break
                 self._idf[var] = new
 
-        ampy.debug.print(self.ID, "IDFs:", {var:{B.label for B in self._idf[var]} for var in self._idf})
+        self.debug("IDFs:", {var:{B.label for B in self._idf[var]} for var in self._idf})
 
         # Step 3. Insert phi nodes
         # ------------------------
@@ -182,7 +182,7 @@ class SSA(SSA):
                     self._phi[block].append((self._ssa_vars[cur_idx], src.label))
                 if block not in self._phi_idx:
                     self._phi_idx[block] = self._gen_register(var)
-                    ampy.debug.print(self.ID, f"Inserting new phi variable {self._ssa_vars[self._phi_idx[block]]} in {block.label}")
+                    self.debug(f"Inserting new phi variable {self._ssa_vars[self._phi_idx[block]]} in {block.label}")
 
         prev = (cur_idx := self._phi_idx.get(block, cur_idx))
         for I in block:
@@ -230,7 +230,7 @@ class SSA(SSA):
             # redefinition needs a new variable
             idx = self._gen_register(var)
             I.target = sub(I.target)
-            ampy.debug.print(self.ID, f"Inserting new variable {I.target}")
+            self.debug(f"Inserting new variable {I.target}")
 
         return idx
 

@@ -63,7 +63,7 @@ class Opt:
                 opts.append(self) # update opt list
                 super().__init__(cfg, opts)
 
-                ampy.debug.print(ID, f"initialising opt with arguments {list(args)}, {dict(kwargs)}")
+                self.debug(f"initialising opt with arguments {list(args)}, {dict(kwargs)}")
                 initfunc(self, *args, **kwargs)
                 self._inputs = (tuple(args), kwargs)
 
@@ -200,14 +200,14 @@ class Opt(Opt, RequiresOpt):
         def Opt_pass_wrap(self):
             if self.valid:
                 return
-            ampy.debug.print(self.ID, *self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running optimisation")
+            self.debug(*self.inputs[0], *(f"{k}={v}" for k,v in self.inputs[1].items()), '$', "running optimisation")
             preserved = func(self)
 
             for opt in self.opts:
                 if opt in preserved:
                     continue
                 # anything not explicitly preserved is invalidated
-                ampy.debug.print(self.ID, f"invalidating {opt.ID} ({opt.inputs})")
+                self.debug(f"invalidating {opt.ID} ({opt.inputs})")
                 opt.valid = False
 
             self.valid = True
@@ -276,7 +276,7 @@ class Opt(Opt, RequiresOpt):
         # we might have completely invalidated the pass
         if len(validated) == 0:
             if self.valid:
-                ampy.debug.print(self.ID, "opt has been completely invalidated; clearing owned metadata")
+                self.debug("opt has been completely invalidated; clearing owned metadata")
                 self.clear()
                 del self.CFG.meta[self.ID]
             return
@@ -434,6 +434,12 @@ class Opt(Opt, RequiresOpt):
             meta.setdefault(self.tagged(arg), []).extend(vals)
         else:
             meta[self.tagged(arg)] = list(vals)
+
+    def debug(self, *args, **kwargs):
+        """
+        Print debug information to ampy.debug
+        """
+        ampy.debug.print(self.ID, *args, **kwargs)
 
 class OptList(TypedList):
     """

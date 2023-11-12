@@ -10,7 +10,6 @@ from ampy.ensuretypes import Syntax
 from opt.tools import Opt, OptError
 
 import ampy.types
-import ampy.debug
 
 class LiveAnalysis(Opt):
     # forward declaration
@@ -79,7 +78,7 @@ class LiveAnalysis(LiveAnalysis):
 
         changed = True
         while changed:
-            ampy.debug.print(self.ID, "running flow analysis")
+            self.debug("running flow analysis")
             self._visited = set()
             changed = self._back_flow(self.CFG.entrypoint)
 

@@ -16,7 +16,6 @@ from opt.analysis.domtree import DomTreeAnalysis
 from opt.gvn.rpo_simple import RPO
 
 import ampy.types
-import ampy.debug
 
 class NaiveSimplify(Opt):
     # forward declaration
@@ -58,7 +57,7 @@ class NaiveSimplify(NaiveSimplify):
                 # this is a constant
                 self._const[number] = var
                 continue
-            ampy.debug.print(self.ID, f"Assigning {var} to value number {number}")
+            self.debug(f"Assigning {var} to value number {number}")
             self._vn[var] = number
 
         # Step 1. Perform substitutions

@@ -19,7 +19,6 @@ from opt.ssa import SSA
 from opt.gvn.simple_poly import Polynomial
 
 import ampy.types
-import ampy.debug
 
 class RPO(Opt):
     # forward declaration
@@ -75,7 +74,7 @@ class RPO(RPO):
             return Polynomial(op)
 
         while True:
-            ampy.debug.print(self.ID, "Updating value numbers")
+            self.debug("Updating value numbers")
             lookup = {}
             changed = False
             for block in reversed(postorder):
@@ -117,14 +116,14 @@ class RPO(RPO):
                     if value != vn.get(I.target, None):
                         changed = True
                         vn[I.target] = value
-                        ampy.debug.print(self.ID, f"{I.target} updated to {value}")
+                        self.debug(f"{I.target} updated to {value}")
             
             if not changed:
                 break
 
         # Step 3. Print value number classes
         # ----------------------------------
-        ampy.debug.print(self.ID, "Value numbering complete")
+        self.debug("Value numbering complete")
         vnclasses = {}
         for var, val in vn.items():
             vnclasses.setdefault(val, set()).add(var)
