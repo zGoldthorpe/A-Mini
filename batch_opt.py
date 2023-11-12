@@ -6,6 +6,7 @@ Goldthorpe
 Optimise all ami code in tests/code/ with specified passes for perusing.
 The optimised code is saved in tests/code.vfy/
 """
+#TODO: make modular
 
 import argparse
 import os
@@ -128,8 +129,8 @@ for ami in amis:
                 check=True, # check exit code
                 )
             end_time = time.time()
-        except subprocess.TimeoutExpired:
-            print(f"\033[31mTLE({args.timeout:.3f}s)\033[m")
+        except subprocess.TimeoutExpired as e:
+            print(f"\033[31mTLE({e.timeout:.3f}s)\033[m")
             continue
         except subprocess.CalledProcessError as e:
             print(f"\033[31mERR({e.returncode})\033[m")
