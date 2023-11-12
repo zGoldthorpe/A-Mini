@@ -13,8 +13,9 @@ L.T. Simpson. 1996
 
 from ampy.ensuretypes import Syntax
 from ampy.passmanager import BadArgumentException
-from opt.ssa import SSA
 from opt.tools import Opt
+
+from opt.ssa import SSA
 from opt.gvn.simple_poly import Polynomial
 
 import ampy.types

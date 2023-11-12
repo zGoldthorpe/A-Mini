@@ -10,10 +10,10 @@ to simplify code
 from collections import deque
 
 from ampy.ensuretypes import Syntax
+from opt.tools import Opt
 
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.gvn.rpo_simple import RPO
-from opt.tools import Opt
 
 import ampy.types
 import ampy.debug

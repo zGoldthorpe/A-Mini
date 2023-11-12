@@ -11,11 +11,8 @@ import os
 import re
 import sys
 
-import ampy.debug     as amd
-import ampy.interpret as ami
-import ampy.printing  as amp
-import ampy.reader    as amr
-import ampy.types     as amt
+import ampy.debug
+import ampy.printing
 
 from ui.reader import ReaderUI
 from ui.interpreter import InterpreterUI
@@ -71,8 +68,8 @@ if __name__ == "__main__":
 
     args = argparser.parse_args()
 
-    amd.enabled = args.debug
-    amp.Printing.can_format &= args.format
+    ampy.debug.enabled = args.debug
+    ampy.printing.Printing.can_format &= args.format
 
 
     ### parse source or stdin ###
