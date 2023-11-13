@@ -7,7 +7,7 @@ This provides a simple polynomial type for handling abstract
 polynomial expressions of registers.
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
 
 class Polynomial:
     # forward declaration

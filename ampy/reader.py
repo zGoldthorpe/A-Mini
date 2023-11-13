@@ -8,10 +8,11 @@ This module provides the CFGBuilder, which takes A-Mi code
 for analysis or interpretation.
 """
 
-import ampy.types
-from ampy.ensuretypes import Syntax
-
 import re
+
+from utils.syntax import Syntax
+
+import ampy.types
 
 
 ### Operation parsing ###

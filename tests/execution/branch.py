@@ -4,31 +4,32 @@ from tests.execution.env import ExecutionTestSuite
 
 ts = ExecutionTestSuite("execution/branch")
 
-ts.simulate("goto @label",
+ts.simulate("@0: goto @label",
             "@label: exit")
 
-ts.simulate("%cond = 1",
+ts.simulate("@0: %cond = 1",
             "branch %cond ? @lbl1 : @lbl2",
             "@lbl1: %a = 5",
             "exit",
             "@lbl2: %a = 10",
             expected={"%a" : 5})
 
-ts.simulate("%cond=0",
+ts.simulate("@0: %cond=0",
             "branch%cond?@lbl1:@lbl2",
             "@lbl1:%a=5",
             "exit",
             "@lbl2:%a=10",
             expected={"%a" : 10})
 
-ts.simulate("%cond=-1",
+ts.simulate("@0: %cond=-1",
             "branch%cond?@lbl1:@lbl2",
             "@lbl1:%a=5",
             "exit",
             "@lbl2:%a=10",
             expected={"%a" : 5})
 
-ts.simulate("branch 1 ? @A : @B",
+ts.simulate("@0:",
+            "branch 1 ? @A : @B",
             "@A: %a = 5",
             "branch 0 ? @C : @D",
             "@B: %a = 10",

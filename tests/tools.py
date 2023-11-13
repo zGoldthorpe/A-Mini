@@ -9,7 +9,7 @@ import functools
 import traceback
 import sys
 
-from ampy.printing import psuccess, perror, tame_whitespace
+from utils.printing import psuccess, perror, tame_whitespace
 
 class TestSuite:
     """

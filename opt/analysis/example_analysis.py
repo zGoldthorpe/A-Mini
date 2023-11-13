@@ -14,10 +14,11 @@ At the block level: you can pass an argument "add" or "mul" to track list of
 At the instruction level: "index" indicates the index of the instruction in the block
 """
 
-from ampy.ensuretypes import Syntax
-from ampy.passmanager import BadArgumentException
+from utils.syntax import Syntax
+
 from opt.tools import Opt, RequiresOpt
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
 
 class ExampleAnalysis(Opt):

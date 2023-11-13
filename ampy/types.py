@@ -10,7 +10,7 @@ where each basic block consists of several InstructionClass instances ending wit
 an instruction of the BranchInstructionClass subclass.
 """
 
-from ampy.ensuretypes import Syntax, TypedDict
+from utils.syntax import Syntax, TypedDict
 
 ### Metadata ###
 

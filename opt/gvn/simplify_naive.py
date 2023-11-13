@@ -9,9 +9,9 @@ to simplify code
 
 from collections import deque
 
-from ampy.ensuretypes import Syntax
-from opt.tools import Opt
+from utils.syntax import Syntax
 
+from opt.tools import Opt
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.gvn.rpo_simple import RPO
 

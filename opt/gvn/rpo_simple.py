@@ -11,13 +11,13 @@ L.T. Simpson. 1996
     PhD Thesis, Rice University
 """
 
-from ampy.ensuretypes import Syntax
-from ampy.passmanager import BadArgumentException
-from opt.tools import Opt
+from utils.syntax import Syntax
 
+from opt.tools import Opt
 from opt.ssa import SSA
 from opt.gvn.simple_poly import Polynomial
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
 
 class RPO(Opt):

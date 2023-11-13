@@ -18,7 +18,7 @@ brkpt.clear() # just in case
 
 brkpt.push_brk("0", {'%a' : 1})
 brkpt.push_brk("1", {'%a' : 1, '%b' : 5})
-ts.simulate("%a = 1",
+ts.simulate("@0: %a = 1",
             "brkpt !0",
             "%b = 5",
             "brkpt !1",
@@ -31,7 +31,7 @@ stdin.push_input(5,4)
 brkpt.push_brk("after.read", {'%a' : 5})
 brkpt.push_brk("before.write", {'%a' : 5, '%b' : 4, '%c' : 9})
 brkpt.push_brk("at.end", {'%a' : 5, '%b' : 4, '%c' : 9})
-ts.simulate("read %a",
+ts.simulate("@0: read %a",
             "brkpt !after.read",
             "read %b",
             "%c = %a + %b",

@@ -1,8 +1,9 @@
 import sys
 
+from utils.printing import tame_whitespace as tw
+
 from ampy.reader import CFGBuilder
 from ampy.writer import CFGWriter
-from ampy.printing import tame_whitespace as tw
 from tests.tools import PythonExecutionTestSuite
 
 # NB: this test suite assumes that parsing/reader and parsing/meta pass

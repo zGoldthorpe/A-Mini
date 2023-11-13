@@ -7,11 +7,13 @@ Goldthorpe
 import re
 import sys
 
-import ampy.interpret
-import ampy.printing
-import ampy.types
+import utils.printing
 
 from ui.errors import perror, die, unexpected
+
+import ampy.interpret
+import ampy.types
+
 
 class InterpreterUI:
 
@@ -90,7 +92,7 @@ class InterpreterUI:
         val = None
         while True:
             if self.prompt:
-                ampy.printing.pprompt(reg, '=', end=' ', flush=True)
+                utils.printing.pprompt(reg, '=', end=' ', flush=True)
 
             try:
                 val = int(input())
@@ -116,7 +118,7 @@ class InterpreterUI:
             unexpected(e)
 
         if self.prompt:
-            ampy.printing.pprompt(reg, "= ", end='')
+            utils.printing.pprompt(reg, "= ", end='')
 
         print(val)
 
@@ -124,9 +126,9 @@ class InterpreterUI:
         """
         Open debug interface during breakpoint
         """
-        ampy.printing.pprompt("Reached breakpoint", brkpt)
+        utils.printing.pprompt("Reached breakpoint", brkpt)
         while True:
-            ampy.printing.pprompt(f"(ami-db)", end=' ', flush=True)
+            utils.printing.pprompt(f"(ami-db)", end=' ', flush=True)
             try:
                 q = input().lower().strip()
             except KeyboardInterrupt:
@@ -141,9 +143,9 @@ class InterpreterUI:
                 return
 
             if q.startswith('h'):
-                ampy.printing.pquery("Press <enter> to resume execution.")
-                ampy.printing.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
-                ampy.printing.pquery("Enter \"exit\" to terminate execution and quit.")
+                utils.printing.pquery("Press <enter> to resume execution.")
+                utils.printing.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
+                utils.printing.pquery("Enter \"exit\" to terminate execution and quit.")
             if q == "exit":
                 exit()
 
@@ -152,7 +154,7 @@ class InterpreterUI:
                 try:
                     pat = re.compile(qre)
                 except re.error as se:
-                    ampy.printing.perror(f"Cannot parse expression {qre}: {se}")
+                    utils.printing.perror(f"Cannot parse expression {qre}: {se}")
                     continue
                 except Exception as e:
                     unexpected(e)
@@ -162,7 +164,7 @@ class InterpreterUI:
                         queries.add(reg)
 
             if len(queries) == 0:
-                ampy.printing.perror("No registers match query patterns")
+                utils.printing.perror("No registers match query patterns")
                 continue
 
             maxllen = max(len(reg) for reg in queries)
@@ -180,7 +182,7 @@ class InterpreterUI:
                     self._qhist[reg] = val
 
             for reg in sorted(queries):
-                ampy.printing.pquery(f"{reg: >{maxllen}} = {response[reg]}")
+                utils.printing.pquery(f"{reg: >{maxllen}} = {response[reg]}")
 
 
     def update_trace(self, I):
@@ -191,7 +193,7 @@ class InterpreterUI:
         self.subtle_parallel(repr(I), repr(trI))
 
     def subtle_parallel(self, left, right):
-        ampy.printing.psubtle(f"{left: <{self.trace_width}}", '|', right, file=sys.stderr)
+        utils.printing.psubtle(f"{left: <{self.trace_width}}", '|', right, file=sys.stderr)
 
     @property
     def trace_width(self):

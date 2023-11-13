@@ -1,6 +1,6 @@
 """
-EnsureTypes
-=============
+Type assertions
+=================
 Goldthorpe
 
 This module provides wrapper classes for type-assertions for methods.

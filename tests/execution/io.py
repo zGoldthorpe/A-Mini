@@ -9,28 +9,28 @@ ts = ExecutionTestSuite("execution/io",
         write_handler=stdout)
 
 stdin.push_input(5)
-ts.simulate("read %a",
+ts.simulate("@0: read %a",
             expected={"%a" : 5},
             onexit="assert len(stdin) == 0",
             onexitlocals=dict(stdin=stdin))
 stdin.clear() # just in case
 
 stdout.push_output(5)
-ts.simulate("%a = 5",
+ts.simulate("@0: %a = 5",
             "write %a",
             onexit="assert len(stdout) == 0",
             onexitlocals=dict(stdout=stdout))
 stdout.clear()
 
 stdout.push_output(5)
-ts.simulate("write 5",
+ts.simulate("@0: write 5",
             onexit="assert len(stdout) == 0",
             onexitlocals=dict(stdout=stdout))
 stdout.clear()
 
 stdin.push_input(-6)
 stdout.push_output(-5)
-ts.simulate("read %a",
+ts.simulate("@0: read %a",
             "%b = %a + 1",
             "write %b",
             expected = {"%a" : -6, "%b" : -5},

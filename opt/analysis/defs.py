@@ -7,7 +7,8 @@ This pass tracks the locations of definitions for
 the variables in the CFG
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
+
 from opt.tools import Opt
 
 import ampy.types

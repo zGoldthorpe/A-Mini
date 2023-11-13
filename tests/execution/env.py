@@ -11,8 +11,9 @@ Relies on the correctness of ampy.reader.CFGBuilder
 from collections import deque
 import traceback
 
+from utils.printing import tame_whitespace as tw
+
 from tests.tools import TestSuite
-from ampy.printing import tame_whitespace as tw
 
 import ampy.interpret
 import ampy.reader

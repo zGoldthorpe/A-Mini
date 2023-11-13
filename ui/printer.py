@@ -4,8 +4,8 @@ Printer
 Goldthorpe
 """
 
-import ampy.debug
-import ampy.printing
+import utils.debug
+import utils.printing
 
 class PrinterUI:
     
@@ -21,6 +21,6 @@ class PrinterUI:
                 help="Enable debug messages")
 
     def __init__(self, parsed_args):
-        ampy.debug.enabled = parsed_args.PUI_debug
-        ampy.printing.Printing.can_format &= parsed_args.PUI_format
+        utils.debug.enabled = parsed_args.PUI_debug
+        utils.printing.Printing.can_format &= parsed_args.PUI_format
 

@@ -10,17 +10,18 @@ for analysing a CFG, as well as optimising the CFG
 import re
 import functools
 
-from ampy.ensuretypes import (
+import utils.debug
+from utils.syntax import (
         Assertion,
         Syntax,
         TypedList,
         TypedDict,
         )
+
 from ampy.passmanager import (
         BadArgumentException,
         Pass_ID_re,
         )
-import ampy.debug
 import ampy.types
 
 class Opt:
@@ -437,9 +438,9 @@ class Opt(Opt, RequiresOpt):
 
     def debug(self, *args, **kwargs):
         """
-        Print debug information to ampy.debug
+        Print debug information to utils.debug
         """
-        ampy.debug.print(self.ID, *args, **kwargs)
+        utils.debug.print(self.ID, *args, **kwargs)
 
 class OptList(TypedList):
     """

@@ -15,7 +15,8 @@ T. Lengauer, R.E. Tarjan. 1979.
     Pages 121--141.
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
+
 from opt.tools import Opt
 
 import ampy.types

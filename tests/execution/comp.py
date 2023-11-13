@@ -4,7 +4,8 @@ from tests.execution.env import ExecutionTestSuite
 
 ts = ExecutionTestSuite("execution/comp")
 
-ts.simulate("%a = 1",
+ts.simulate("@0:",
+            "%a = 1",
             "%b = -3",
             "%c = 6",
             "%eq = %a == %b",

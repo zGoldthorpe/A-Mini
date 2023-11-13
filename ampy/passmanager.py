@@ -9,7 +9,7 @@ This module provides the class used for managing passes
 
 import importlib
 
-from ampy.ensuretypes import (
+from utils.syntax import (
         Assertion,
         Syntax,
         TypedDict,

@@ -8,9 +8,9 @@ Hoists definitions to parent blocks as move instructions, and
 then converts phi instruction into another move instruction.
 """
 
-from ampy.ensuretypes import Syntax
-from opt.tools import Opt
+from utils.syntax import Syntax
 
+from opt.tools import Opt
 from opt.analysis.defs import DefAnalysis
 
 import ampy.types

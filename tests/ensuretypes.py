@@ -1,7 +1,7 @@
 import sys
 
-from ampy.ensuretypes import Syntax, Assertion
-from ampy.printing import tame_whitespace as tw
+from utils.syntax import Syntax, Assertion
+from utils.printing import tame_whitespace as tw
 from tests.tools import PythonExecutionTestSuite
 
 ts = PythonExecutionTestSuite("ensuretypes")

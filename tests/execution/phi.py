@@ -4,24 +4,25 @@ from tests.execution.env import ExecutionTestSuite
 
 ts = ExecutionTestSuite("execution/phi")
 
-ts.simulate("goto @A",
+ts.simulate("@0: goto @A",
             "@A: goto @B",
             "@B: %p = phi [3, @A]",
             expected = {"%p" : 3})
 
-ts.simulate("goto @A",
+ts.simulate("@0: goto @A",
             "@A: goto @B",
             "@B: goto @C",
             "@C: %p = phi [3, @A], [-1, @B]",
             expected = {"%p" : -1})
 
-ts.simulate("goto @jmp",
+ts.simulate("@0: goto @jmp",
             "@jmp: goto @jmp.2",
             "@jmp.2: goto @jmp.3",
             "@jmp.3: %p = phi [-6, @jmp], [3,@jmp.3], [ 0, @jmp.2 ]",
             expected = {"%p" : 0})
 
-ts.simulate("%0 = 6",
+ts.simulate("@0:",
+            "%0 = 6",
             "%1 = 8",
             "goto @jmp",
             "@jmp: goto @jmp.2",

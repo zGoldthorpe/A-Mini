@@ -16,9 +16,9 @@ R. Cytron, J. Ferrante, B.K. Rosen, M.N. Wegman, F.K. Zadeck. 1991.
     Pages 451--490.
 """
 
-from ampy.ensuretypes import Syntax
-from opt.tools import Opt
+from utils.syntax import Syntax
 
+from opt.tools import Opt
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.live import LiveAnalysis

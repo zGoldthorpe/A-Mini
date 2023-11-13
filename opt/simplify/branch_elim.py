@@ -6,12 +6,11 @@ Goldthorpe
 This pass simplifies branches and merges basic blocks where possible.
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
 
 from opt.tools import Opt
 
 import ampy.types
-import ampy.debug
 
 class BranchElim(Opt):
     # forward declaration
@@ -37,7 +36,7 @@ class BranchElim(BranchElim):
         changed = False
 
         while True:
-            ampy.debug.print(self.ID, "cycling through blocks")
+            self.debug("cycling through blocks")
             reduced = False
 
             blocks = set(self.CFG)
@@ -63,7 +62,7 @@ class BranchElim(BranchElim):
 
                 if len(child.parents) == 1:
                     # we can merge the child with the block at no risk
-                    ampy.debug.print(self.ID, f"Merging {child.label} with its parent {block.label}")
+                    self.debug("Merging {child.label} with its parent {block.label}")
                     reduced = True
                     block._instructions.pop() 
                     for I in child:
@@ -114,7 +113,7 @@ class BranchElim(BranchElim):
                     if not can_merge:
                         continue
 
-                    ampy.debug.print(self.ID, f"Merging {block.label} into only child {child.label}")
+                    self.debug(f"Merging {block.label} into only child {child.label}")
                     reduced = True
                     block_parents = block.parents
                     for parent in block_parents:

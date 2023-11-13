@@ -6,7 +6,9 @@ Goldthorpe
 
 import re
 
-import ampy.printing
+import utils.printing
+
+from ui.errors import perror, die, unexpected
 
 from ampy.passmanager import (
         BadArgumentException,
@@ -15,8 +17,6 @@ from ampy.passmanager import (
 
 from opt import OptManager as OM
 from opt.tools import Opt, OptList, OptError
-
-from ui.errors import perror, die, unexpected
 
 class OptUI:
 
@@ -48,11 +48,11 @@ class OptUI:
         """
         Print out the passes
         """
-        ampy.printing.psubtle("Optimisation passes:")
+        utils.printing.psubtle("Optimisation passes:")
         spaces = max(len(opt) for opt in OM)
         for opt in sorted(OM):
-            ampy.printing.pquery(f"\t{opt: <{spaces}}", end=' ')
-            ampy.printing.phidden(f"({cls._pass_class(opt)})")
+            utils.printing.pquery(f"\t{opt: <{spaces}}", end=' ')
+            utils.printing.phidden(f"({cls._pass_class(opt)})")
 
     @classmethod
     def fully_explain_pass(cls, passid):
@@ -70,11 +70,11 @@ class OptUI:
         """
         if passid not in OM:
             die(f"Unrecognised pass {passid}")
-        ampy.printing.psubtle(passid, end=' ')
-        ampy.printing.phidden(f"({cls._pass_class(passid)})")
+        utils.printing.psubtle(passid, end=' ')
+        utils.printing.phidden(f"({cls._pass_class(passid)})")
         Pass = OM[passid]
         if Pass.__doc__ is not None:
-            ampy.printing.pquery(Pass.__doc__)
+            utils.printing.pquery(Pass.__doc__)
 
 
     @classmethod

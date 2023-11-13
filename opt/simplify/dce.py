@@ -7,12 +7,11 @@ Dead code elimination pass based on the observation that registers
 are only important if they dictate a branch, or are written to output.
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
 
 from opt.tools import Opt
 
 import ampy.types
-import ampy.debug
 
 class DCE(Opt):
     # forward declaration
@@ -52,7 +51,7 @@ class DCE(DCE):
         
         updating = True
         while updating:
-            ampy.debug.print(self.ID, "running flow analysis")
+            self.debug("running flow analysis")
             updating = self._back_flow(self.CFG.entrypoint, set())
 
         # Step 2. Eliminate non-obsed definitions

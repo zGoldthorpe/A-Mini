@@ -7,8 +7,9 @@ This module takes an ampy.types.CFG program and outputs plaintext
 A-Mi source code (that could, in principle, be re-read).
 """
 
+from utils.syntax import Syntax
+
 import ampy.types
-from ampy.ensuretypes import Syntax
 
 class CFGWriter:
     """

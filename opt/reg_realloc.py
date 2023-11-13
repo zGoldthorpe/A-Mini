@@ -15,13 +15,13 @@ R. Briggs, K.D. Cooper, K. Kennedy, L. Torezon. 1989.
     Pages 275--284.
 """
 
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
+
 from ampy.passmanager import BadArgumentException
-from opt.tools import Opt
-
-from opt.analysis.live import LiveAnalysis
-
 import ampy.types
+
+from opt.tools import Opt
+from opt.analysis.live import LiveAnalysis
 
 class RR(Opt):
     # forward declaration

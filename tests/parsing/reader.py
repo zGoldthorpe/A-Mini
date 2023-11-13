@@ -1,8 +1,10 @@
 import glob
 import sys
 
+from utils.printing import tame_whitespace as tw
+
 from ampy.reader import CFGBuilder, AnonymousBlockError
-from ampy.printing import tame_whitespace as tw
+
 from tests.tools import PythonExecutionTestSuite
 
 ts = PythonExecutionTestSuite("parsing/reader")
@@ -74,12 +76,12 @@ ts.exec("builder = CFGBuilder()",
         state=dict(CFGBuilder=CFGBuilder,
                 prog=empty_block_prog))
 
-anon_block_prog = [
-        "goto @A",
-        "goto @B", # dead code
+dead_block_prog = [
+        "@0: goto @A",
+        "@1: goto @B", # dead code
         "@A: goto @C",
         "@B: goto @C", # dead code
-        "branch %c ? @A : @C", # dead code
+        "@2: branch %c ? @A : @C", # dead code
         "@C: exit",
         ]
 ts.exec("builder = CFGBuilder()",
@@ -88,8 +90,16 @@ ts.exec("builder = CFGBuilder()",
         "assert len(cfg['@A'].parents) == 1",
         "assert len(cfg['@C'].parents) == 1",
         state=dict(CFGBuilder=CFGBuilder,
-                prog=anon_block_prog))
-ts.exec("builder = CFGBuilder(allow_anon_blocks=False)",
+                prog=dead_block_prog))
+anon_block_prog = [
+        "@0: goto @A",
+        "@1: goto @B", # dead code
+        "@A: goto @C",
+        "@B: goto @C", # dead code
+        "branch %c ? @A : @C", # dead code
+        "@C: exit",
+        ]
+ts.exec("builder = CFGBuilder()",
         ("cfg = builder.build(*prog)", AnonymousBlockError),
         state=dict(CFGBuilder=CFGBuilder,
                 prog=anon_block_prog))

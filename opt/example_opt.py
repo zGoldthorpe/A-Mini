@@ -14,11 +14,12 @@ will add goto instructions to break up the
 code into blocks of specified maximum size.
 (Or pass -1 to avoid trimming block size.)
 """
-from ampy.ensuretypes import Syntax
-from ampy.passmanager import BadArgumentException
-from opt.tools import Opt
+from utils.syntax import Syntax
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
+
+from opt.tools import Opt
 
 ### required opts ###
 from opt.analysis.example_analysis import ExampleAnalysis

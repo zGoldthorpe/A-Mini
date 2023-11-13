@@ -4,7 +4,8 @@ from tests.execution.env import ExecutionTestSuite
 
 ts = ExecutionTestSuite("execution/arith")
 
-ts.simulate("%a = 2",
+ts.simulate("@0:",
+            "%a = 2",
             "%b = 5",
             "%c = -3",
             "%sum = %a + %b",
@@ -19,7 +20,8 @@ ts.simulate("%a = 2",
                 "%prod" : -15,
                 })
 
-ts.simulate("%0 = -5",
+ts.simulate("@0:",
+            "%0 = -5",
             "%1 = 3",
             "%sum = %0 + 5",
             "%sum.1 = 4 + %1",

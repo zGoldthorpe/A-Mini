@@ -1,9 +1,9 @@
 import sys
 
-import ampy.printing
+import utils.printing
 
 def perror(*args, **kwargs):
-    ampy.printing.perror(*args, **kwargs, file=sys.stderr)
+    utils.printing.perror(*args, **kwargs, file=sys.stderr)
 
 def die(msg):
     perror(msg)

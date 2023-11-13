@@ -7,11 +7,12 @@ Goldthorpe
 import os
 import sys
 
-import ampy.printing
-import ampy.reader
-import ampy.types
+import utils.printing
 
 from ui.errors import perror, die, unexpected
+
+import ampy.reader
+import ampy.types
 
 class ReaderUI:
 
@@ -77,11 +78,11 @@ class ReaderUI:
         """
         Simple and pretty CLI for getting instructions from STDIN
         """
-        ampy.printing.pprompt(ampy.printing.tame_whitespace("""
+        utils.printing.pprompt(utils.printing.tame_whitespace("""
             Enter A-Mi instructions below.
             Press Ctrl-D to end input, and Ctrl-C to cancel."""))
         while True:
-            ampy.printing.pprompt(f"{len(self._instructions)+1: >4d} | ", end='', flush=True)
+            utils.printing.pprompt(f"{len(self._instructions)+1: >4d} | ", end='', flush=True)
             try:
                 self._instructions.append(input().strip())
             except KeyboardInterrupt:

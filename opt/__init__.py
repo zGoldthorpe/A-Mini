@@ -21,7 +21,6 @@ OptManager.register("opt.analysis.defs.DefAnalysis")
 OptManager.register("opt.analysis.live.LiveAnalysis")
 
 OptManager.register("opt.simplify.dce.DCE")
-OptManager.register("opt.simplify.dce_naive.DCE")
 OptManager.register("opt.simplify.branch_elim.BranchElim")
 
 OptManager.register("opt.ssa.SSA")

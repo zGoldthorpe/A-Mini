@@ -7,9 +7,9 @@ This module simulates the execution of an A-Mi program encoded
 as an ampy.types.CFG
 """
 
-import ampy.types
-from ampy.ensuretypes import Syntax
+from utils.syntax import Syntax
 
+import ampy.types
 
 class RegDict:
     """

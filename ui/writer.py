@@ -4,11 +4,12 @@ Writer
 Goldthorpe
 """
 
-import ampy.printing
-import ampy.writer
-import ampy.types
+import utils.printing
 
 from ui.errors import perror, die, unexpected
+
+import ampy.writer
+import ampy.types
 
 class WriterUI:
 

@@ -6,10 +6,10 @@ Goldthorpe
 This module performs liveness opt on a CFG.
 """
 
-from ampy.ensuretypes import Syntax
-from ampy.passmanager import BadArgumentException
+from utils.syntax import Syntax
 from opt.tools import Opt, OptError
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
 
 class LiveAnalysis(Opt):
