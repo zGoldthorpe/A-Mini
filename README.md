@@ -82,7 +82,12 @@ To run the interpreter, simply call
 ```console
 python3 ami.py path/to/code.ami
 ```
-The interpreter supports some command-line options; for instance,
+You may also have the input code undergo optimisations prior to execution.
+```console
+python3 ami.py path/to/code.ami --add-pass="pass"
+```
+Optimisation arguments are the same as those of `amo.py`, which is described more [below](#a-mi-optimisation)
+The interpreter supports some other command-line options; for instance,
 ```console
 python3 ami.py path/to/code.ami --trace
 ```

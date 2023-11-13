@@ -102,7 +102,7 @@ class InterpreterUI:
                 print()
                 exit()
             except EOFError:
-                perror("Unexpected EOF.")
+                die("Unexpected EOF.")
             except Exception as e:
                 unexpected(e)
         self._interpreter.write(reg, val)

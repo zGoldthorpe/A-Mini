@@ -21,16 +21,8 @@ from ui.errors import perror, die, unexpected
 class OptUI:
 
     @classmethod
-    def add_arguments(self, parser, *, flag=True):
-        """
-        The `flag` argument, if False, reads in passes without the --add-pass flag.
-        """
-        if flag:
-            pass_args = ("-p", "--add-pass")
-        else:
-            pass_args = ()
-
-        parser.add_argument(*pass_args,
+    def add_arguments(self, parser):
+        parser.add_argument("-p", "--add-pass",
                 dest="OUIpasses",
                 action="append",
                 metavar="[PASS | \"PASS(arg0, arg1, ..., k0=v0, k1=v1, ...)\"]",
