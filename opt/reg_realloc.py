@@ -19,7 +19,6 @@ from ampy.ensuretypes import Syntax
 from ampy.passmanager import BadArgumentException
 from opt.tools import Opt
 
-from opt.analysis.defs import DefAnalysis
 from opt.analysis.live import LiveAnalysis
 
 import ampy.types
@@ -65,12 +64,14 @@ class RR(RR):
         # cp[var]: set of copy instructions
 
         live = self.require(LiveAnalysis)
-        self.RIG = {var:set() for var in self.require(DefAnalysis).vars}
+        self.RIG = {}
         self.cp = {}
         for block in self.CFG:
             for i, I in enumerate(block):
                 regs = live.live_in(block, i)
                 self.num_reg = max(self.num_reg, len(regs))
+                for u in regs:
+                    self.RIG.setdefault(u, set())
                 for u in regs:
                     for v in regs:
                         if u >= v:
@@ -81,6 +82,8 @@ class RR(RR):
                 # also add conflicts between conditionally live instructions
                 for parent, cond_regs in live.live_in_phi(block, i).items():
                     self.num_reg = max(self.num_reg, len(regs) + len(cond_regs))
+                    for u in cond_regs:
+                        self.RIG.setdefault(u, set())
                     for u in regs + cond_regs:
                         for v in cond_regs:
                             if u == v:
@@ -182,16 +185,22 @@ class RR(RR):
         for block in self.CFG:
             to_delete = []
             for i, I in enumerate(block):
+                if isinstance(I, ampy.types.DefInstructionClass):
+                    if I.target in self._col:
+                        I.target = sub(I.target)
+                    elif isinstance(I, ampy.types.ReadInstruction):
+                        I.target = "%_"
+                    else: # dead variable, and not a read
+                        to_delete.append(i)
+                        continue
+
                 if isinstance(I, ampy.types.BinaryInstructionClass):
-                    I.target = sub(I.target)
                     I.operands = tuple(map(sub, I.operands))
                 elif isinstance(I, ampy.types.MovInstruction):
-                    I.target = sub(I.target)
                     I.operand = sub(I.operand)
                     if I.target == I.operand:
                         to_delete.append(i)
                 elif isinstance(I, ampy.types.PhiInstruction):
-                    I.target = sub(I.target)
                     I.conds = tuple(map(lambda p: (sub(p[0]), p[1]), I.conds))
                     if len(set(var for var, _ in I.conds)) == 1:
                         if I.target == I.conds[0][0]:
@@ -200,12 +209,10 @@ class RR(RR):
                             block._instructions[i] = ampy.types.MovInstruction(I.target, I.conds[0][0])
                 elif isinstance(I, ampy.types.BranchInstruction):
                     I.cond = sub(I.cond)
-                elif isinstance(I, ampy.types.ReadInstruction):
-                    I.target = sub(I.target)
                 elif isinstance(I, ampy.types.WriteInstruction):
                     I.operand = sub(I.operand)
                 else:
-                    # goto, exit, brkpt
+                    # read, goto, exit, brkpt
                     pass
 
             for i in reversed(to_delete):
