@@ -27,3 +27,5 @@ OptManager.register("opt.simplify.branch_elim.BranchElim")
 OptManager.register("opt.ssa.SSA")
 OptManager.register("opt.gvn.rpo_simple.RPO")
 OptManager.register("opt.gvn.simplify_naive.NaiveSimplify")
+
+OptManager.register("opt.reg_realloc.RR")

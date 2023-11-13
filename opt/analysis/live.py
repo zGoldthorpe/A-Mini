@@ -7,6 +7,7 @@ This module performs liveness opt on a CFG.
 """
 
 from ampy.ensuretypes import Syntax
+from ampy.passmanager import BadArgumentException
 from opt.tools import Opt, OptError
 
 import ampy.types
@@ -20,31 +21,47 @@ class LiveAnalysis(LiveAnalysis):
     live
 
     Determines the live-in and live-out sets for every block and instruction.
-    Note: liveness of a variable in a phi node is fuzzy. If a block @A has
-    a phi node
+    Note: liveness of a variable in a phi node is fuzzy.
+    If a block @A has a phi node
     @A:
         %0 = phi [ %1, @B ], ...
         ...
-    then the variable %1 will be declared live coming out of @B, but will *not*
-    be declared live coming into @A, because liveness is conditional on arriving
-    through @B.
+    then the liveness of %1 is conditional on entering through @B.
+    Therefore, live_in consists of unconditionally live variables, and
+    live_phi gives live variables conditional on the previous block label.
     """
 
     @LiveAnalysis.init("live")
-    def __init__(self, /):
+    def __init__(self):
         pass
 
     @LiveAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock)
-      | Syntax(object, ampy.types.BasicBlock, int) >> [tuple, str])
+      | Syntax(object, ampy.types.BasicBlock, int)
+      >> [tuple, str])
     def live_in(self, block, idx=None, /):
+        """
+        Give unconditionally live variables coming into block or instruction
+        """
         if idx is None:
             return tuple(self.get(block, "in", default=[]))
         return tuple(self.get(block, idx, "in", default=[]))
 
     @LiveAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock)
-      | Syntax(object, ampy.types.BasicBlock, int) >> [tuple, str])
+      | Syntax(object, ampy.types.BasicBlock, int)
+      >> {ampy.types.BasicBlock : [tuple, str]})
+    def live_in_phi(self, block, idx=None, /):
+        if idx is None:
+            return {parent : tuple(self.get(block, f"in/{parent.label}", default=[]))
+                        for parent in block.parents}
+        return {parent : tuple(self.get(block, idx, f"in/{parent.label}", default=[]))
+                    for parent in block.parents}
+
+    @LiveAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock)
+      | Syntax(object, ampy.types.BasicBlock, int)
+      >> [tuple, str])
     def live_out(self, block, idx=None, /):
         if idx is None:
             return tuple(self.get(block, "out", default=[]))
@@ -67,14 +84,23 @@ class LiveAnalysis(LiveAnalysis):
         self._in = {block:set() for block in self.CFG}
         self._out = {}
 
-        # process phi nodes first
-        self._phi = {block:set() for block in self.CFG}
+        # compute conditional live-in sets first
+        # (these do not require back-propagation)
+        self._in_phi = {}
         for block in self.CFG:
-            for I in block:
+            phi_in = {parent.label:set() for parent in block.parents}
+            for i, I in reversed(list(enumerate(block))):
                 if isinstance(I, ampy.types.PhiInstruction):
-                    for val, label in I.conds:
-                        if val.startswith('%'):
-                            self._phi[self.CFG[label]].add(val)
+                    for var, lbl in I.conds:
+                        if var.startswith('%'):
+                            phi_in[lbl].add(var)
+
+                self._in_phi[block, i] = {parent : set(phi_in[parent.label])
+                                            for parent in block.parents}
+
+            self._in_phi[block] = {parent : phi_in[parent.label]
+                                    for parent in block.parents}
+
 
         changed = True
         while changed:
@@ -93,9 +119,14 @@ class LiveAnalysis(LiveAnalysis):
                 continue
             self.assign(block, "in", *sorted(self._in[block]))
             self.assign(block, "out", *sorted(self._out[block]))
+            for parent in block.parents:
+                self.assign(block, f"in/{parent.label}", *sorted(self._in_phi[block][parent]))
+
             for i in range(len(block)):
                 self.assign(block, i, "in", *sorted(self._in[block, i]))
                 self.assign(block, i, "out", *sorted(self._out[block, i]))
+                for parent in block.parents:
+                    self.assign(block, i, f"in/{parent.label}", *sorted(self._in_phi[block, i][parent]))
 
         return self.opts
 
@@ -120,11 +151,10 @@ class LiveAnalysis(LiveAnalysis):
 
         old_out = self._out.get((block,br), set())
         old_in = self._in.get((block,br), set())
-
-        self._out[block,br] = self._phi[block]
-        # live-out always includes specific variables from phi nodes
+        
+        self._out[block, br] = set()
         for child in block.children:
-            self._out[block,br] |= self._in[child]
+            self._out[block, br] |= self._in[child] | self._in_phi[child][block]
 
         defs, uses = self._def_use(block[br])
         self._in[block,br] = (self._out[block,br] - defs) | uses
@@ -165,8 +195,8 @@ class LiveAnalysis(LiveAnalysis):
         if isinstance(I, ampy.types.MovInstruction):
             return {I.target}, reg_set(I.operand)
         if isinstance(I, ampy.types.PhiInstruction):
-            # operands of a phi node do *not* count as uses
-            # they are instead handled separately
+            # conditional uses don't count in this case
+            # they are handled separately
             return {I.target}, set()
         if isinstance(I, ampy.types.BranchInstruction):
             return set(), reg_set(I.cond)

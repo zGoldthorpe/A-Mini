@@ -1,0 +1,16 @@
+; Takes two integers and prints them in increasing order
+
+@main:
+    read %0
+    read %1
+    %swap = %1 < %0
+    branch %swap ? @swap : @print
+
+@swap:
+    %t = %0
+    %0 = %1
+    %1 = %t
+
+@print:
+    write %0
+    write %1
