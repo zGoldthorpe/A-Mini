@@ -25,11 +25,17 @@ class ReaderUI:
 
     def __init__(self, parsed_args):
         self._instructions = []
-        if parsed_args.fname is None:
+        self._fname = parsed_args.fname
+
+    def fetch_input(self):
+        """
+        Obtain input from file or STDIN.
+        """
+        if self._fname is None:
             self.fname = "<stdin>"
             self._read_input()
         else:
-            self.fname = parsed_args.fname
+            self.fname = self._fname
             self._read_file_lines()
 
     def build_cfg(self):

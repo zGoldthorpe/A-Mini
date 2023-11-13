@@ -7,12 +7,6 @@ This is a proof-of-concept interpreter for A-Mi
 """
 
 import argparse
-import os
-import re
-import sys
-
-import ampy.debug
-import ampy.printing
 
 from ui.printer import PrinterUI
 from ui.reader import ReaderUI
@@ -24,20 +18,21 @@ if __name__ == "__main__":
 
     argparser = argparse.ArgumentParser(
                     description="Proof-of-concept interpreter for A-Mi")
-    PrinterUI.add_arguments(argparser)
-    ReaderUI.add_arguments(argparser)
-    InterpreterUI.add_arguments(argparser)
+    PrinterUI.add_arguments(argparser.add_argument_group("formatting"))
+    ReaderUI.add_arguments(argparser.add_argument_group("input"))
+    InterpreterUI.add_arguments(argparser.add_argument_group("interpreter"))
 
 
     args = argparser.parse_args()
-    
     PrinterUI(args)
+    reader = ReaderUI(args)
+    interpreter = InterpreterUI(args)
 
     ### parse source or stdin ###
-
-    cfg = ReaderUI(args).build_cfg()
+    reader.fetch_input()
+    cfg = reader.build_cfg()
 
     ### run program ###
-
-    InterpreterUI(cfg, args).run()
+    interpreter.load_cfg(cfg)
+    interpreter.run()
 

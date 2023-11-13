@@ -38,10 +38,8 @@ class InterpreterUI:
                 nargs="?",
                 help="Insert breakpoint at specified frequency (default: never)")
 
-    def __init__(self, cfg, parsed_args):
-        self._cfg = cfg
+    def __init__(self, parsed_args):
         self._interpreter = ampy.interpret.Interpreter()
-        self._interpreter.load(self._cfg)
 
         self.trace = parsed_args.IUItrace
         self.prompt = parsed_args.IUIprompt
@@ -54,6 +52,13 @@ class InterpreterUI:
         self._qhist = {}
         # tracker of current label
         self._label = None
+
+    def load_cfg(self, cfg):
+        """
+        Load the CFG of the program to run.
+        """
+        self._cfg = cfg
+        self._interpreter.load(self._cfg)
 
     def run(self):
         while self._interpreter.is_executing:
@@ -96,6 +101,8 @@ class InterpreterUI:
             except KeyboardInterrupt:
                 print()
                 exit()
+            except EOFError:
+                perror("Unexpected EOF.")
             except Exception as e:
                 unexpected(e)
         self._interpreter.write(reg, val)
