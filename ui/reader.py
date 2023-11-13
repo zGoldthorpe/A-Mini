@@ -11,17 +11,25 @@ import ampy.printing
 import ampy.reader
 import ampy.types
 
-from ui.tools import perror, die, unexpected
+from ui.errors import perror, die, unexpected
 
 class ReaderUI:
 
-    def __init__(self, fname, /):
+    @classmethod
+    def add_arguments(cls, parser):
+        parser.add_argument("fname",
+                metavar="<prog.ami>",
+                nargs="?",
+                help="""File containing plaintext A-Mi instructions.
+                        If omitted, code will be read through STDIN.""")
+
+    def __init__(self, parsed_args):
         self._instructions = []
-        if fname is None:
+        if parsed_args.fname is None:
             self.fname = "<stdin>"
             self._read_input()
         else:
-            self.fname = fname
+            self.fname = parsed_args.fname
             self._read_file_lines()
 
     def build_cfg(self):

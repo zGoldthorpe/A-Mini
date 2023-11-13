@@ -11,18 +11,42 @@ import ampy.interpret
 import ampy.printing
 import ampy.types
 
-from ui.tools import perror, die, unexpected
+from ui.errors import perror, die, unexpected
 
 class InterpreterUI:
 
-    def __init__(self, cfg, trace, prompt, interrupt, brkpts):
+    @classmethod
+    def add_arguments(cls, parser):
+
+        parser.add_argument("-i", "--prompt",
+                dest="IUIprompt",
+                action="store_true",
+                help="Enable prompt messages when A-Mi code calls a 'read' or a 'write'.")
+        parser.add_argument("-t", "--trace",
+                dest="IUItrace",
+                action="store_true",
+                help="Output execution trace to STDERR")
+        parser.add_argument("-B", "--suppress-breakpoint",
+                dest="IUIbrkpts",
+                action="store_false",
+                help="Ignore breakpoints in code")
+        parser.add_argument("--interrupt",
+                dest="IUIinterrupt",
+                choices=("never", "instructions", "blocks"),
+                const="blocks",
+                default="never",
+                nargs="?",
+                help="Insert breakpoint at specified frequency (default: never)")
+
+    def __init__(self, cfg, parsed_args):
         self._cfg = cfg
         self._interpreter = ampy.interpret.Interpreter()
         self._interpreter.load(self._cfg)
-        self.trace = trace
-        self.prompt = prompt
-        self.interrupt = interrupt
-        self.brkpts = brkpts
+
+        self.trace = parsed_args.IUItrace
+        self.prompt = parsed_args.IUIprompt
+        self.interrupt = parsed_args.IUIinterrupt
+        self.brkpts = parsed_args.IUIbrkpts
 
         # formatting for trace output
         self._trace_width = None
