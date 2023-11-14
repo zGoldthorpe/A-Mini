@@ -12,9 +12,8 @@ import sys
 import utils.printing
 
 enabled = False
-file = sys.stderr
 
 def print(obj, *args, **kwargs):
-    global enabled, file
+    global enabled
     if enabled:
-        utils.printing.pdebug(obj, "::", *args, **kwargs, file=file)
+        utils.printing.pdebug(obj, "::", *args, **kwargs, file=sys.stderr)

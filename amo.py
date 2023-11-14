@@ -9,9 +9,9 @@ This is a proof-of-concept analyser/optimiser for A-Mi
 import argparse
 
 from ui.printer import PrinterUI
-from ui.reader import ReaderUI
-from ui.opter import OptUI
-from ui.writer import WriterUI
+from ui.reader  import ReaderUI
+from ui.opter   import OptUI
+from ui.writer  import WriterUI
 
 if __name__ == "__main__":
 

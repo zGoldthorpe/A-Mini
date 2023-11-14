@@ -8,10 +8,10 @@ This is a proof-of-concept interpreter for A-Mi
 
 import argparse
 
-from ui.printer import PrinterUI
-from ui.reader import ReaderUI
+from ui.printer     import PrinterUI
+from ui.reader      import ReaderUI
 from ui.interpreter import InterpreterUI
-from ui.opter import OptUI
+from ui.opter       import OptUI
 
 if __name__ == "__main__":
 

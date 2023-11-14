@@ -64,9 +64,9 @@ class Opt:
                 opts.append(self) # update opt list
                 super().__init__(cfg, opts)
 
-                self.debug(f"initialising opt with arguments {list(args)}, {dict(kwargs)}")
                 initfunc(self, *args, **kwargs)
                 self._inputs = (tuple(args), kwargs)
+                self.debug(f"<init>")
 
             Opt_init_wrap.__doc__ = ("Expects a CFG, a TypedList of previously-instantiated opts"
                         + (f", {len(def_args)} positional argument{'s' if len(def_args) != 1 else ''}" if len(def_args) > 0 else "")
@@ -208,7 +208,7 @@ class Opt(Opt, RequiresOpt):
                 if opt in preserved:
                     continue
                 # anything not explicitly preserved is invalidated
-                self.debug(f"invalidating {opt.ID} ({opt.inputs})")
+                self.debug(f"invalidating {opt.name}")
                 opt.valid = False
 
             self.valid = True
@@ -302,13 +302,33 @@ class Opt(Opt, RequiresOpt):
     @classmethod
     @(Syntax(object, Pass_ID_re) >> None)
     def ID(cls, ID):
+        """
+        Pass identifier
+        """
         cls._ID = ID
         cls._recog = re.compile(f"{cls._ID}/(.*)")
 
     @property
     @(Syntax(object) >> ((), [tuple, str], {str:str}))
     def inputs(self):
+        """
+        Positional and keyword arguments to pass
+        """
         return self._inputs
+
+    @property
+    @(Syntax(object) >> str)
+    def name(self):
+        """
+        Verbose command-line name of pass
+        """
+        args, kwargs = self.inputs
+        strargs = ", ".join(str(arg) for arg in args)
+        strkwargs = ", ".join(f"{key}={value}" for key, value in kwargs.items())
+        inputs = ", ".join(filter(lambda s:len(s) > 0, (strargs, strkwargs)))
+        if len(inputs) > 0:
+            return f"{self.ID}({inputs})"
+        return self.ID
 
     @(Syntax(object, str) >> (str, None))
     def extract_arg(self, arg):
@@ -440,7 +460,7 @@ class Opt(Opt, RequiresOpt):
         """
         Print debug information to utils.debug
         """
-        utils.debug.print(self.ID, *args, **kwargs)
+        utils.debug.print(self.name, *args, **kwargs)
 
 class OptList(TypedList):
     """

@@ -5,7 +5,9 @@ Goldthorpe
 """
 
 import re
+import time
 
+import utils.debug
 import utils.printing
 
 from ui.errors import perror, die, unexpected
@@ -144,6 +146,7 @@ class OptUI:
             die(f"{Pass.ID} received invalid argument.\n{e}")
 
     def execute_passes(self):
+        start_time = time.process_time()
         for opt in self._optlist:
             try:
                 opt.perform_opt()
@@ -151,6 +154,16 @@ class OptUI:
                 die(f"{opt.ID} encountered an error in source code.\n\t{repr(e.block[e.index])}\n[{e.block.label}:{e.index}] {e.message}")
             except Exception as e:
                 unexpected(e)
+        delta = time.process_time() - start_time
+        utils.debug.print("opt", f"completed in {delta:.3f}s")
+
+    @property
+    def opts_cl(self):
+        """
+        Tuple of passes as given from the command line.
+        """
+        return tuple(self._passes_ls) if self._passes_ls is not None else ()
+
 
     @property
     def CFG(self):
