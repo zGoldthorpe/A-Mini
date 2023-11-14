@@ -1,11 +1,13 @@
 """
-Test files
-============
+Test file management
+======================
 Goldthorpe
 """
 
 import os
 import shutil
+
+import utils.debug
 
 from ui.errors import perror, die, unexpected
 
@@ -18,10 +20,18 @@ class TestFileUI:
                         metavar="FOLDER",
                         action="append",
                         help="Specify which folders to test on.")
+        parser.add_argument("-Xvfy", "--clear-vfy",
+                        dest="TFUIclear_vfy",
+                        action="store_true",
+                        help="Delete .vfy folders.")
+        parser.add_argument("-Xout", "--clear-out",
+                        dest="TFUIclear_out",
+                        action="store_true",
+                        help="Delete .out folders.")
         parser.add_argument("-X", "--clear",
                         dest="TFUIclear",
                         action="store_true",
-                        help="Delete output folders.")
+                        help="Equivalent to -Xvfy -Xout")
 
     def __init__(self, parsed_args):
 
@@ -31,11 +41,11 @@ class TestFileUI:
             self.folders = parsed_args.TFMfolders
 
         self._scan()
-
-        if parsed_args.TFUIclear:
-            # after all that, if the user wanted to clear the data, then so be it
-            self.delete_data()
-
+        
+        if parsed_args.TFUIclear_vfy or parsed_args.TFUIclear:
+            self.delete_vfy()
+        if parsed_args.TFUIclear_out or parsed_args.TFUIclear:
+            self.delete_out()
 
     def _scan(self):
         """
@@ -103,19 +113,32 @@ class TestFileUI:
                     die(f"Expected file\n\t{amif}\ndoes not exist for corresponding input folder {ami}.in/")
                 die(f"Expected file\n\t{amif}\ndoes not exist for corresponding vfy folder {ami}.vfy/")
 
-    def delete_data(self):
+    def delete_vfy(self):
         """
-        Delete all output and vfy folders.
+        Delete all vfy folders.
         """
         for ami in self._tests:
             vfy = self.get_test_vfy_folder(ami)
-            out = self.get_test_output_folder(ami)
             if os.path.exists(vfy):
-                print("Deleting", vfy)
+                utils.debug.print("fileman", "Deleting", vfy)
                 shutil.rmtree(vfy)
+        # refresh after the deletion
+        self._scan()
+
+    def delete_out(self):
+        """
+        Delete all out folders.
+        """
+        for ami in self._tests:
+            out = self.get_test_output_folder(ami)
             if os.path.exists(out):
-                print("Deleting", out)
+                utils.debug.print("fileman", "Deleting", out)
                 shutil.rmtree(out)
+            for opt in self.get_test_opts(ami):
+                out = self.get_test_opt_output_folder(ami, opt)
+                if os.path.exists(out):
+                    utils.debug.print("fileman", "Deleting", out)
+                    shutil.rmtree(out)
         # refresh after the deletion
         self._scan()
 
@@ -138,7 +161,7 @@ class TestFileUI:
 
                     # remove outdated output
                     if outf in data.get("@out", set()):
-                        fullout = self.get_test_corresponding_output(ami, inf)
+                        fullout = self.get_test_output_fpath(ami, outf)
                         if not os.path.exists(fullout):
                             continue
                         outfmtime = os.path.getmtime(fullout)
@@ -146,7 +169,7 @@ class TestFileUI:
                             continue
                         self._tests[ami]["@out"].remove(outf)
                         if os.path.exists(fullout):
-                            print(f"{fullout} is out of date.")
+                            utils.debug.print("fileman", f"{fullout} is out of date.")
                             os.remove(fullout)
 
 
@@ -155,7 +178,7 @@ class TestFileUI:
                         if opt.startswith('@'):
                             continue
                         if outf in odata.get("@out", set()):
-                            fullout = self.get_test_opt_corresponding_output(ami, opt, inf)
+                            fullout = self.get_test_opt_output_fpath(ami, opt, outf)
                             if not os.path.exists(fullout):
                                 continue
                             outfmtime = os.path.getmtime(fullout)
@@ -163,7 +186,7 @@ class TestFileUI:
                                 continue
                             self._tests[ami][opt]["@out"].remove(outf)
                             if os.path.exists(fullout):
-                                print(f"{fullout} is out of date.")
+                                utils.debug.print("fileman", f"{fullout} is out of date.")
                                 os.remove(fullout)
 
             # now check for updates in source file
@@ -173,7 +196,7 @@ class TestFileUI:
                 if outmtime <= amimtime:
                     del self._tests[ami]["@out"]
                     if os.path.exists(out_fld):
-                        print(f"{out_fld} is out of date.")
+                        utils.debug.print("fileman", f"{out_fld} is out of date.")
                         shutil.rmtree(out_fld)
             vfy_fld = self.get_test_vfy_folder(ami)
             if os.path.exists(vfy_fld):
@@ -182,7 +205,7 @@ class TestFileUI:
                     for opt in list(filter(lambda k: not k.startswith('@'), data)):
                         del self._tests[ami][opt]
                     if os.path.exists(vfy_fld):
-                        print(f"{vfy_fld} is out of date.")
+                        utils.debug.print("fileman", f"{vfy_fld} is out of date.")
                         shutil.rmtree(vfy_fld)
 
     @property
@@ -224,8 +247,7 @@ class TestFileUI:
         """
         Get file path to output file corresponding to input filename.
         """
-        file = os.path.splitext(inputfile)[0] + ".out"
-        return os.path.join(self.get_test_output_folder(test), file)
+        return os.path.splitext(inputfile)[0] + ".out"
 
     def get_test_output_files(self, test):
         return tuple(filter(lambda f: f.endswith(".out"),
@@ -234,10 +256,17 @@ class TestFileUI:
     def get_test_output_fpath(self, test, file):
         return os.path.join(self.get_test_output_folder(test), file)
 
+    def get_test_corresponding_trace_fpath(self, test, inputfile):
+        """
+        Get full path to trace file
+        """
+        trace = os.path.splitext(inputfile)[0] + ".trace"
+        return self.get_test_output_fpath(test, trace)
+
     def get_test_vfy_folder(self, test):
         return f"{test}.vfy"
 
-    def get_test_corresponding_opt(self, test, opt):
+    def get_test_opt(self, test, opt):
         """
         opt is a chosen name representing optimisation (not an ami file)
         """
@@ -247,9 +276,19 @@ class TestFileUI:
         return tuple(filter(lambda p: not p.startswith('@'),
             self._tests.get(test, {})))
 
-    def get_test_opt_corresponding_log(self, test, opt):
+    def get_test_opt_log(self, test, opt):
         return os.path.join(self.get_test_vfy_folder(test), f"{opt}.log")
 
-    def get_test_opt_corresponding_output(self, test, opt, inputfile):
-        file = os.path.splitext(inputfile)[0] + ".out"
-        return os.path.join(self.get_test_vfy_folder(test), f"{opt}.out", file)
+    def get_test_opt_output_folder(self, test, opt):
+        return os.path.join(self.get_test_vfy_folder(test), f"{opt}.out")
+
+    def get_test_opt_output_files(self, test, opt):
+        return tuple(filter(lambda p: p.endswith(".out"),
+            self._tests.get(test, {}).get(opt, {}).get("@out", ())))
+
+    def get_test_opt_output_fpath(self, test, opt, output):
+        return os.path.join(self.get_test_opt_output_folder(test, opt), output)
+
+    def get_test_opt_corresponding_trace_fpath(self, test, opt, inputfile):
+        trace = os.path.splitext(inputfile)[0] + ".trace"
+        return self.get_test_opt_output_fpath(test, opt, trace)

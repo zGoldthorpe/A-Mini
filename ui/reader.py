@@ -68,7 +68,7 @@ class ReaderUI:
         Read from a file and return the list of inputs.
         """
         if not os.path.exists(self.fname):
-            die("Source file {self.fname} does not exist.")
+            die(f"Source file {self.fname} does not exist.")
         if not os.path.isfile(self.fname):
             die(f"{self.fname} is not a file!")
         with open(self.fname, 'r') as file:

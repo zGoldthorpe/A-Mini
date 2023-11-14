@@ -38,8 +38,10 @@ class MultiUI:
     @classmethod
     def fopen(cls, file, mode='r'):
         folder = os.path.split(file)[0]
-        if not os.path.exists(folder):
+        try:
             shutil.os.makedirs(folder)
+        except FileExistsError:
+            pass
         return open(file, mode)
 
 
@@ -56,8 +58,13 @@ class MultiUI:
         Add a process intended for running asynchronously with others.
         """
         def wrapped_target():
-            if stdin is not None:
-                sys.stdin = self.fopen(stdin, 'r')
+            # multiprocessing processes close stdin by default
+            # so we need to circumvent this
+            def subwrapped_target(*w_args, **w_kwargs):
+                if stdin is not None:
+                    sys.stdin = self.fopen(stdin, 'r')
+                target(*w_args, **w_kwargs)
+
             if stdout is not None:
                 sys.stdout = self.fopen(stdout, 'w')
             if stderr is not None:
@@ -65,7 +72,7 @@ class MultiUI:
 
             # for timing out, I don't know a better way than to
             # spawn a second process, which seems insane
-            proc = multiprocessing.Process(target=target, args=args, kwargs=kwargs)
+            proc = multiprocessing.Process(target=subwrapped_target, args=args, kwargs=kwargs)
             proc.start()
             proc.join(timeout=self.timeout)
             exit(proc.exitcode)

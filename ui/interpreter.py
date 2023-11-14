@@ -6,7 +6,9 @@ Goldthorpe
 
 import re
 import sys
+import time
 
+import utils.debug
 import utils.printing
 
 from ui.errors import perror, die, unexpected
@@ -63,6 +65,7 @@ class InterpreterUI:
         self._interpreter.load(self._cfg)
 
     def run(self):
+        runtime = time.process_time()
         while self._interpreter.is_executing:
             I = self._interpreter.current_instruction
             if self.trace:
@@ -81,12 +84,16 @@ class InterpreterUI:
                 self.write(e.register)
             except ampy.interpret.BreakpointInterrupt as e:
                 if self.brkpts:
-                    self.debug(e.name)
+                    self.debugger(e.name)
             
             if not self.brkpts or self.interrupt == "never" or isinstance(I, ampy.types.BrkInstruction):
                 continue
             if self.interrupt == "instructions" or isinstance(I, ampy.types.BranchInstructionClass):
-                self.debug(f"<{repr(I)}>")
+                self.debugger(f"<{repr(I)}>")
+
+        # execution completed
+        runtime = time.process_time() - runtime
+        utils.debug.print("interpreter", "total execution time:", f"{runtime:.3f}s")
 
     def read_int(self, reg):
         val = None
@@ -122,7 +129,7 @@ class InterpreterUI:
 
         print(val)
 
-    def debug(self, brkpt):
+    def debugger(self, brkpt):
         """
         Open debug interface during breakpoint
         """
