@@ -40,14 +40,14 @@ class TestFileUI:
         else:
             self.folders = parsed_args.TFMfolders
 
-        self._scan()
+        self.rescan()
         
         if parsed_args.TFUIclear_vfy or parsed_args.TFUIclear:
             self.delete_vfy()
         if parsed_args.TFUIclear_out or parsed_args.TFUIclear:
             self.delete_out()
 
-    def _scan(self):
+    def rescan(self):
         """
         Scan folders for vfy and output files.
         """
@@ -123,7 +123,7 @@ class TestFileUI:
                 utils.debug.print("fileman", "Deleting", vfy)
                 shutil.rmtree(vfy)
         # refresh after the deletion
-        self._scan()
+        self.rescan()
 
     def delete_out(self):
         """
@@ -140,7 +140,7 @@ class TestFileUI:
                     utils.debug.print("fileman", "Deleting", out)
                     shutil.rmtree(out)
         # refresh after the deletion
-        self._scan()
+        self.rescan()
 
     def delete_outdated(self):
         """
@@ -289,6 +289,9 @@ class TestFileUI:
     def get_test_opt_output_fpath(self, test, opt, output):
         return os.path.join(self.get_test_opt_output_folder(test, opt), output)
 
+    def get_test_opt_corresponding_diff_fpath(self, test, opt, outputfile):
+        diff = os.path.splitext(outputfile)[0] + ".diff"
+        return self.get_test_opt_output_fpath(test, opt, diff)
     def get_test_opt_corresponding_trace_fpath(self, test, opt, inputfile):
         trace = os.path.splitext(inputfile)[0] + ".trace"
         return self.get_test_opt_output_fpath(test, opt, trace)

@@ -8,7 +8,9 @@ class Printing:
     # class variable to toggle formatting
     can_format = sys.platform.startswith("linux")
 
-    def formatted(at_begin, at_end, *args, file=sys.stdout, flush=True, **kwargs):
+    def formatted(at_begin, at_end, *args, file=None, flush=True, **kwargs):
+        if file is None:
+            file=sys.stdout
         if Printing.can_format:
             print(at_begin, end='', file=file)
 

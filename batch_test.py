@@ -10,6 +10,7 @@ optimisation passes.
 import argparse
 import multiprocessing
 
+from ui.diff        import DiffUI
 from ui.interpreter import InterpreterUI
 from ui.multi       import MultiUI
 from ui.printer     import PrinterUI
@@ -58,7 +59,7 @@ def batch_opt(tfmanager, multi, opter, *, meta=True):
         if opt in tfmanager.get_test_opts(test):
             continue
         multi.prepare_process(
-                tfmanager.get_test_opt(test, opt),
+                "OPT :: " + tfmanager.get_test_opt(test, opt),
                 target=run_opt,
                 args=(test,),
                 stderr=tfmanager.get_test_opt_log(test, opt))
@@ -104,7 +105,6 @@ def batch_run(tfmanager, multi):
             outf = tfmanager.get_test_corresponding_output(test, inf)
 
             if outf not in tfmanager.get_test_output_files(test):
-                print(tfmanager.get_test_input_fpath(test, inf))
                 multi.prepare_process(
                         tfmanager.get_test_output_fpath(test, outf),
                         target=simulate,
@@ -125,7 +125,38 @@ def batch_run(tfmanager, multi):
 
     return multi.execute()
 
-            
+def batch_diff(tfmanager, multi):
+    """
+    Compare optimised outputs with original for inconsistencies.
+    """
+    # target process function
+    def run_diff(file1, file2):
+        ns = argparse.Namespace()
+        ns.PUIformat = False
+        ns.PUIdebug = False
+        ns.DUIwidth = 48
+        ns.DUIall = True
+        PrinterUI(ns)
+        diff = DiffUI(ns)
+
+        diff.read_files(file1, file2)
+        diff.display_diff()
+
+        exit(diff.files_differ)
+
+
+    # set up processes
+    for test in tfmanager.tests:
+        for opt in tfmanager.get_test_opts(test):
+            for outf in tfmanager.get_test_output_files(test):
+                multi.prepare_process(
+                        tfmanager.get_test_opt_corresponding_diff_fpath(test, opt, outf),
+                        target=run_diff,
+                        args=(tfmanager.get_test_output_fpath(test, outf),
+                                tfmanager.get_test_opt_output_fpath(test, opt, outf)),
+                        stdout=tfmanager.get_test_opt_corresponding_diff_fpath(test, opt, outf))
+
+    return multi.execute()
 
 
 
@@ -150,9 +181,21 @@ if __name__ == "__main__":
                     action="store_false",
                     help="Do not write metadata to optimised output code.")
 
-    opt_parser = subparsers.add_parser("run",
+    run_parser = subparsers.add_parser("run",
                     description="Generate output for corresponding inputs.",
                     help="Run code with provided inputs.")
+
+    diff_parser = subparsers.add_parser("diff",
+                    description="Produce diff between two files.",
+                    help="Diff two files.")
+    diff_parser.add_argument("file1",
+                    metavar="FILE",
+                    help="First file of diff.")
+    diff_parser.add_argument("file2",
+                    metavar="FILE",
+                    help="Second file of diff.")
+    DiffUI.add_arguments(diff_parser)
+
 
 
     args = argparser.parse_args()
@@ -168,8 +211,23 @@ if __name__ == "__main__":
 
         case "opt":
             opter = OptUI(args)
-            batch_opt(tfmanager, multi, opter, meta=args.meta)
+            res = batch_opt(tfmanager, multi, opter, meta=args.meta)
+            if any(ec for _, ec in res.items()):
+                exit(99)
 
         case "run":
-            batch_run(tfmanager, multi)
+            res = batch_run(tfmanager, multi)
+            if any(ec for _, ec in res.items()):
+                exit(99)
+            
+            tfmanager.rescan() # process newly-created files
+            dres = batch_diff(tfmanager, multi)
+            if any(ec for _, ec in dres.items()):
+                exit(99)
 
+        case "diff":
+            diff = DiffUI(args)
+            diff.read_files(args.file1, args.file2)
+            diff.display_diff()
+            exit(diff.files_differ)
+            
