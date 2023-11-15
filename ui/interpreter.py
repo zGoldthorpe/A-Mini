@@ -42,13 +42,20 @@ class InterpreterUI:
                 nargs="?",
                 help="Insert breakpoint at specified frequency (default: never)")
 
-    def __init__(self, parsed_args):
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(trace=parsed_args.IUItrace,
+                prompt=parsed_args.IUIprompt,
+                interrupt=parsed_args.IUIinterrupt,
+                brkpts=parsed_args.IUIbrkpts)
+
+    def __init__(self, trace=False, prompt=False, interrupt="never", brkpts=True):
         self._interpreter = ampy.interpret.Interpreter()
 
-        self.trace = parsed_args.IUItrace
-        self.prompt = parsed_args.IUIprompt
-        self.interrupt = parsed_args.IUIinterrupt
-        self.brkpts = parsed_args.IUIbrkpts
+        self.trace = trace
+        self.prompt = prompt
+        self.interrupt = interrupt
+        self.brkpts = brkpts
 
         # formatting for trace output
         self._trace_width = None

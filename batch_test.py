@@ -10,6 +10,8 @@ optimisation passes.
 import argparse
 import multiprocessing
 
+import utils.printing
+
 from ui.diff        import DiffUI
 from ui.interpreter import InterpreterUI
 from ui.multi       import MultiUI
@@ -27,30 +29,17 @@ def batch_opt(tfmanager, multi, opter, *, meta=True):
     
     # target process function
     def run_opt(test):
-        ns = argparse.Namespace()
-        # simulate inline arguments
-        # reader
-        ns.fname = tfmanager.get_test_ami(test)
-        # printer
-        ns.PUIformat = False
-        ns.PUIdebug = True
-        # writer
-        ns.WUImeta = meta
-        ns.WUIframe = None
-        ns.WUIoutput = tfmanager.get_test_opt(test, opt)
-
-        PrinterUI(ns)
-        reader = ReaderUI(ns)
-        writer = WriterUI(ns)
+        PrinterUI(can_format=False, debug=True)
+        reader = ReaderUI(fname=tfmanager.get_test_ami(test))
+        writer = WriterUI(meta=meta, frame=None,
+                fname=tfmanager.get_test_opt(test, opt))
         
         # parse
         reader.fetch_input()
         cfg = reader.build_cfg()
-
         # optimise
         opter.load_cfg(cfg)
         opter.execute_passes()
-
         # write
         writer.write(opter.CFG)
 
@@ -73,28 +62,15 @@ def batch_run(tfmanager, multi):
 
     # target process function
     def simulate(fname):
-        ns = argparse.Namespace()
-        # simulate inline arguments
-        # reader
-        ns.fname = fname
-        # printer
-        ns.PUIformat = False
-        ns.PUIdebug = True
-        # interpreter
-        ns.IUIprompt = False
-        ns.IUItrace = True
-        ns.IUIbrkpts = False
-        ns.IUIinterrupt = "never"
-        
-
-        PrinterUI(ns)
-        reader = ReaderUI(ns)
-        interpreter = InterpreterUI(ns)
-        
+        PrinterUI(can_format=False, debug=True)
+        reader = ReaderUI(fname=fname)
+        interpreter = InterpreterUI(prompt=False,
+                                trace=True,
+                                brkpts=False,
+                                interrupt="never")
         # parse
         reader.fetch_input()
         cfg = reader.build_cfg()
-
         # run
         interpreter.load_cfg(cfg)
         interpreter.run()
@@ -131,13 +107,8 @@ def batch_diff(tfmanager, multi):
     """
     # target process function
     def run_diff(file1, file2):
-        ns = argparse.Namespace()
-        ns.PUIformat = False
-        ns.PUIdebug = False
-        ns.DUIwidth = 48
-        ns.DUIall = True
-        PrinterUI(ns)
-        diff = DiffUI(ns)
+        PrinterUI(can_format=False, debug=False)
+        diff = DiffUI(fullcontent=True)
 
         diff.read_files(file1, file2)
         diff.display_diff()
@@ -172,6 +143,8 @@ if __name__ == "__main__":
     TestFileUI.add_arguments(argparser.add_argument_group("file management"))
 
     subparsers = argparser.add_subparsers(title="test types", dest="type")
+
+    ### opt arguments ###
     opt_parser = subparsers.add_parser("opt",
                     description="Apply optimisation passes to code suite.",
                     help="Pass optimisations.")
@@ -180,11 +153,13 @@ if __name__ == "__main__":
                     dest="meta",
                     action="store_false",
                     help="Do not write metadata to optimised output code.")
-
+    
+    ### run arguments ###
     run_parser = subparsers.add_parser("run",
                     description="Generate output for corresponding inputs.",
                     help="Run code with provided inputs.")
 
+    ### diff arguments ###
     diff_parser = subparsers.add_parser("diff",
                     description="Produce diff between two files.",
                     help="Diff two files.")
@@ -199,10 +174,10 @@ if __name__ == "__main__":
 
 
     args = argparser.parse_args()
-    PrinterUI(args)
+    PrinterUI.arg_init(args)
 
-    multi = MultiUI(args)
-    tfmanager = TestFileUI(args)
+    multi = MultiUI.arg_init(args)
+    tfmanager = TestFileUI.arg_init(args)
 
     tfmanager.verify_folder_integrity()
     tfmanager.delete_outdated()
@@ -210,23 +185,26 @@ if __name__ == "__main__":
     match args.type:
 
         case "opt":
-            opter = OptUI(args)
+            utils.printing.phidden("batch_opt :: updating optimised files")
+            opter = OptUI.arg_init(args)
             res = batch_opt(tfmanager, multi, opter, meta=args.meta)
             if any(ec for _, ec in res.items()):
                 exit(99)
 
         case "run":
+            utils.printing.phidden("batch_run :: updating output files")
             res = batch_run(tfmanager, multi)
             if any(ec for _, ec in res.items()):
                 exit(99)
             
+            utils.printing.phidden("batch_diff :: checking output file correctnesss")
             tfmanager.rescan() # process newly-created files
             dres = batch_diff(tfmanager, multi)
             if any(ec for _, ec in dres.items()):
                 exit(99)
 
         case "diff":
-            diff = DiffUI(args)
+            diff = DiffUI.arg_init(args)
             diff.read_files(args.file1, args.file2)
             diff.display_diff()
             exit(diff.files_differ)

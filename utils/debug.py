@@ -13,7 +13,10 @@ import utils.printing
 
 enabled = False
 
-def print(obj, *args, **kwargs):
+def print(obj, *args, print_func=None, **kwargs):
     global enabled
     if enabled:
-        utils.printing.pdebug(obj, "::", *args, **kwargs, file=sys.stderr)
+        if print_func is None:
+            print_func = utils.printing.pdebug
+
+        print_func(obj, "::", *args, **kwargs, file=sys.stderr)

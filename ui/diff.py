@@ -25,9 +25,14 @@ class DiffUI:
                         action="store_true",
                         help="Display the contents of both files lined up, rather than isolating just the lines around differences.")
 
-    def __init__(self, parsed_args):
-        self._width = parsed_args.DUIwidth
-        self._all = parsed_args.DUIall
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(width=parsed_args.DUIwidth,
+                fullcontent=parsed_args.DUIall)
+
+    def __init__(self, width=48, fullcontent=False):
+        self._width = width
+        self._all = fullcontent
         if self._width <= 0:
             die("Diff page width cannot be zero.")
     

@@ -44,11 +44,15 @@ class MultiUI:
             pass
         return open(file, mode)
 
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(max_procs=parsed_args.MUImax_procs,
+                timeout=parsed_args.MUItimeout)
 
-    def __init__(self, parsed_args):
+    def __init__(self, max_procs=32, timeout=None):
 
-        self.max_procs = parsed_args.MUImax_procs
-        self.timeout = parsed_args.MUItimeout # could be None
+        self.max_procs = max_procs
+        self.timeout = timeout
         
         self._proc_queue = collections.deque()
         self._running_procs = {} # map from ID to process
@@ -109,7 +113,8 @@ class MultiUI:
                     if exit_code[ID] != 0:
                         perror(f"Process {ID} terminated with nonzero exit code {exit_code[ID]}.")
                     else:
-                        utils.debug.print(ID, f"process terminated in {runtime[ID]:.3f}s.")
+                        utils.debug.print(ID, f"process terminated in {runtime[ID]:.3f}s.",
+                                print_func=utils.printing.psuccess)
                     del self._running_procs[ID]
 
         overall_time = time.time() - overall_time

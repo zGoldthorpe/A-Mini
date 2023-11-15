@@ -33,18 +33,26 @@ class TestFileUI:
                         action="store_true",
                         help="Equivalent to -Xvfy -Xout")
 
-    def __init__(self, parsed_args):
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(folders=parsed_args.TFUIfolders,
+                clear_vfy=parsed_args.TFUIclear_vfy,
+                clear_out=parsed_args.TFUIclear_out,
+                clear=parsed_args.TFUIclear)
 
-        if parsed_args.TFUIfolders is None:
+
+    def __init__(self, folders=None, clear_vfy=False, clear_out=False, clear=False):
+
+        if folders is None:
             self.folders = ["code/"]
         else:
-            self.folders = parsed_args.TFMfolders
+            self.folders = folders
 
         self.rescan()
         
-        if parsed_args.TFUIclear_vfy or parsed_args.TFUIclear:
+        if clear_vfy or clear:
             self.delete_vfy()
-        if parsed_args.TFUIclear_out or parsed_args.TFUIclear:
+        if clear_out or clear:
             self.delete_out()
 
     def rescan(self):

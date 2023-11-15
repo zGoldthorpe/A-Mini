@@ -32,9 +32,15 @@ class WriterUI:
                 help="""Specify destination file for optimised A-Mi code.
                         If omitted, will be printed to STDOUT.""")
 
-    def __init__(self, parsed_args):
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(frame=parsed_args.WUIframe,
+                meta=parsed_args.WUImeta,
+                fname=parsed_args.WUIoutput)
+
+    def __init__(self, frame=None, meta=True, fname=None):
         # parse frame formatting
-        if parsed_args.WUIframe is None:
+        if frame is None:
             tab, code = 4, 96 # good ol' hardcoded integers
         else:
             try:
@@ -54,9 +60,9 @@ class WriterUI:
                 code = None
 
         self._writer = ampy.writer.CFGWriter(
-                write_meta=parsed_args.WUImeta,
+                write_meta=meta,
                 tabwidth=tab, codewidth=code)
-        self._fname = parsed_args.WUIoutput
+        self._fname = fname
 
     def write(self, cfg):
         if self._fname is not None:

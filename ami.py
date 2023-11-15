@@ -26,10 +26,10 @@ if __name__ == "__main__":
     OptUI.add_arguments(argparser.add_argument_group("optimisation"))
 
     args = argparser.parse_args()
-    PrinterUI(args)
-    reader = ReaderUI(args)
-    interpreter = InterpreterUI(args)
-    opter = OptUI(args)
+    PrinterUI.arg_init(args)
+    reader = ReaderUI.arg_init(args)
+    interpreter = InterpreterUI.arg_init(args)
+    opter = OptUI.arg_init(args)
 
     ### parse source or stdin ###
     reader.fetch_input()

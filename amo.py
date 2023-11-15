@@ -27,10 +27,10 @@ if __name__ == "__main__":
     # managing optimisations
 
     args = argparser.parse_args()
-    PrinterUI(args)
-    reader = ReaderUI(args)
-    opter = OptUI(args)
-    writer = WriterUI(args)
+    PrinterUI.arg_init(args)
+    reader = ReaderUI.arg_init(args)
+    opter = OptUI.arg_init(args)
+    writer = WriterUI.arg_init(args)
 
     ### parse source or stdin ###
     reader.fetch_input()

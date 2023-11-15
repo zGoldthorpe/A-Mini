@@ -107,20 +107,27 @@ class OptUI:
         if opt in OM:
             return OM[opt], opt_args, opt_kwargs
 
-    def __init__(self, parsed_args):
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(ls=parsed_args.OUIls,
+                explain=parsed_args.OUIexplain,
+                fullyexplain=parsed_args.OUIfullyexplain,
+                passes_ls=parsed_args.OUIpasses)
+
+    def __init__(self, ls=False, explain=None, fullyexplain=None, passes_ls=[]):
         self._optlist = OptList()
 
-        if parsed_args.OUIls:
+        if ls:
             self.list_passes()
             exit()
-        if parsed_args.OUIexplain is not None:
-            self.explain_pass(parsed_args.OUIexplain)
+        if explain is not None:
+            self.explain_pass(explain)
             exit()
-        if parsed_args.OUIfullyexplain is not None:
-            self.fully_explain_pass(parsed_args.OUIfullyexplain)
+        if fullyexplain is not None:
+            self.fully_explain_pass(fullyexplain)
             exit()
 
-        self._passes_ls = parsed_args.OUIpasses
+        self._passes_ls = passes_ls
 
     def load_cfg(self, cfg):
         """

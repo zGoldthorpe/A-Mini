@@ -20,7 +20,13 @@ class PrinterUI:
                 action="store_true",
                 help="Enable debug messages")
 
-    def __init__(self, parsed_args):
-        utils.debug.enabled = parsed_args.PUIdebug
-        utils.printing.Printing.can_format &= parsed_args.PUIformat
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(debug=parsed_args.PUIdebug,
+                can_format=parsed_args.PUIformat)
+
+
+    def __init__(self, debug=False, can_format=True):
+        utils.debug.enabled = debug
+        utils.printing.Printing.can_format &= can_format
 

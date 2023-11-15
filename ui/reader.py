@@ -24,9 +24,13 @@ class ReaderUI:
                 help="""File containing plaintext A-Mi instructions.
                         If omitted, code will be read through STDIN.""")
 
-    def __init__(self, parsed_args):
+    @classmethod
+    def arg_init(cls, parsed_args):
+        return cls(fname=parsed_args.fname)
+
+    def __init__(self, fname):
         self._instructions = []
-        self._fname = parsed_args.fname
+        self._fname = fname
 
     def fetch_input(self):
         """
