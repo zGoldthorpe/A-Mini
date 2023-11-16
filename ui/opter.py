@@ -107,6 +107,7 @@ class OptUI:
 
         if opt in OM:
             return OM[opt], opt_args, opt_kwargs
+        die(f"Cannot recognise pass {opt}.")
 
     @classmethod
     def arg_init(cls, parsed_args):
@@ -157,7 +158,8 @@ class OptUI:
 
     def execute_passes(self):
         start_time = time.process_time()
-        for opt in self._optlist:
+        for opt in list(self._optlist):
+            # copy list in case opt calls append new opts
             try:
                 opt.perform_opt()
             except OptError as e:
