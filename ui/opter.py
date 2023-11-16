@@ -16,6 +16,7 @@ from ampy.passmanager import (
         BadArgumentException,
         Pass_ID_re,
         )
+import ampy.types
 
 from opt import OptManager as OM
 from opt.tools import Opt, OptList, OptError
@@ -127,7 +128,9 @@ class OptUI:
             self.fully_explain_pass(fullyexplain)
             exit()
 
-        self._passes_ls = passes_ls
+        if passes_ls is None:
+            passes_ls = ()
+        self._passes_ls = tuple(self.parse_pass(opt) for opt in passes_ls)
 
     def load_cfg(self, cfg):
         """
@@ -135,8 +138,8 @@ class OptUI:
         """
         self._cfg = cfg
         if self._passes_ls is not None:
-            for opt in self._passes_ls:
-                self.add_pass(*self.parse_pass(opt))
+            for opt, args, kwargs in self._passes_ls:
+                self.add_pass(opt, args, kwargs)
 
 
     def add_pass(self, Pass:type, args:tuple, kwargs:dict):
@@ -169,7 +172,9 @@ class OptUI:
         """
         Tuple of passes as given from the command line.
         """
-        return tuple(self._passes_ls) if self._passes_ls is not None else ()
+        # this is a little hacky to trick opt to initialise with
+        # an empty CFG and an empty 
+        return tuple(opt(ampy.types.CFG(), OptList(), *args, **kwargs).name for opt, args, kwargs in self._passes_ls)
 
 
     @property
