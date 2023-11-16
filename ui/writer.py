@@ -28,6 +28,7 @@ class WriterUI:
         parser.add_argument("-o", "--output",
                 dest="WUIoutput",
                 action="store",
+                metavar="<opt.ami>",
                 type=str,
                 help="""Specify destination file for optimised A-Mi code.
                         If omitted, will be printed to STDOUT.""")
