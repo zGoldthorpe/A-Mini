@@ -41,3 +41,7 @@ __pycache__/
 *.exe
 *.out
 *.app
+
+# Misc
+*.hide
+*.test
