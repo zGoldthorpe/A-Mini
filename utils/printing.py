@@ -34,7 +34,7 @@ def pquery(*args, **kwargs):
 def psubtle(*args, **kwargs):
     Printing.formatted("\033[36m", "\033[m", *args, **kwargs)
 def phidden(*args, **kwargs):
-    Printing.formatted("\033[37m", "\033[m", *args, **kwargs)
+    Printing.formatted("\033[2m", "\033[m", *args, **kwargs)
 
 
 def tame_whitespace(src:str, indent_second_line=False, tab_width=4):

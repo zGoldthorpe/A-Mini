@@ -19,8 +19,6 @@ class DCE(Opt):
 
 class DCE(DCE):
     """
-    dce
-
     Eliminates definitions that do not eventually lead to a branch condition
     or a write to output.
     """

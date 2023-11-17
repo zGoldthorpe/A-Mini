@@ -19,8 +19,6 @@ class DefAnalysis(Opt):
 
 class DefAnalysis(DefAnalysis):
     """
-    defs
-
     Records the definitions and uses of all variables,
     recording the result in global metadata.
 

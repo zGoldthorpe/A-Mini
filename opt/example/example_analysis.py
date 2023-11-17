@@ -27,18 +27,14 @@ class ExampleAnalysis(Opt):
 
 class ExampleAnalysis(ExampleAnalysis):
     """
-    example_analysis(track, *, count)
-
     Example analysis pass to demonstrate some opt functionality.
     Locally indexes every instruction in each block.
 
-    track: "add" or "mul"
+    instr_tracker: "add" or "mul"
         for each block, track indices of adds or mults, resp.
-        (default "add")
 
     count="blocks" or "instructions":
         counts the total number of blocks or instructions in CFG
-        (default "blocks")
     """
     # every class should have a docstring
 
@@ -109,6 +105,23 @@ class ExampleAnalysis(ExampleAnalysis):
         # since this is an analysis pass, it does not affect the CFG
         # therefore, return all opts as "preserved"
         return self.opts
+
+    @ExampleAnalysis.getter
+    @(Syntax(object) >> int)
+    def get_count(self):
+        """
+        Fetch the number of blocks or instructions
+        """
+        return int(self[f"num_{self.count}"])
+
+    @ExampleAnalysis.getter
+    @(Syntax(object, ampy.types.BasicBlock) >> [int])
+    def get_op_indices(self, block):
+        """
+        Return the list of instruction indices of the adds or multiplications
+        in the given block
+        """
+        return list(map(int, self[block:self.var]))
 
 class AddLister(RequiresOpt):
     """

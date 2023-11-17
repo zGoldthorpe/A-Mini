@@ -18,8 +18,6 @@ class LiveAnalysis(Opt):
 
 class LiveAnalysis(LiveAnalysis):
     """
-    live
-
     Determines the live-in and live-out sets for every block and instruction.
     Note: liveness of a variable in a phi node is fuzzy.
     If a block @A has a phi node

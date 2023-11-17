@@ -23,8 +23,6 @@ class NaiveSimplify(Opt):
 
 class NaiveSimplify(NaiveSimplify):
     """
-    gvn-simplify-naive
-
     Uses gvn-simple information to eliminate redundant definitions.
     Does not hoist or do anything advanced.
 

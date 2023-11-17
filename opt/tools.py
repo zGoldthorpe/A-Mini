@@ -7,8 +7,9 @@ This module provides classes for reading and writing metadata
 for analysing a CFG, as well as optimising the CFG
 """
 
-import re
 import functools
+import inspect
+import re
 
 import utils.debug
 from utils.syntax import (
@@ -44,10 +45,38 @@ class Opt:
         """
         cls.ID = ID
         def Opt_init_wrapper(initfunc):
+            # extract function arguments
+            argspec = inspect.getfullargspec(initfunc)
+            cls.positional_arguments = tuple(zip(argspec.args[1:], def_args))
+            cls.keyword_arguments = tuple((kw,def_kwargs[kw]) for kw in argspec.kwonlyargs)
+
+            # now produce the "help" header
+            positional = ", ".join(argspec.args[1:])
+            positional_defs = ", ".join(val for _, val in cls.positional_arguments)
+            keyword = ", ".join(argspec.kwonlyargs)
+            keyword_defs = ", ".join(f"{var}={val}" for var, val in cls.keyword_arguments)
+            if len(positional) > 0:
+                if len(keyword) > 0:
+                    arg_str = f"({positional}, *, {keyword})"
+                    arg_defs = f"({positional_defs}, {keyword_defs})"
+                else:
+                    arg_str = f"({positional}, /)"
+                    arg_defs = f"({positional_defs})"
+            elif len(keyword) > 0:
+                arg_str = f"(*, {keyword})"
+                arg_defs = f"({keyword_defs})"
+            else:
+                arg_str = ""
+                arg_defs = ""
+
+            cls.generic = f"{cls.ID}{arg_str}"
+            cls.generic_defs = f"{cls.ID}{arg_defs}"
+            ### above code is meant for the class docstring ###
 
             @functools.wraps(initfunc)
             @(Syntax(object, ampy.types.CFG, ((TypedList, [Opt]),), str, ...).set_allow_extra_kwargs(True, str) >> None)
             def Opt_init_wrap(self, cfg, opts, *args, **kwargs):
+
                 args = list(args)
                 if len(args) > len(def_args):
                     raise BadArgumentException(f"{cls.ID} expects at most {len(def_args)} positional argument{'s' if len(def_args) != 1 else ''}; received {len(args)}.")

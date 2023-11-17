@@ -53,7 +53,7 @@ class OptUI:
         """
         utils.printing.psubtle("Optimisation passes:")
         spaces = max(len(opt) for opt in OM)
-        for opt in sorted(OM):
+        for opt in sorted(OM, key=lambda opt: cls._pass_class(opt)):
             utils.printing.pquery(f"\t{opt: <{spaces}}", end=' ')
             utils.printing.phidden(f"({cls._pass_class(opt)})")
 
@@ -73,9 +73,12 @@ class OptUI:
         """
         if passid not in OM:
             die(f"Unrecognised pass {passid}")
-        utils.printing.psubtle(passid, end=' ')
-        utils.printing.phidden(f"({cls._pass_class(passid)})")
         Pass = OM[passid]
+        utils.printing.psubtle(Pass.ID, end=' ')
+        if Pass.generic_defs != Pass.ID:
+            utils.printing.psubtle("=", Pass.generic_defs, end=' ')
+        utils.printing.phidden(f"({cls._pass_class(passid)})\n")
+        utils.printing.pquery(Pass.generic)
         if Pass.__doc__ is not None:
             utils.printing.pquery(Pass.__doc__)
 

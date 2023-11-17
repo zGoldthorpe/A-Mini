@@ -18,8 +18,6 @@ class BranchElim(Opt):
 
 class BranchElim(BranchElim):
     """
-    branch-elim
-
     Simplifies control flow graph: simplifies branches, and merges
     basic blocks where possible.
     """

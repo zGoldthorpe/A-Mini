@@ -27,8 +27,6 @@ class DomTreeAnalysis(Opt):
 
 class DomTreeAnalysis(DomTreeAnalysis):
     """
-    domtree
-
     Runs the Lengauer-Tarjan algorithm for computing the dominator
     tree for a control flow graph.
     """

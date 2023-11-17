@@ -26,8 +26,6 @@ class RPO(Opt):
 
 class RPO(RPO):
     """
-    gvn-simple(mode)
-
     Runs a simple version of Simpson's RPO GVN algorithm
 
     mode: "simple" or "poly"

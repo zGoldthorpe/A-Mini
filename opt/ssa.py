@@ -31,8 +31,6 @@ class SSA(Opt):
 
 class SSA(SSA):
     """
-    ssa
-
     Runs the Cytron-Ferrante algorithm for converting code
     into static single assignment form.
     """

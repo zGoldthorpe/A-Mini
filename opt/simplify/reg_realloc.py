@@ -29,16 +29,13 @@ class RR(Opt):
 
 class RR(RR):
     """
-    reg-realloc(num, /)
-
     Reduce number of registers used. (Obfuscates register names)
 
-    num: int
+    num_reg: int
         Number of registers to try and allocate to.
         Pass will target the maximum between this input number and the
         lower bound it determines via live analysis.
         This is used to determine \"spillage\".
-        (default: 0)
     """
 
     @RR.init("reg-realloc", "0")

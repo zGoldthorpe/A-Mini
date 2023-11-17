@@ -14,6 +14,7 @@ will add goto instructions to break up the
 code into blocks of specified maximum size.
 (Or pass -1 to avoid trimming block size.)
 """
+
 from utils.syntax import Syntax
 
 from ampy.passmanager import BadArgumentException
@@ -22,7 +23,7 @@ import ampy.types
 from opt.tools import Opt
 
 ### required opts ###
-from opt.analysis.example_analysis import ExampleAnalysis
+from opt.example.example_analysis import ExampleAnalysis
 
 class ExampleOpt(Opt):
     # forward declaration
@@ -30,18 +31,14 @@ class ExampleOpt(Opt):
 
 class ExampleOpt(ExampleOpt):
     """
-    example_opt(swap, *, max_block_size)
-
     Example pass to demonstrate optimisation functionality.
     
     swap: "add" or "mul"
         for each add or mul instruction, swap the operands.
-        (default "add")
 
     max_block_size=int:
         if -1, does nothing; otherwise, cuts blocks into
         chunks of specified maximum size
-        (default -1)
     """
     # every class should have a docstring
 
@@ -77,16 +74,26 @@ class ExampleOpt(ExampleOpt):
         # every Opt must have exactly one opt method
         # its name is unimportant, but MUST be decorated as above.
         
+        analysis = self.require(ExampleAnalysis, self.swap, count=any)
+        # fetch the required analysis (we do not care about the `count` arg)
+
+        changed = False
         for block in list(self.CFG):
-            swaps = self.require(ExampleAnalysis, self.swap, count=any)[block:f"{self.swap}_indices"]
-            # fetch results from the example analysis (can also omit the count kwarg)
-            for i_str in swaps:
-                i = int(i_str)
+            swaps = analysis.get_op_indices(block)
+            for i in swaps:
+                changed = True
                 (op1, op2) = block[i].operands
                 block[i].operands = (op2, op1)
 
-        preserved = tuple(opt for opt in self.opts
+        # if this transformation made any changes, we need to track
+        # its changes
+        if changed:
+            preserved = tuple(opt for opt in self.opts
                         if isinstance(opt, (ExampleAnalysis, ExampleOpt)))
+        else:
+            preserved = self.opts
+
+        ### now to go to round 2
 
         if self.max_size != -1:
             # time to trim basic blocks
@@ -132,7 +139,7 @@ class ExampleOpt(ExampleOpt):
             if changed:
                 # this action is quite destructive, so it's unlikely any
                 # analysis survives it
-                preserved = tuple(opt for opt in self.opts
+                preserved = tuple(opt for opt in preserved
                             if isinstance(opt, ExampleOpt))
 
         # opt method MUST return list or tuple of all preserved opts

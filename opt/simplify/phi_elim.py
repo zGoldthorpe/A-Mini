@@ -21,8 +21,6 @@ class PhiElim(Opt):
 
 class PhiElim(PhiElim):
     """
-    phi-elim
-
     Simple phi-elimination pass; doesn't do anything fancy.
     """
 
