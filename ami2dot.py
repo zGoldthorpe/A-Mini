@@ -27,19 +27,19 @@ if __name__ == "__main__":
     args = argparser.parse_args()
 
     PrinterUI(debug=False, can_format=False) # disable debug output
+    reader = ReaderUI.arg_init(args)
+    opter = OptUI.arg_init(args)
+    dot = DotUI.arg_init(args)
 
     ### parse source or stdin ###
-    reader = ReaderUI.arg_init(args)
     reader.fetch_input()
     cfg = reader.build_cfg()
 
     ### optimise ###
-    opter = OptUI.arg_init(args)
     opter.load_cfg(cfg)
     opter.execute_passes()
 
     ### print DOT ###
-    dot = DotUI.arg_init(args)
     dot.print_dot(opter.CFG)
 
     
