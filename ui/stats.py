@@ -95,6 +95,8 @@ class StatUI:
             if isinstance(val, float):
                 mathmode = True
                 modifier = f".{self._prec}f"
+                if val > 1e25:
+                    return r"$\infty$" if self._style == "latex" else "inf"
             if self._relative is not None:
                 if self._relative.startswith('+'):
                     modifier = '+' + modifier
@@ -119,12 +121,12 @@ class StatUI:
                     return lambda arg: func(arg) - baseline[param]
                 case '+%':
                     if flip:
-                        return lambda arg: (baseline[param] - func(arg))/baseline[param]
-                    return lambda arg: (func(arg) - baseline[param]) / baseline[param]
+                        return lambda arg: (baseline[param] - func(arg))/(baseline[param]+1e-100)
+                    return lambda arg: (func(arg) - baseline[param]) / (baseline[param]+1e-100)
                 case 'x' | 'x%':
                     if flip:
-                        return lambda arg: baseline[param] / func(arg)
-                    return lambda arg: func(arg) / baseline[param]
+                        return lambda arg: baseline[param] / (func(arg)+1e-100)
+                    return lambda arg: func(arg) / (baseline[param]+1e-100)
                 case _:
                     die(f"Unrecognised relativity specifier {self._relative}.")
 

@@ -327,8 +327,6 @@ if __name__ == "__main__":
     StatUI.add_arguments(stats_parser)
     stats_parser.add_argument("stat",
                     choices=("code", "trace"),
-                    const="code",
-                    nargs="?",
                     help="Specify which statistics to report on.")
 
     args = argparser.parse_args()

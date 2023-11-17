@@ -45,7 +45,7 @@ class OperationReader:
         Otherwise, returns the instruction class instance produced
         from parsing.
         """
-        m = self._syntax.fullmatch(_clean_whitespace(instruction))
+        m = self._syntax.fullmatch(_preprocess(instruction))
         if m is None:
             return None
         return self._cls(*self._extract(m))
@@ -105,9 +105,21 @@ _opcodes = dict(
             rf"{_var} = {_op} - {_op}",
             ampy.types.SubInstruction,
             ),
+        neg = OperationReader(
+            rf"{_var} = - {_op}",
+            ampy.types.NegInstruction, # phony
+            ),
         mul = OperationReader(
             rf"{_var} = {_op} \* {_op}",
             ampy.types.MulInstruction,
+            ),
+        div = OperationReader(
+            rf"{_var} = {_op} / {_op}",
+            ampy.types.DivInstruction,
+            ),
+        mod = OperationReader(
+            rf"{_var} = {_op} % {_op}",
+            ampy.types.ModInstruction,
             ),
         # comparisons
         eq  = OperationReader(
@@ -122,9 +134,42 @@ _opcodes = dict(
             rf"{_var} = {_op} < {_op}",
             ampy.types.LtInstruction,
             ),
+        gt  = OperationReader(
+            rf"{_var} = {_op} > {_op}",
+            ampy.types.GtInstruction,
+            ),
         leq = OperationReader(
             rf"{_var} = {_op} <= {_op}",
             ampy.types.LeqInstruction,
+            ),
+        geq = OperationReader(
+            rf"{_var} = {_op} >= {_op}",
+            ampy.types.GeqInstruction,
+            ),
+        # bitwise
+        land = OperationReader(
+            rf"{_var} = {_op} & {_op}",
+            ampy.types.AndInstruction,
+            ),
+        lor = OperationReader(
+            rf"{_var} = {_op} | {_op}",
+            ampy.types.OrInstruction,
+            ),
+        xor = OperationReader(
+            rf"{_var} = {_op} \^ {_op}",
+            ampy.types.XOrInstruction,
+            ),
+        lnot = OperationReader(
+            rf"{_var} = ~{_op}",
+            ampy.types.NotInstruction,
+            ),
+        lshift = OperationReader(
+            rf"{_var} = {_op} << {_op}",
+            ampy.types.LShiftInstruction,
+            ),
+        rshift = OperationReader(
+            rf"{_var} = {_op} >> {_op}",
+            ampy.types.RShiftInstruction,
             ),
         # branching
         goto = OperationReader(
@@ -217,6 +262,8 @@ class CFGBuilder:
                 self._block_start = i
                 self._last_instruction = None
                 self._block_label, instruction = instruction.split(':', 1)
+                if re.fullmatch(_lbl, self._block_label) is None:
+                    raise ParseError(i, f"Invalid label \"{self._block_label}\".")
 
             instruction = instruction.strip() # strip whitespace
 
@@ -334,9 +381,12 @@ class EmptyCFGError(ParseError):
 
 ### Private helper methods ###
 
-def _clean_whitespace(instr):
+def _preprocess(instr):
     """
-    Cleans up instruction whitespace
+    Cleans up instruction
     """
+    instr = re.sub(r"\s+", ' ', instr)
+    instr = re.sub(r"(\W)(-?0x[0-9a-fA-F]+)", # convert hex
+            lambda m: m.group(1) + str(int(m.group(2), base=16)), instr)
     return ' '.join(instr.strip().split())
 

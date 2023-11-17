@@ -11,7 +11,7 @@ python3 ami2dot.py code.ami | dot -Tpdf > code.pdf
 ```
 will produce a PDF visualising the CFG for `code.ami`.
 
-The script `ami2dot.py` can also run the input code through [optimisation passes](docs/amo.md) prior to producing DOT output.
+The script `ami2dot.py` can also run the input code through [optimisation passes](amo.md) prior to producing DOT output.
 Run
 ```console
 python3 ami2dot.py -h
@@ -40,7 +40,7 @@ into the more terse
 ```
 %x = phi(%a, %b, 9)
 ```
-Note, however, that the information lost through this simplification may not be recoverable: the order of arguments to the `phi` node will likely be unrelated to the relative positions of incoming arrows in the CFG!
+> *Note.* The information lost through this simplification may not be recoverable: the order of arguments to the `phi` node will likely be unrelated to the relative positions of incoming arrows in the rendered DOT graph!
 
 ### Pseudocode
 

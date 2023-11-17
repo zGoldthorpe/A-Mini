@@ -92,6 +92,10 @@ class InterpreterUI:
             except ampy.interpret.BreakpointInterrupt as e:
                 if self.brkpts:
                     self.debugger(e.name)
+            except ampy.interpret.UnknownInstructionError as e:
+                die(f"Unknown instruction at {e.block.label}:{e.instruction_index}:\n\t{e.message}")
+            except ampy.interpret.InstructionException as e:
+                die(f"An exception occurred at {e.block.label}:{e.instruction_index}:\n\t{e.message}")
             
             if not self.brkpts or self.interrupt == "never" or isinstance(I, ampy.types.BrkInstruction):
                 continue
@@ -141,7 +145,16 @@ class InterpreterUI:
         Open debug interface during breakpoint
         """
         utils.printing.pprompt("Reached breakpoint", brkpt)
+        showprompt = True
         while True:
+
+            if showprompt:
+                utils.printing.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
+                utils.printing.pquery("Enter nothing to exit debugger and resume execution.")
+                utils.printing.pquery("Enter \"h\" to print this help message again.")
+                utils.printing.pquery("Enter \"exit\" to terminate execution and quit.")
+                showprompt = False
+
             utils.printing.pprompt(f"(ami-db)", end=' ', flush=True)
             try:
                 q = input().lower().strip()
@@ -154,13 +167,14 @@ class InterpreterUI:
                 unexpected(e)
 
             if len(q) == 0:
+                utils.printing.pquery("Resuming program execution.")
                 return
 
             if q.startswith('h'):
-                utils.printing.pquery("Press <enter> to resume execution.")
-                utils.printing.pquery("Enter a space-separated list of register names or regex patterns to query register values.")
-                utils.printing.pquery("Enter \"exit\" to terminate execution and quit.")
+                showprompt = True
+                continue
             if q == "exit":
+                utils.printing.pquery("Exiting program.")
                 exit()
 
             queries = set()

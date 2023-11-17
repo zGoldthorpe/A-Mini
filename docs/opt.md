@@ -12,8 +12,10 @@ opt/example/example_opt.py
 1. [The initialiser](#the-initialiser)
 1. [The optimiser](#the-optimiser)
 1. [Managing metadata](#managing-metadata)
+1. [Debugging](#debugging)
 1. [Bootstrapping off other passes](#bootstrapping-off-other-passes)
 1. [Registering the pass](#registering-the-pass)
+1. [Testing](#testing)
 
 ## Boilerplate
 
@@ -53,7 +55,7 @@ class ExampleAnalysis(ExampleAnalysis):
         # ...
 ```
 
-The first argument passed to `ExampleAnalysis.init` specifies the pass ID, which is how [`amo.py`](docs/amo.md) (or other optimisation scripts) will refer to the pass after it is registered.
+The first argument passed to `ExampleAnalysis.init` specifies the pass ID, which is how [`amo.py`](amo.md) (or other optimisation scripts) will refer to the pass after it is registered.
 
 The next arguments describe the **default values for all arguments** of the pass.
 In particular, all arguments to a pass must be optional and have default parameters.
@@ -204,6 +206,22 @@ These custom methods also have other advantages:
 - Unlike the generic metadata `get` call, these methods are visible to Python and its `help` builtin method.
 - The generic `get` call either returns `None` or a list of strings, which can be inconvenient if the metadata is meant to represent a single integer, for instance. This can be fixed with custom `getter` methods.
 
+## Debugging
+
+It is likely very helpful (even after the optimisation pass is made to work without error) to litter the optimisation pass with debugging information.
+
+To print to the debugger, call the inherited method
+```python
+Opt.debug(*args, **kwargs)
+```
+which is effectively a decorated version of Python's built-in `print` function (and thus behaves similarly), but standardises the output between passes (all of which will be printing to the same debugger).
+
+The debugger is disabled by default by the interpreter `ami.py` and optimiser `amo.py`.
+To enable debug output, just pass the `-D` argument:
+```console
+python3 amo.py --add-pass="pass" -D path/to/code.ami
+```
+
 ## Bootstrapping off other passes
 
 The previous section describes how to write metadata and read your own metadata.
@@ -264,3 +282,99 @@ somewhere near the bottom of `opt/__init__.py`.
 
 > *Note.* The relative position of these registered passes has no bearing on anything.
 > If pass IDs are not unique, the `OptManager` will complain.
+
+## Testing
+
+It is important to ensure that any pass is correct, and efficient.
+To help do so, we have the `batch_test.py` script.
+```console
+python3 batch_test.py --add-folder code/folder {test} [test options]
+```
+the `--add-folder` option to point to a folder for testing (you can pass `--add-folder` multiple times to test multiple folders).
+If unspecified, the script will test on the entire `code/` folder.
+
+The option `{test}` is required, and specifies which test to run, which is one of `opt`, `run`, and `stats`.
+
+As usual, running
+```console
+python3 batch_test.py -h
+```
+displays all options and their explanations and usage.
+
+### The `opt` test
+```console
+python3 batch_test.py [...] opt --add-pass="pass"
+```
+
+The `opt` flag tells the script to apply optimisation passes to all code in the specified folder(s).
+The syntax for passes is the same as for [`amo.py`](amo.md).
+
+The purpose of this test is to ensure that the optimisation at least runs without throwing any errors.
+
+Optimised code for `code/foo/bar.ami` is saved in `code/foo/bar.vfy/` with the name given by the sequence of passes executed.
+To delete these folders (without deleting the original `ami` files), run
+```console
+python3 batch_test.py --clear-vfy
+```
+
+### The `run` test
+```console
+python3 batch_test.py [...] run
+```
+
+After the `opt` test, `run` checks that the output files have the same input/output behaviour as the original file.
+To do so, the `run` test expects sample input data to `code/foo/bar.ami` as `*.in` files in the folder `code/foo/bar.in/`.
+
+The script will first generate test output for each input using the original scripts, storing them in `code/foo/bar.out/`.
+The script will likewise generate output for each input applied to the various optimised codes found in `code/foo/bar.vfy/`.
+
+After all of the output is generated, the script will conclude with a pass verifying that the outputs line up, complaining otherwise.
+
+If files disagree, you can see their diff by running
+```console
+python3 batch_test.py diff code/foo/bar.out/test.out code/foo/bar.vfy/opt.out/test.out
+```
+(which has pretty and colourful output, or you can just use the usual `diff` command).
+> *Note.* The diff output is also saved in `code/foo/bar.vfy/opt.out/test.diff`.
+
+To clear the output folders (but not the optimised code), run
+```console
+python3 batch_test.py --clear-out
+```
+
+To clear all generated files (therefore only keeping the original code and the input files), run
+```console
+python3 batch_test.py --clear
+```
+
+### `stats`
+
+The `run` test generates `diff` files as well as `trace` files, the latter containing the execution path of both the original and optimised programs.
+There are two options:
+```console
+python3 batch_test.py [...] stats code
+python3 batch_test.py [...] stats trace
+```
+The `code` option analyses the effect of the optimisation on code: in particular, it indicates for each program:
+- the total number of instructions
+- the total number of basic blocks
+- the total number of virtual registers
+- the number of `phi` nodes
+and compares them with each other and the original.
+
+The `trace` option analyses the runtime information.
+Since "runtime" is likely not very meaningful (the language is simulated... in Python), it instead indicates for each program and each test input:
+- the number of instructions executed
+- the number of basic blocks executed (equivalently, the number of branches + 1)
+- the number of *conditional* branches executed
+
+The format of the output is controlled by the `--style` option, and can be `pretty`, `csv`, or `latex`.
+If you wish to pipe the output into a file, you might want to disable the ANSI colouring, so run e.g.
+```console
+python3 batch_test.py --plain stats trace --style=csv > stats.csv
+```
+
+Other options for `stats` can be found by running
+```console
+python3 batch_test.py stats -h
+```

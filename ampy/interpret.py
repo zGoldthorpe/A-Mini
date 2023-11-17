@@ -155,72 +155,102 @@ class Interpreter:
         if not self.is_loaded:
             raise LoadError("CFG is not loaded.")
 
-        if isinstance(instruction, ampy.types.MovInstruction):
-            self._rd[instruction.target] = self._rd[instruction.operand]
-            return
-        if isinstance(instruction, ampy.types.PhiInstruction):
-            for val, lbl in instruction.conds:
-                if self._prev_label == lbl:
-                    self._rd[instruction.target] = self._rd[val]
-                    return
-            raise UnknownInstructionError(f"phi cannot resolve branch from {self._prev_label}.")
+        match type(instruction):
 
-        if isinstance(instruction, ampy.types.ArithInstructionClass):
-            op0 = self._rd[instruction.operands[0]]
-            op1 = self._rd[instruction.operands[1]]
-            if isinstance(instruction, ampy.types.AddInstruction):
-                res = op0 + op1
-            elif isinstance(instruction, ampy.types.SubInstruction):
-                res = op0 - op1
-            elif isinstance(instruction, ampy.types.MulInstruction):
-                res = op0 * op1
-            else:
-                raise UnknownInstructionError("Unspecified arithmetic instruction.")
-            self._rd[instruction.target] = res
-            return
+            case ampy.types.MovInstruction:
+                self._rd[instruction.target] = self._rd[instruction.operand]
+                return
 
-        if isinstance(instruction, ampy.types.CompInstructionClass):
-            op0 = self._rd[instruction.operands[0]]
-            op1 = self._rd[instruction.operands[1]]
-            if isinstance(instruction, ampy.types.EqInstruction):
-                res = op0 == op1
-            elif isinstance(instruction, ampy.types.NeqInstruction):
-                res = op0 != op1
-            elif isinstance(instruction, ampy.types.LtInstruction):
-                res = op0 < op1
-            elif isinstance(instruction, ampy.types.LeqInstruction):
-                res = op0 <= op1
-            else:
-                raise UnknownInstructionError("Unspecified comparison instruction.")
-            self._rd[instruction.target] = int(res)
-            return
+            case ampy.types.PhiInstruction:
+                for val, lbl in instruction.conds:
+                    if self._prev_label == lbl:
+                        self._rd[instruction.target] = self._rd[val]
+                        return
+                raise UnknownInstructionError(f"phi cannot resolve branch from {self._prev_label}.")
 
-        if isinstance(instruction, ampy.types.BranchInstructionClass):
-            self._block_i = 0
-            self._prev_label = self.block_label
-            if isinstance(instruction, ampy.types.ExitInstruction):
-                # clear current block to indicate that program has exited
-                self._block = None
-            elif isinstance(instruction, ampy.types.GotoInstruction):
-                self._block = self._cfg[instruction.target]
-            elif isinstance(instruction, ampy.types.BranchInstruction):
-                cond = self._rd[instruction.cond]
-                if cond:
-                    self._block = self._cfg[instruction.iftrue]
+            case T if issubclass(T, ampy.types.BinaryInstructionClass):
+                op0 = self._rd[instruction.operands[0]]
+                op1 = self._rd[instruction.operands[1]]
+
+                if issubclass(T, ampy.types.ArithInstructionClass):
+                    match T:
+                        case ampy.types.AddInstruction:
+                            res = op0 + op1
+                        case ampy.types.SubInstruction:
+                            res = op0 - op1
+                        case ampy.types.MulInstruction:
+                            res = op0 * op1
+                        case ampy.types.DivInstruction:
+                            if op1 == 0:
+                                raise InstructionException(f"Division base {instruction.operands[1]} is zero!")
+                            res = op0 // op1
+                        case ampy.types.ModInstruction:
+                            if op1 == 0:
+                                raise InstructionException(f"Modulo base {instruction.operands[1]} is zero!")
+                            res = op0 % op1
+                        case _:
+                            raise UnknownInstructionError("Unimplemented arithmetic instruction.")
+                elif issubclass(T, ampy.types.CompInstructionClass):
+                    match T:
+                        case ampy.types.EqInstruction:
+                            res = op0 == op1
+                        case ampy.types.NeqInstruction:
+                            res = op0 != op1
+                        case ampy.types.LtInstruction:
+                            res = op0 < op1
+                        case ampy.types.LeqInstruction:
+                            res = op0 <= op1
+                        case _:
+                            raise UnknownInstructionError("Unimplemented comparison instruction.")
+                    res = int(res) # convert back into integer before continuing
+                elif issubclass(T, ampy.types.BitwiseInstructionClass):
+                    match T:
+                        case ampy.types.AndInstruction:
+                            res = op0 & op1
+                        case ampy.types.OrInstruction:
+                            res = op0 | op1
+                        case ampy.types.XOrInstruction:
+                            res = op0 ^ op1
+                        case ampy.types.LShiftInstruction:
+                            res = op0 << op1
+                        case ampy.types.RShiftInstruction:
+                            res = op0 >> op1
+                        case _:
+                            raise UnknownInstructionError("Unimplemented bitwise instruction.")
                 else:
-                    self._block = self._cfg[instruction.iffalse]
-            else:
-                raise UnknownInstructionError("Unspecified branch instruction.")
-            return
+                    raise UnknownInstructionError("Unimplemented binary operation instruction.")
+                self._rd[instruction.target] = res
+                return
 
-        if isinstance(instruction, ampy.types.ReadInstruction):
-            raise ReadInterrupt(instruction.target)
+            case T if issubclass(T, ampy.types.BranchInstructionClass):
+                self._block_i = 0
+                self._prev_label = self.block_label
+                match T:
+                    case ampy.types.ExitInstruction:
+                        # clear current block to indicate that program has exited
+                        self._block = None
+                    case ampy.types.GotoInstruction:
+                        self._block = self._cfg[instruction.target]
+                    case ampy.types.BranchInstruction:
+                        if self._rd[instruction.cond]:
+                            self._block = self._cfg[instruction.iftrue]
+                        else:
+                            self._block = self._cfg[instruction.iffalse]
+                    case _:
+                        raise UnknownInstructionError("Unimplemented branch instruction.")
+                return
 
-        if isinstance(instruction, ampy.types.WriteInstruction):
-            raise WriteInterrupt(instruction.operand)
+            case ampy.types.ReadInstruction:
+                raise ReadInterrupt(instruction.target)
 
-        if isinstance(instruction, ampy.types.BrkInstruction):
-            raise BreakpointInterrupt(instruction.name)
+            case ampy.types.WriteInstruction:
+                raise WriteInterrupt(instruction.operand)
+
+            case ampy.types.BrkInstruction:
+                raise BreakpointInterrupt(instruction.name)
+
+            case _:
+                raise UnknownInstructionError("Unimplemented instruction.")
 
 
     @(Syntax(object) >> None)

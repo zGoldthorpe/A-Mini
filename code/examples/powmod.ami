@@ -1,0 +1,43 @@
+; Fast computation of a^b mod m
+; Restricted to when b >= 0 and m > 0
+
+@main:
+    read %a
+    read %b
+    read %m
+    %valid = %m > 0
+    branch %valid ? @check_b : @error
+
+@check_b:
+    %valid = %b >= 0
+    branch %valid ? @init : @error
+
+@error:
+    write -1
+    exit
+
+@init:
+    %R = 1 % %m  ; the final result
+    %P = %a % %m ; iterative multiplication
+
+@main_loop:
+    %finished = %b == 0
+    branch %finished ? @print : @pow_mod
+
+@print:
+    write %R
+    exit
+
+@pow_mod:
+    %bit = %b & 1
+    branch %bit ? @commit : @update
+
+@commit:
+    %R = %R * %P
+    %R = %R % %m
+
+@update:
+    %P = %P * %P
+    %P = %P % %m
+    %b = %b >> 1
+    goto @main_loop

@@ -14,8 +14,8 @@ endif
 
 syn keyword amiCommand phi goto branch exit read write
 
-syn match amiOp '[+\-*?:<=\[,\]]'
-syn match amiInteger '-\?\d\+'
+syn match amiOp '[+\-*/%~|^&?:<>=\[,\]]'
+syn match amiInteger '-\?\(0x[0-9a-fA-F]\+\|\d\+\)'
 syn match amiLabel '@[.a-zA-Z0-9_]\+'
 syn match amiReg '%[.a-zA-Z0-9_]\+'
 
@@ -30,8 +30,8 @@ let b:current_syntax = "ami"
 hi def link amiCommand  Statement
 hi def link amiOp       Operator
 hi def link amiInteger  Constant
-hi def link amiReg      Identifier
-hi def link amiLabel    Type
+hi def link amiReg      Type
+hi def link amiLabel    Identifier
 hi def link amiComment  Comment
 hi def link amiMeta     PreProc
 hi def link amiBrkPt    Todo

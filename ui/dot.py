@@ -116,8 +116,10 @@ class DotUI:
     def plain_repr(self, I):
         if isinstance(I, ampy.types.BrkInstruction):
             return None
-        if isinstance(I, (ampy.types.LeqInstruction, ampy.types.LtInstruction)):
+        if isinstance(I, (ampy.types.LeqInstruction, ampy.types.LtInstruction, ampy.types.LShiftInstruction)):
             return repr(I).replace('<', r'\<')
+        if isinstance(I, ampy.types.RShiftInstruction):
+            return repr(I).replace('>', r'\>')
         if isinstance(I, ampy.types.PhiInstruction) and self.no_phi_labels:
             return f"{I.target} = phi({', '.join(val for val, _ in I.conds)})"
         if isinstance(I, ampy.types.GotoInstruction) and self.simple_branch:
@@ -134,42 +136,77 @@ class DotUI:
                 return f"({var[1:]})"
             return var[1:]
 
-        if isinstance(I, ampy.types.MovInstruction):
-            return f"{reg(I.target)} := {reg(I.operand)}"
-        if isinstance(I, ampy.types.PhiInstruction):
-            if self.no_phi_labels:
-                return f"{reg(I.target)} := phi({', '.join(reg(val) for val, _ in I.conds)})"
-            return f"{reg(I.target)} := phi " + ", ".join(
-                    f"[{reg(val)}, {cond}]" for val, cond in I.conds)
-        if isinstance(I, ampy.types.ArithInstructionClass):
-            return f"{reg(I.target)} := {reg(I.operands[0])} {I.op} {reg(I.operands[1])}"
-        if isinstance(I, ampy.types.CompInstructionClass):
-            match I.op:
-                case "==":
-                    op = '='
-                case "<":
-                    op = r"\<"
-                case "<=":
-                    op = r"\<="
-                case _:
-                    op = I.op
-            return f"{reg(I.target)} := ({reg(I.operands[0])} {op} {reg(I.operands[1])})"
-        if isinstance(I, ampy.types.GotoInstruction):
-            if self.simple_branch:
+        match type(I):
+
+            case ampy.types.MovInstruction:
+                return f"{reg(I.target)} := {reg(I.operand)}"
+
+            case ampy.types.PhiInstruction:
+                if self.no_phi_labels:
+                    return f"{reg(I.target)} := phi({', '.join(reg(val) for val, _ in I.conds)})"
+                return f"{reg(I.target)} := phi " + ", ".join(
+                        f"[{reg(val)}, {cond}]" for val, cond in I.conds)
+
+            case T if issubclass(T, ampy.types.BinaryInstructionClass):
+                op1, op2 = map(lambda o: re.sub(r"-(.*)", r"(-\1)", reg(o)), I.operands)
+                if issubclass(T, ampy.types.ArithInstructionClass):
+                    match I.op:
+                        case "%":
+                            op = "mod"
+                        case _:
+                            op = I.op
+
+                elif issubclass(T, ampy.types.BitwiseInstructionClass):
+                    match I.op:
+                        case "&":
+                            op = "and"
+                        case "|":
+                            op = "or"
+                        case "^":
+                            op = "xor"
+                        case "<<":
+                            op = r"\<\<"
+                        case ">>":
+                            op = r"\>\>"
+                        case _:
+                            op = I.op
+                elif issubclass(T, ampy.types.CompInstructionClass):
+                    match I.op:
+                        case "==":
+                            op = '='
+                        case "<":
+                            op = r"\<"
+                        case "<=":
+                            op = r"\<="
+                        case _:
+                            op = I.op
+                    # also override the return value in this case
+                    return f"{reg(I.target)} := ({op1} {op} {op2})"
+
+                return f"{reg(I.target)} := {op1} {op} {op2}"
+
+            case ampy.types.GotoInstruction:
+                if self.simple_branch:
+                    return None
+                return repr(I)
+            
+            case ampy.types.BranchInstruction:
+                if self.simple_branch:
+                    return f"if ({reg(I.cond)})"
+                return fr"if ({reg(I.cond)}) goto {I.iftrue}\lgoto {I.iffalse}"
+
+            case ampy.types.ExitInstruction:
+                return "exit"
+
+            case ampy.types.ReadInstruction:
+                return f"{reg(I.target)} := read()"
+            
+            case ampy.types.WriteInstruction:
+                return f"write({reg(I.operand)})"
+
+            case _:
+                # ignore breakpoints and unknowns
                 return None
-            return repr(I)
-        if isinstance(I, ampy.types.BranchInstruction):
-            if self.simple_branch:
-                return f"if ({reg(I.cond)})"
-            return fr"if ({reg(I.cond)}) goto {I.iftrue}\lgoto {I.iffalse}"
-        if isinstance(I, ampy.types.ExitInstruction):
-            return "exit"
-        if isinstance(I, ampy.types.ReadInstruction):
-            return f"{reg(I.target)} := read()"
-        if isinstance(I, ampy.types.WriteInstruction):
-            return f"write({reg(I.operand)})"
-        # ignore breakpoints
-        return None
 
     ### LaTeX DOT output ###
 
@@ -222,7 +259,7 @@ class DotUI:
     
     def tex_repr(self, I):
         def sanitise(s):
-            return s.replace('_', r'\_').replace('%', r'\%')
+            return s.replace('_', r'\_').replace('%', r'\%').replace('&', r'\&')
 
         if isinstance(I, ampy.types.BrkInstruction):
             return None
@@ -254,49 +291,84 @@ class DotUI:
             var = re.sub(r"_(?!\{)", r'\\_', var)
             return var
 
-        if isinstance(I, ampy.types.MovInstruction):
-            return fr"{reg(I.target)} \gets {reg(I.operand)}"
-        if isinstance(I, ampy.types.PhiInstruction):
-            if self.no_phi_labels:
-                args = ", ".join(reg(val) for val, _ in I.conds)
-            else:
-                args = ", ".join(
-                        fr"\overset{{{self.tex_label(cond)}}}{{\vphantom{{|}}{reg(val)}}}"
-                        for val, cond in I.conds)
-            return fr"{reg(I.target)} \gets \phi({args})"
-        if isinstance(I, ampy.types.ArithInstructionClass):
-            match I.op:
-                case '*':
-                    op = r"\cdot"
-                case _:
-                    op = I.op
-            op1, op2 = map(lambda o: re.sub(r"-(.*)", r"(-\1)", reg(o)),
+        match type(I):
+            case ampy.types.MovInstruction:
+                return fr"{reg(I.target)} \gets {reg(I.operand)}"
+
+            case ampy.types.PhiInstruction:
+                if self.no_phi_labels:
+                    args = ", ".join(reg(val) for val, _ in I.conds)
+                else:
+                    args = ", ".join(
+                            fr"\overset{{{self.tex_label(cond)}}}{{\vphantom{{|}}{reg(val)}}}"
+                            for val, cond in I.conds)
+                return fr"{reg(I.target)} \gets \phi({args})"
+
+            case T if issubclass(T, ampy.types.BinaryInstructionClass):
+                op1, op2 = map(lambda o: re.sub(r"-(.*)", r"(-\1)", reg(o)),
                             I.operands)
-            return fr"{reg(I.target)} \gets {op1} {op} {op2}"
-        if isinstance(I, ampy.types.CompInstructionClass):
-            match I.op:
-                case "==":
-                    op = '='
-                case "!=":
-                    op = r"\neq"
-                case "<=":
-                    op = r"\leq"
-                case _:
-                    op = I.op
-            return fr"{reg(I.target)} \gets ({reg(I.operands[0])} {op} {reg(I.operands[1])})"
-        if isinstance(I, ampy.types.GotoInstruction):
-            if self.simple_branch:
+                    
+                if issubclass(T, ampy.types.ArithInstructionClass):
+                    match I.op:
+                        case '*':
+                            op = r"\cdot"
+                        case '/':
+                            op = r"\div"
+                        case '%':
+                            op = r"\mod"
+                        case _:
+                            op = I.op
+
+                elif issubclass(T, ampy.types.BitwiseInstructionClass):
+                    match I.op:
+                        case '&':
+                            op = r"\wedge"
+                        case '|':
+                            op = r"\vee"
+                        case '^':
+                            op = r"\mathbin{\underline{\vee}}"
+                            # or \oplus, I guess
+                        case "<<":
+                            op = r"\ll"
+                        case ">>":
+                            op = r"\gg"
+                        case _:
+                            op = I.op
+
+                elif issubclass(T, ampy.types.CompInstructionClass):
+                    match I.op:
+                        case "==":
+                            op = '='
+                        case "!=":
+                            op = r"\neq"
+                        case "<=":
+                            op = r"\leq"
+                        case _:
+                            op = I.op
+                    # also override return in this case
+                    return fr"{reg(I.target)} \gets ({op1} {op} {op2})"
+
+                return fr"{reg(I.target)} \gets {op1} {op} {op2}"
+            
+            case ampy.types.GotoInstruction:
+                if self.simple_branch:
+                    return None
+                return fr"\mathbf{{goto}}~{self.tex_label(I.target)}"
+
+            case ampy.types.BranchInstruction:
+                if self.simple_branch:
+                    return fr"\mathbf{{if}}({reg(I.cond)})"
+                return fr"\mathbf{{if}}({reg(I.cond)})~\mathbf{{goto}}~{self.tex_label(I.iftrue)} \\ \mathbf{{goto}}~{self.tex_label(I.iffalse)}"
+
+            case ampy.types.ExitInstruction:
+                return r"\mathbf{exit}"
+            
+            case ampy.types.ReadInstruction:
+                return fr"{reg(I.target)} \gets \mathbf{{read}}()"
+
+            case ampy.types.WriteInstruction:
+                return fr"\mathbf{{write}}({reg(I.operand)})"
+
+            case _:
+                # ignore breakpoints and unknowns
                 return None
-            return fr"\mathbf{{goto}}~{self.tex_label(I.target)}"
-        if isinstance(I, ampy.types.BranchInstruction):
-            if self.simple_branch:
-                return fr"\mathbf{{if}}({reg(I.cond)})"
-            return fr"\mathbf{{if}}({reg(I.cond)})~\mathbf{{goto}}~{self.tex_label(I.iftrue)} \\ \mathbf{{goto}}~{self.tex_label(I.iffalse)}"
-        if isinstance(I, ampy.types.ExitInstruction):
-            return r"\mathbf{exit}"
-        if isinstance(I, ampy.types.ReadInstruction):
-            return fr"{reg(I.target)} \gets \mathbf{{read}}()"
-        if isinstance(I, ampy.types.WriteInstruction):
-            return fr"\mathbf{{write}}({reg(I.operand)})"
-        # ignore brkpt instructions
-        return None
