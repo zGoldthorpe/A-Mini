@@ -69,6 +69,7 @@ class DCE(DCE):
                     continue
                 if I.target not in self._out[block, i]:
                     changed = True
+                    self.debug(f"Removing instruction {repr(I)} from {block.label}")
                     to_delete.append(i)
 
             for i in reversed(to_delete):

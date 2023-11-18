@@ -1,0 +1,29 @@
+; Computes the GCD of two numbers
+; Well, there are technically two GCDs most of the time, so print the nonnegative GCD
+
+@main:
+    read %a
+    read %b
+
+@check_zero:
+    ; if %b == 0, then %a is the GCD
+    branch %b ? @reduce : @finish
+
+@finish:
+    %flip = %a < 0
+    branch %flip ? @negate : @print
+
+@negate:
+    %a = -%a
+
+@print:
+    write %a
+    exit
+
+@reduce:
+    %t = %b
+    %b = %a % %b
+    %a = %t
+    goto @check_zero
+
+    

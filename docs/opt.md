@@ -120,7 +120,7 @@ For example, the `example_analysis` pass has the method
 class ExampleAnalysis(ExampleAnalysis):
     # ...
     @ExampleAnalysis.opt_pass
-    def get_into(self):
+    def get_info(self):
         # ...
         return self.opts
 ```

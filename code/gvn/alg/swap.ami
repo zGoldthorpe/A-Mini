@@ -1,0 +1,8 @@
+@main:
+    read %0
+    read %1
+    %t = %0
+    %0 = %1
+    %1 = %t
+    write %0
+    write %1
