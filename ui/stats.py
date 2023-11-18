@@ -14,10 +14,10 @@ def pstructure(*args, **kwargs):
     utils.printing.Printing.formatted("\033[2m", "\033[m", *args, **kwargs)
 def pval(*args, good=False, best=False, bad=False, worst=False, **kwargs):
     utils.printing.Printing.formatted(
-            "\033[41m" if bad and worst and not best else
+            "\033[37;41m" if bad and worst and not best else
             "\033[32;41m" if good and worst and not best else
             "\033[31m" if (bad and not good) or (worst and not best) else
-            "\033[42m" if good and best and not worst else
+            "\033[37;42m" if good and best and not worst else
             "\033[31;42m" if bad and best and not worst else
             "\033[32m" if (good and not bad) or (best and not worst) else
             "", "\033[m", *args, **kwargs)

@@ -60,9 +60,12 @@ class BinaryInstructionClass(DefInstructionClass):
     Instruction class for all instructions that compute
     a binary operation
     """
-    @(Syntax(object, str, str, str, str) >> None)
-    def __init__(self, op, res, op1, op2):
-        self.op = op
+    
+    op = "??"
+    # operation as a class variable
+
+    @(Syntax(object, str, str, str) >> None)
+    def __init__(self, res, op1, op2):
         self.operands = (op1, op2)
         super().__init__(res)
 
@@ -104,14 +107,16 @@ class PhiInstruction(DefInstructionClass):
         return f"{self.target} = phi " + ", ".join(f"[ {val}, {lbl} ]" for val, lbl in self.conds)
 
 class AddInstruction(ArithInstructionClass):
+    op = '+'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__('+', dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class SubInstruction(ArithInstructionClass):
+    op = '-'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__('-', dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class NegInstruction(PhonyInstruction):
     @(Syntax(object, str, str) >> SubInstruction)
@@ -120,34 +125,40 @@ class NegInstruction(PhonyInstruction):
         return SubInstruction(dest, '0', op)
 
 class MulInstruction(ArithInstructionClass):
+    op = '*'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__('*', dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class DivInstruction(ArithInstructionClass):
+    op = '/'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__('/', dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class ModInstruction(ArithInstructionClass):
+    op = '%'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__('%', dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class AndInstruction(BitwiseInstructionClass):
+    op = '&'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("&", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class OrInstruction(BitwiseInstructionClass):
+    op = '|'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("|", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class XOrInstruction(BitwiseInstructionClass):
+    op = '^'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("^", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class NotInstruction(PhonyInstruction):
     @(Syntax(object, str, str) >> XOrInstruction)
@@ -156,30 +167,35 @@ class NotInstruction(PhonyInstruction):
         return XOrInstruction(dest, '1', op)
 
 class LShiftInstruction(BitwiseInstructionClass):
+    op = "<<"
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("<<", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class RShiftInstruction(BitwiseInstructionClass):
+    op = ">>"
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__(">>", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 
 class EqInstruction(CompInstructionClass):
+    op = "=="
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("==", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class NeqInstruction(CompInstructionClass):
+    op = "!="
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("!=", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class LtInstruction(CompInstructionClass):
+    op = '<'
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("<", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class GtInstruction(PhonyInstruction):
     @(Syntax(object, str, str, str) >> LtInstruction)
@@ -188,9 +204,10 @@ class GtInstruction(PhonyInstruction):
         return LtInstruction(dest, op2, op1)
 
 class LeqInstruction(CompInstructionClass):
+    op = "<="
     @(Syntax(object, str, str, str) >> None)
     def __init__(self, dest, op1, op2):
-        super().__init__("<=", dest, op1, op2)
+        super().__init__(dest, op1, op2)
 
 class GeqInstruction(PhonyInstruction):
     @(Syntax(object, str, str, str) >> LeqInstruction)
