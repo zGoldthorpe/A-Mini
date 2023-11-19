@@ -163,8 +163,8 @@ class XOrInstruction(BitwiseInstructionClass):
 class NotInstruction(PhonyInstruction):
     @(Syntax(object, str, str) >> XOrInstruction)
     def __new__(cls, dest, op):
-        # ~x = 1 ^ x
-        return XOrInstruction(dest, '1', op)
+        # ~x = -1 ^ x
+        return XOrInstruction(dest, "-1", op)
 
 class LShiftInstruction(BitwiseInstructionClass):
     op = "<<"
