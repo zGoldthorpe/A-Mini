@@ -23,7 +23,8 @@ EXEC=$(patsubst %,execution/%,\
 		io.py)
 
 OPT=$(patsubst %,opt/%,\
-		 example_analysis.py)
+		 example_analysis.py \
+		 abstract_expr.py)
 
 TESTS=ensuretypes.py \
 	  $(CFG) \

@@ -7,9 +7,7 @@ This module provides a datatype for managing abstract computation expressions,
 primarily for value numbering.
 """
 
-import builtins
-
-from utils.syntax import Syntax
+from utils.syntax import Syntax, Assertion
 from opt.tools import OptError
 
 import ampy.types as amt
@@ -22,80 +20,95 @@ class Expr(Expr):
     """
     Formal computational expression, with rewriting rules
     """
-    @(Syntax(object, str, ...) >> None)
-    def __init__(self, primitive='0', /):
-        # an expression is an AST, whose leaf nodes are constants
-        # or virtual registers
+    @(Syntax(object, int, reduce=bool)
+      | Syntax(object, str, reduce=bool)
+      | Syntax(object, ((type, Assertion(lambda T: issubclass(T, amt.BinaryInstructionClass))),), Expr, ..., reduce=bool))
+    def __init__(self, op, *exprs, reduce=True):
+        # an expression is an AST whose leaf nodes are constants / registers
         #
-        # op: type of operation
-        #   - int: integer
-        #   - str: register
-        #   - instruction class: corresponding operation
-        # left: first operand
-        # right: second operand
-        if primitive.startswith('%'):
-            self.op = str
-            self.left = primitive
-        else:
-            self.op = int
-            self.left = int(primitive)
-        self.right = None
+        # op: operation or constant
+        # args: arguments
+        self.op = op
+        self.args = list(exprs)
+        if reduce:
+            self.reduce()
 
-    @classmethod
-    @(Syntax(object, type, Expr, Expr) >> Expr)
-    def genexpr(cls, opclass, left, right):
-        """
-        Build an expression from a binary operation (specified by
-        its instruction class) and expression operands
-        """
-        expr = Expr.__new__(Expr)
-        expr.op = opclass
-        expr.left = left
-        expr.right = right
-        expr.rewrite()
-        return expr
+    ### convenient getters/setters ###
 
+    @property
+    @(Syntax(object) >> (int,str))
+    def value(self):
+        return self.op
+
+    @property
+    @(Syntax(object) >> Expr)
+    def left(self):
+        return self.args[0]
+    @left.setter
+    @(Syntax(object, Expr) >> None)
+    def left(self, expr):
+        self.args[0] = expr
+
+    @property
+    @(Syntax(object) >> Expr)
+    def right(self):
+        return self.args[-1]
+    @right.setter
+    @(Syntax(object, Expr) >> None)
+    def right(self, expr):
+        self.args[-1] = expr
+
+    ### for printing ###
+    
     def __str__(self):
 
-        match self.op:
-            
-            case builtins.int:
-                # integer
-                return str(self.left)
+        if isinstance(self.op, (int, str)):
+            rep = str(self.value)
+            if rep.startswith('-'):
+                return f"({rep})"
+            return rep
 
-            case builtins.str:
-                # register
-                return self.left
-
-            case T if issubclass(T, amt.BinaryInstructionClass):
-                return f"({self.left} {T.op} {self.right})"
-            
-            case T:
-                # shouldn't happen
-                return f"({self.left} {T} {self.right})"
+        return "({})".format(f" {self.op.op} ".join(str(arg) for arg in self.args))
 
     def __repr__(self):
         return f"Expr<{self}>"
 
+    ### comparisons ###
     @(Syntax(object, Expr) >> int)
     def compare(self, other):
         """
-        Returns -1, 0, 1 if self is lt, eq, or gt other, resp.
-        Total ordering is fairly arbitrary
+        Returns -1, 0, 1 if self is lt, eq, gt other (respectively).
+        Total ordering is somewhat arbitrary:
+        integers < registers
+        expressions with matching operations are sorted by arity
+        then sorted in lexicographical order by arguments
         """
         def cmp(a, b):
             return (a > b) - (a < b)
-
         if self.op == other.op:
-            if self.op in (int, str):
-                return cmp(self.left, other.left)
-            if (res := self.left.compare(other.left)) != 0:
+            if isinstance(self.op, (int, str)):
+                return 0
+            if (res := cmp(len(self.args), len(other.args))) != 0:
                 return res
-            return self.right.compare(other.right)
+            for L, R in zip(self.args, other.args):
+                if (res := L.compare(R)) != 0:
+                    return res
+            return 0
+
+        if isinstance(self.op, int):
+            if isinstance(other.op, int):
+                return cmp(self.op, other.op)
+            return -1
+        if isinstance(other.op, int):
+            return +1
+        if isinstance(self.op, str):
+            if isinstance(other.op, str):
+                return cmp(self.op, other.op)
+            return -1
+        if isinstance(other.op, str):
+            return +1
 
         order = (
-                builtins.int,
-                builtins.str,
                 amt.AddInstruction,
                 amt.SubInstruction,
                 amt.MulInstruction,
@@ -118,112 +131,252 @@ class Expr(Expr):
             if other.op == op:
                 return +1
 
-        # they were both of an unrecognised type at this point
+        # we should not be able to reach here
         raise NotImplementedError
 
+    @(Syntax(object, Expr) >> bool)
+    def __eq__(self, other):
+        return self.compare(other) == 0
 
+    @(Syntax(object, Expr) >> bool)
+    def __ne__(self, other):
+        return self.compare(other) != 0
 
+    @(Syntax(object, Expr) >> bool)
+    def __lt__(self, other):
+        return self.compare(other) == -1
 
+    @(Syntax(object, Expr) >> bool)
+    def __le__(self, other):
+        return self.compare(other) <= 0
 
+    def __hash__(self):
+        #TODO: don't hash; this data structure is inefficient to
+        # hash and then check equality with
+        return hash((self.op, tuple(self.args)))
+
+    ### rewriting ###
     @(Syntax(object) >> None)
-    def rewrite(self):
+    def reduce(self):
         """
-        Apply rewriting rules to simplify expression.
-        The assumption/invariant is that the operands are already
-        fully simplified.
+        Apply rewriting rules to put expression into a canonical form.
+        The hope is that two expressions are equivalent precisely if
+        their canonical forms coincide, but this will only be an approximation
+        since I am not thinking through all possible rewriting rules.
+
+        The assumption is that the operands are already reduced.
         """
         # rewriting rules implemented:
         # redundancy: a - b = a + (-1)*b
-        # commutativity: +, *, &, |, ^, ==, !=
         # associativity: +, *, &, |, ^
-        # 2-sided distributivity: (*,+), (&,|^)
-        #              (we do not distribute (|,&) as this
-        #               would result in infinite expansion)
-        # left distributivity: (<<,+&|^), (>>,&|^)
-        
-        if self.op in (int, str):
-            return
+        # commutativity: +, *, &, |, ^
+        # c-distributivity: (*,+) (&,|^)
+        #    (we do not distribute (|,&) as this would cause infinite recursion)
+        # l-distrivutivity: (<<,+&|^), (>>,&|^)
+        # exponent rules for << and >>
 
-        cmp = self.left.compare(self.right)
-        if cmp == 0:
-            self._simplify_eq()
-            return # the subexprs are fully simplified already
-        if cmp == 1:
-            if self.op in (
-                    amt.AddInstruction,
-                    amt.MulInstruction,
-                    amt.AndInstruction,
-                    amt.OrInstruction,
-                    amt.XOrInstruction,
-                    amt.EqInstruction,
-                    amt.NeqInstruction):
-                self.left, self.right = self.right, self.left
+        if isinstance(self.op, (int, str)):
+            return
 
         while True:
 
             match self.op:
+
                 case amt.AddInstruction:
-                    if self._reassociate():
-                        continue
-                    
-                    # group like terms, but only if
-                    # the coefficient is constant
-                    if (self.left.op == amt.MulInstruction
-                            and self.left.left.op == int):
-                        cmp = self.right.compare(self.left.right)
-                        if cmp == 0:
-                            # (n * a) + a = (n+1) * a
-                            self.op = amt.MulInstruction
-                            self.left = Expr(str(self.left.left.left + 1))
+                    self._assoc()
+                    # now, group like terms, where terms are summands
+                    # except a constant multiplication coefficient
+                    #TODO: this uses hashing
+                    terms = {}
+                    for arg in self.args:
+                        if arg.op == 0:
                             continue
-                    elif (self.right.op == amt.MulInstruction
-                            and self.right.left.op == int):
-                        cmp = self.left.compare(self.right.right)
-                        if cmp == 0:
-                            # a + (n * a) = (n+1) * a
-                            self.op = amt.MulInstruction
-                            self.right = Expr(str(self.right.left.left + 1))
-                            self.left, self.right = self.right, self.left
-                            # swap is necessary
+                        if isinstance(arg.op, int):
+                            terms[Expr(1)] = terms.get(Expr(1), 0) + arg.op
+                        elif (arg.op == amt.MulInstruction
+                                and isinstance(arg.left.op, int)):
+                            if len(arg.args) > 2:
+                                e = Expr(amt.MulInstruction, *arg.args[1:], reduce=False)
+                            else:
+                                e = arg.right
+                            terms[e] = terms.get(e, 0) + arg.left.op
+                        else:
+                            terms[arg] = terms.get(arg, 0) + 1
+
+                    self.args = sorted(Expr(amt.MulInstruction, Expr(coef), term)
+                            for term, coef in terms.items() if coef != 0)
+                    
+                    if len(self.args) == 0:
+                        self.op = 0
+                        break
+                    if len(self.args) == 1:
+                        self.op = self.left.op
+                        self.args = self.left.args
+                        break
 
                 case amt.SubInstruction:
                     # a - b = a + (-1)*b
                     self.op = amt.AddInstruction
-                    self.right = Expr.genexpr(
-                            amt.MulInstruction,
-                            Expr("-1"),
-                            self.right)
+                    self.right = Expr(amt.MulInstruction, Expr(-1), self.right)
                     continue
 
                 case amt.MulInstruction:
-                    if self._reassociate():
+                    self._assoc()
+                    if self._distribute(amt.AddInstruction):
                         continue
-                    if self._distribute(
-                            amt.AddInstruction):
-                        continue
+                    # use commutativity to reorganise factors and group consts
+                    const = 1
+                    kept = []
+                    for arg in self.args:
+                        if isinstance(arg.op, int):
+                            const *= arg.op
+                            if const == 0:
+                                break
+                        else:
+                            kept.append(arg)
+                    if const == 0 or len(kept) == 0:
+                        self.op = const
+                        self.args = []
+                        break
+                    if const != 1:
+                        kept.append(Expr(const))
+                    self.args = sorted(kept)
+
+                    if len(self.args) == 1:
+                        self.op = self.left.op
+                        self.args = self.left.args
 
                 case amt.DivInstruction:
-                    pass
+                    if self.right.op == 0:
+                        raise OptError("Division by zero discovered.")
+                    if self.right.op == 1:
+                        # a / 1 = a
+                        self.op = self.left.op
+                        self.args = self.left.args
+                        break
+                    if self.left.op == 0:
+                        # 0 / a = 0
+                        self.op = 0
+                        self.args = []
+                        break
+                    if self.right.op == -1:
+                        # a / (-1) = (-1) * a
+                        self.op = amt.MulInstruction
+                        self.right = self.left
+                        self.left = Expr(-1)
+                        continue
+                    if self.left == self.right:
+                        # a / a = 1
+                        self.op = 1
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = self.left.op // self.right.op
+                        self.args = []
+                        break
 
                 case amt.ModInstruction:
-                    pass
+                    if self.right.op == 0:
+                        raise OptError("Modulo zero discovered.")
+                    if (self.left.op == 0
+                            or (isinstance(self.right.op, int)
+                                and abs(self.right.op) == 1)
+                            or self.left == self.right):
+                        # 0 % b = 0
+                        # a % 1 = a % (-1) = 0
+                        # a % a = 0
+                        self.op = 0
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = self.left.op % self.right.op
+                        self.args = []
+                        break
 
                 case amt.AndInstruction:
-                    if self._reassociate():
+                    self._assoc()
+                    if self._distribute(amt.OrInstruction, amt.XOrInstruction):
                         continue
-                    if self._distribute(
-                            amt.OrInstruction,
-                            amt.XOrInstruction):
-                        continue
+
+                    # use commutativity to collapse dupes and reduce consts
+                    #TODO: uses hashing
+                    const = -1
+                    argset = set()
+                    for arg in self.args:
+                        if isinstance(arg.op, int):
+                            const &= arg.op
+                            if const == 0:
+                                break
+                        else:
+                            argset.add(arg)
+                    if const == 0 or len(argset) == 0:
+                        # and with zero is zero
+                        self.op = const
+                        self.args = []
+                        break
+                    if const != -1:
+                        argset.add(Expr(const))
+                    self.args = sorted(argset)
+
+                    if len(self.args) == 1:
+                        self.op = self.left.op
+                        self.args = self.left.args
+                        break
 
                 case amt.OrInstruction:
-                    if self._reassociate():
-                        continue
-                    #TODO absorption: a | (a & b) = a
+                    self._assoc()
+
+                    # use commutativity to collapse dupes and reduce consts
+                    const = 0
+                    argset = set()
+                    for arg in self.args:
+                        if isinstance(arg.op, int):
+                            const |= arg.op
+                            if const == -1:
+                                break
+                        else:
+                            argset.add(arg)
+                    if const == -1 or len(argset) == 0:
+                        # or with -1 is -1
+                        self.op = const
+                        self.args = []
+                        break
+                    if const != 0:
+                        argset.add(Expr(const))
+                    self.args = sorted(argset)
+
+                    #TODO: absorption? a | (a & b) = a
+
+                    if len(self.args) == 1:
+                        self.op = self.left.op
+                        self.args = self.left.args
 
                 case amt.XOrInstruction:
-                    if self._reassociate():
-                        continue
+                    self._assoc()
+
+                    # use commutativity to cancel dupes and reduce consts
+                    const = 0
+                    argset = set()
+                    for arg in self.args:
+                        if isinstance(arg.op, int):
+                            const ^= arg.op
+                        else:
+                            try:
+                                argset.remove(arg)
+                            except KeyError:
+                                argset.add(arg)
+                    if len(argset) == 0:
+                        self.op = const
+                        self.args = []
+                        break
+                    if const != 0:
+                        argset.add(Expr(const))
+
+                    self.args = sorted(argset)
+
+                    if len(self.args) == 1:
+                        self.op = self.left.op
+                        self.args = self.left.args
 
                 case amt.LShiftInstruction:
                     if self._distribute_left(
@@ -232,9 +385,43 @@ class Expr(Expr):
                             amt.OrInstruction,
                             amt.XOrInstruction):
                         continue
-                    #TODO:
-                    # (a << b) << c = a << (b + c)
-                    # (a << b) >> c = a << (b - c)
+                    
+                    # exponent rules
+                    if self.left.op == amt.LShiftInstruction:
+                        # (a << b) << c = a << (b + c)
+                        self.right = Expr(
+                                amt.AddInstruction,
+                                self.left.right,
+                                self.right)
+                        self.left = self.left.left
+                        continue
+                    if self.left.op == amt.RShiftInstruction:
+                        # (a >> b) << b = a
+                        if self.left.right == self.right:
+                            self.op = self.left.left.op
+                            self.args = self.left.left.args
+                            break
+
+                    if self.left.op == 0:
+                        # 0 << a = 0
+                        self.op = 0
+                        self.args = []
+                        break
+
+                    if isinstance(self.right.op, int):
+                        if isinstance(self.left.op, int):
+                            self.op = self.left.op << self.right.op
+                            self.args = []
+                            break
+                        if (n := self.right.op) >= 0:
+                            # a << n = (2**n) * a
+                            self.op = amt.MulInstruction
+                            self.right = self.left
+                            self.left = Expr(2**n)
+                            continue
+                        # a << (-n) = a >> n
+                        self.right.op *= -1
+                        self.op = amt.RShiftInstruction
 
                 case amt.RShiftInstruction:
                     if self._distribute_left(
@@ -242,309 +429,195 @@ class Expr(Expr):
                             amt.OrInstruction,
                             amt.XOrInstruction):
                         continue
-                    #TODO:
-                    # (a >> b) >> c = a >> (b + c)
-                    # (a >> b) << b = a
 
-                #TODO: for comparisons, move everything
-                # to the RIGHT (since 0 is a const, it should
-                # be on the left)
+                    # exponent rules
+                    if self.left.op == amt.LShiftInstruction:
+                        # (a << b) >> c = a << (b - c)
+                        self.right = Expr(
+                                amt.SubInstruction,
+                                self.left.right,
+                                self.right)
+                        self.left = self.left.left
+                        self.op = amt.LShiftInstruction
+                        continue
+                    if self.left.op == amt.RShiftInstruction:
+                        # (a >> b) >> c = a >> (b + c)
+                        self.right = Expr(
+                                amt.AddInstruction,
+                                self.left.right,
+                                self.right)
+                        self.left = self.left.left
+                        continue
+
+                    if self.left.op == 0:
+                        # 0 >> n = 0
+                        self.op = 0
+                        self.args = []
+                        break
+
+                    if isinstance(self.right.op, int):
+                        if isinstance(self.left.op, int):
+                            self.op = self.left.op >> self.right.op
+                            self.args = []
+                            break
+                        if self.right.op <= 0:
+                            # a >> (-n) = a << n
+                            self.op = amt.LShiftInstruction
+                            self.right.op *= -1
+                            continue
+
+                case amt.EqInstruction:
+                    if self.left == self.right:
+                        self.op = 1
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = 0
+                        self.args = []
+                        break
+                    if self.left.op != 0:
+                        self.right = Expr(amt.SubInstruction, self.right, self.left)
+                        self.left = Expr(0)
+                        continue
+
+                case amt.NeqInstruction:
+                    if self.left == self.right:
+                        self.op = 0
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = 1
+                        self.args = []
+                        break
+                    if self.left.op != 0:
+                        self.right = Expr(amt.SubInstruction, self.right, self.left)
+                        self.left = Expr(0)
+                        continue
+
+                case amt.LtInstruction:
+                    if self.left == self.right:
+                        self.op = 0
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = self.left.op < self.right.op
+                        self.args = []
+                        break
+                    if self.left.op != 0:
+                        self.right = Expr(amt.SubInstruction, self.right, self.left)
+                        self.left = Expr(0)
+                        continue
+
+                case amt.LeqInstruction:
+                    if self.left == self.right:
+                        self.op = 1
+                        self.args = []
+                        break
+                    if isinstance(self.left.op, int) and isinstance(self.right.op, int):
+                        self.op = self.left.op <= self.right.op
+                        self.args = []
+                        break
+                    if self.left.op != 0:
+                        self.right = Expr(amt.SubInstruction, self.right, self.left)
+                        self.left = Expr(0)
+                        continue
 
                 case _:
+                    # shouldn't happen
                     pass
 
-            self._eval() # now evaluate constant expressions
+            # after all the reductions happen, exit the loop
+            break
+    
 
-            if self.op != int:
-                if self.left.op == int:
-                    self._simplify_left()
-                if self.right.op == int:
-                    self._simplify_right()
-            return
-
+    ## associativity ##
     @(Syntax(object) >> None)
-    def _eval(self):
+    def _assoc(self):
         """
-        If both operands are integers, then just evaluate
+        Assuming expression is associative, regroups expression as
+        a . (b . c) = a . b . c
+        (a . b) . c = a . b . c
         """
-        if self.left.op != int or self.right.op != int:
-            return
-
-        lhs = self.left.left
-        rhs = self.right.left
-
-        match self.op:
-            case amt.AddInstruction:
-                self.left = lhs + rhs
-            case amt.MulInstruction:
-                self.left = lhs * rhs
-            case amt.DivInstruction:
-                if rhs == 0:
-                    raise OptError("Program leads to a division by zero!")
-                self.left = lhs // rhs
-            case amt.ModInstruction:
-                if rhs == 0:
-                    raise OptError("Program leads to a modulo by zero!")
-                self.left = lhs % rhs
-            case amt.AndInstruction:
-                self.left = lhs & rhs
-            case amt.OrInstruction:
-                self.left = lhs | rhs
-            case amt.XOrInstruction:
-                self.left = lhs ^ rhs
-            case amt.LShiftInstruction:
-                self.left = lhs << rhs
-            case amt.RShiftInstruction:
-                self.left = lhs >> rhs
-            case amt.EqInstruction:
-                self.left = int(lhs == rhs)
-            case amt.NeqInstruction:
-                self.left = int(lhs != rhs)
-            case amt.LtInstruction:
-                self.left = int(lhs < rhs)
-            case amt.LeqInstruction:
-                self.left = int(lhs <= rhs)
-            case _:
-                return
-
-        # at this point, match successfully evaluated expression
-        self.op = int
-        self.right = None
-
-    @(Syntax(object) >> None)
-    def _simplify_left(self):
+        newargs = []
+        for arg in self.args:
+            if arg.op == self.op:
+                newargs.extend(arg.args)
+            else:
+                newargs.append(arg)
+        self.args = newargs
+    
+    ## distributivity ##
+    @(Syntax(object, type, ...) >> bool)
+    def _distribute(self, *ops):
         """
-        Assumes left operand is an integer, but right operand is not
+        Distributes self.op over the ops specified, and return True
+        if distribution occurs
         """
-        match self.left.left:
-            case 0:
-                match self.op:
-                    case (amt.AddInstruction
-                            | amt.OrInstruction
-                            | amt.XOrInstruction):
-                        # 0 + a = a
-                        # 0 | a = a
-                        # 0 ^ a = a
-                        self.op = self.right.op
-                        self.left = self.right.left
-                        self.right = self.right.right
-                    case (amt.MulInstruction
-                            | amt.DivInstruction
-                            | amt.ModInstruction
-                            | amt.AndInstruction
-                            | amt.LShiftInstruction
-                            | amt.RShiftInstruction):
-                        # 0 * a = 0
-                        # 0 / a = 0
-                        # 0 % a = 0
-                        # 0 & a = 0
-                        # 0 << a = 0
-                        # 0 >> a = 0
-                        self.op = int
-                        self.left = 0
-                        self.right = None
-                    case _:
-                        # other cases have no reductions
-                        pass
-            case 1:
-                if self.op == amt.MulInstruction:
-                    # 1 * a = a
-                    self.op = self.right.op
-                    self.left = self.right.left
-                    self.right = self.right.right
-            case -1:
-                match self.op:
-                    case amt.AndInstruction:
-                        # (-1) & a = a
-                        self.op = self.right.op
-                        self.left = self.right.left
-                        self.right = self.right.right
-                    case (amt.OrInstruction
-                            | amt.RShiftInstruction):
-                        # (-1) | a = (-1)
-                        # (-1) >> a = (-1)
-                        self.op = int
-                        self.left = -1
-                        self.right = None
-                    case _:
-                        pass
-            case _:
-                pass
-
-    @(Syntax(object) >> None)
-    def _simplify_right(self):
-        """
-        Assumes right operand is an integer, but left operand
-        is not, which restricts our attention to noncommutative
-        operations, as the commutative operands are sorted so that
-        constants are on the left.
-        """
-        rarg = self.right.left
-        match self.op:
-            case amt.DivInstruction:
-                if rarg == 0:
-                    raise OptError("Program leads to a division by zero!")
-                elif rarg == 1:
-                    # a / 1 = a
-                    self.op = self.left.op
-                    self.right = self.left.right
-                    self.left = self.left.left
-                elif rarg == -1:
-                    # a / (-1) = (-1) * a
-                    self.op = amt.MulInstruction
-                    self.right = self.left
-                    self.left = Expr("-1")
-                    # this may lead to some further simplification
-                    self.rewrite()
-            case amt.ModInstruction:
-                if rarg == 0:
-                    raise OptError("Program leads to modulo by zero!")
-                elif abs(rarg) == 1:
-                    # a % 1 = a % (-1) = 0
-                    self.op = int
-                    self.left = 0
-                    self.right = None
-            case amt.LShiftInstruction:
-                if rarg == 0:
-                    # a << 0 = a
-                    self.op = self.left.op
-                    self.right = self.left.right
-                    self.left = self.left.left
-                elif rarg > 0:
-                    # a << n = (2**n)*a
-                    self.op = amt.MulInstruction
-                    self.right = self.left
-                    self.left = Expr(str(2**rarg))
-                    self.rewrite()
-                else:
-                    # a << (-n) = a >> n
-                    self.op = amt.RShiftInstruction
-                    self.right.left *= -1
-                    self.rewrite()
-            case amt.RShiftInstruction:
-                if rarg == 0:
-                    # a >> 0 = a
-                    self.op = self.left.op
-                    self.right = self.left.right
-                    self.left = self.left.left
-                elif rarg < 0:
-                    # a >> (-n) = (2**n)*a
-                    self.op = amt.MulInstruction
-                    self.right = self.left
-                    self.left = Expr(str(2**(-rarg)))
-                    self.rewrite()
-
-    @(Syntax(object) >> None)
-    def _simplify_eq(self):
-        """
-        On the assumption that the two operands are equal, simplifies the computation.
-        Recursively rewrites if necessary
-        """
-        match self.op:
-            case (amt.SubInstruction
-                    | amt.ModInstruction
-                    | amt.XOrInstruction
-                    | amt.NeqInstruction
-                    | amt.LtInstruction):
-                # a - a = 0
-                # a % a = 0
-                # a ^ a = 0
-                # (a != a) = 0
-                # (a < a) = 0
-                self.op = int
-                self.left = 0
-                self.right = None
-            case (amt.DivInstruction
-                    | amt.EqInstruction
-                    | amt.LeqInstruction):
-                # assuming division is well-defined
-                # a / a = 1
-                # (a == a) = 1
-                # (a <= a) = 1
-                self.op = int
-                self.left = 1
-                self.right = None
-            case (amt.AndInstruction
-                    | amt.OrInstruction):
-                # a & a = a; 
-                # a | a = a;
-                self.op = self.left.op
-                self.right = self.left.right
-                self.left = self.left.left
-            case amt.AddInstruction:
-                # a + a = 2 * a
-                self.op = amt.MulInstruction
-                self.left = Expr("2")
-                self.rewrite()
-            case _:
-                # other cases have no simplification
-                pass
-
-    @(Syntax(object) >> bool)
-    def _reassociate(self):
-        """
-        Assumes expr op is associative and tries to rewrite
-        a . (b . c) => (a . b) . c
-        Return whether or not the transformation happened
-        """
-        if self.right.op != self.op:
-            return False
-        self.left = Expr.genexpr(
-                self.op,
-                self.left,
-                self.right.left)
-        self.right = self.right.right
-        return True
+        for i, arg in enumerate(self.args):
+            op = self.op
+            if arg.op in ops:
+                # a . (b : c) . d = (a . b . d) : (a . c . d)
+                self.op = arg.op
+                self.args = [Expr(op, *self.args[:i], aa, *self.args[i+1:])
+                        for aa in arg.args]
+                return True
+        return False
 
     @(Syntax(object, type, ...) >> bool)
-    def _distribute_left(self, *opclasses):
+    def _distribute_left(self, *ops):
         """
-        Checks if expr is of the form (a : b) . c where (:) is
-        in the list of permissible opclasses.
-        Then rewrites the expression as
-        (a . c) : (b . c)
+        Distributes (a : b) . c = (a . c) : (b . c)
         """
-        if (op := self.left.op) not in opclasses:
-            return False
-        rhs = self.right
-        self.right = Expr.genexpr(
-                self.op,
-                self.left.right,
-                rhs)
-        self.left = Expr.genexpr(
-                self.op,
-                self.left.left,
-                rhs)
-        self.op = op
-        return True
+        if self.left.op in ops:
+            op = self.op
+            self.op = self.left.op
+            self.args = [Expr(op, arg, self.right) for arg in self.left.args]
+            return True
+        return False
 
-    @(Syntax(object, type, ...) >> bool)
-    def _distribute_right(self, *opclasses):
-        """
-        Checks if expr is of the form a . (b : c) where (:) is
-        in the list of permissible opclasses.
-        Then rewrites the expression as
-        (a . b) : (a . c)
-        """
-        if (op := self.right.op) not in opclasses:
-            return False
-        lhs = self.left
-        self.left = Expr.genexpr(
-                self.op,
-                lhs,
-                self.right.left)
-        self.right = Expr.genexpr(
-                self.op,
-                lhs,
-                self.right.right)
-        self.op = op
-        return True
+class ExprUI:
+    """
+    Wrapper for Expr for easy user testing
+    """
+    def __init__(self, expr):
+        if isinstance(expr, Expr):
+            self.expr = expr
+        else:
+            self.expr = Expr(expr)
 
-    @(Syntax(object, type, ...) >> bool)
-    def _distribute(self, *opclasses):
-        """
-        Combination of dist left and dist right
-        """
-        return self._distribute_left(*opclasses) or self._distribute_right(*opclasses)
+    def __repr__(self):
+        return repr(self.expr) + '~'
 
+    def _op(self, op, other):
+        return ExprUI(Expr(op, self.expr, other.expr))
 
+    def __add__(self, other):
+        return self._op(amt.AddInstruction, other)
+    def __sub__(self, other):
+        return self._op(amt.SubInstruction, other)
+    def __mul__(self, other):
+        return self._op(amt.MulInstruction, other)
+    def __truediv__(self, other):
+        return self._op(amt.DivInstruction, other)
+    def __mod__(self, other):
+        return self._op(amt.ModInstruction, other)
+    
+    def __and__(self, other):
+        return self._op(amt.AndInstruction, other)
+    def __or__(self, other):
+        return self._op(amt.OrInstruction, other)
+    def __xor__(self, other):
+        return self._op(amt.XOrInstruction, other)
+    def __lshift__(self, other):
+        return self._op(amt.LShiftInstruction, other)
+    def __rshift__(self, other):
+        return self._op(amt.RShiftInstruction, other)
+
+    def __eq__(self, other):
+        return self._op(amt.EqInstruction, other)
+    def __ne__(self, other):
+        return self._op(amt.NeqInstruction, other)
+    def __lt__(self, other):
+        return self._op(amt.LtInstruction, other)
+    def __le__(self, other):
+        return self._op(amt.LeqInstruction, other)
