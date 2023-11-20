@@ -1,0 +1,18 @@
+; compute modulus n by 2**m
+; (m needs to be >= 0)
+@main:
+    read %n
+    read %m
+    %invalid = %m < 0
+    branch %invalid ? @invalid : @mod
+@invalid:
+    write -1
+    exit
+@mod:
+    %base = 1 << %m
+    %mod.usual = %n % %base
+    %bm1 = %base - 1
+    %mod.bits = %n & %bm1
+    write %mod.usual
+    write %mod.bits
+    exit

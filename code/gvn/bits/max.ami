@@ -1,0 +1,25 @@
+; Bit Twiddling Hacks
+; https://graphics.stanford.edu/~seander/bithacks.html
+@main:
+    read %x
+    read %y
+    ; bit-hack: max = x ^ ((x^y)&-(x<y))
+    %r = %x < %y
+    %max = -%r
+    %l = %x ^ %y
+    %max = %l & %max
+    %max = %x ^ %max
+    branch %r ? @less : @greater
+
+@less:
+    %max.br = %y
+    goto @done
+
+@greater:
+    %max.br = %y
+    goto @done
+
+@done:
+    write %max
+    write %max.br
+
