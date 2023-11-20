@@ -499,6 +499,23 @@ class CFG(CFG):
                 yield self._blocks[label]
 
     @property
+    @(Syntax(object) >> [BasicBlock])
+    def postorder(self):
+        """
+        Returns the list of basic blocks in postorder
+        """
+        ret = []
+        seen = set()
+        def dfs(block):
+            seen.add(block)
+            for child in block.children:
+                if child not in seen:
+                    dfs(child)
+            ret.append(block)
+        dfs(self.entrypoint)
+        return ret
+
+    @property
     @(Syntax(object) >> [iter, BasicBlock])
     def undefined_blocks(self):
         for label in self._undef_blocks:
@@ -602,7 +619,10 @@ class CFG(CFG):
         """
         Clean up CFG.
         Remove unreachable blocks, test phi nodes, and ensure all
-        children know all parents
+        children know all parents.
+        Phi nodes are checked for covering all possible parents, and
+        also for ensuring phi arguments are not defined earlier in
+        the same block.
         """
         untouched = {block for block in self}
         def dfs(block):
@@ -625,12 +645,15 @@ class CFG(CFG):
 
             parent_labels = {parent.label for parent in block.parents}
             instructions = enumerate(block)
+            assigns = set()
             for i, I in instructions:
                 if isinstance(I, PhiInstruction):
                     # we will just passively clean up phi nodes
                     I.conds = tuple(filter(
                         lambda p: p[1] in parent_labels,
                         I.conds))
+                    if any(val in assigns for val, _ in I.conds):
+                        raise BadPhiError(block, i, f"Phi node in {block.label}:{i} has argument that is defined earlier in {block.label}.")
                     lbls = {lbl for _, lbl in I.conds}
                     if len(lbls) < len(I.conds):
                         raise BadPhiError(block, i, f"Phi node in {block.label}:{i} has repeated labels.")
@@ -639,6 +662,8 @@ class CFG(CFG):
                     if len(I.conds) == 1:
                         block._instructions[i] = MovInstruction(I.target, I.conds[0][0])
                         block[i].meta = I.meta
+                if isinstance(I, DefInstructionClass):
+                    assigns.add(I.target)
 
 
 

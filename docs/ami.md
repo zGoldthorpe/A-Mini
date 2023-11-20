@@ -53,6 +53,16 @@ A `phi` node **must** have a value corresponding to every possible previous bloc
 
 > *Note.* `phi` nodes are implemented so that A-Mi code can be written in [static single-assignment](https://en.wikipedia.org/wiki/Static_single_assignment_form) (SSA) form, but A-Mi code does not need to be in SSA form by default.
 
+Arguments of a `phi` node **cannot** be defined earlier in the same block: for example, the following
+```ami
+@A: read %0
+    branch %0 ? @B : @C
+@B: goto @C
+@C: read %1
+    %2 = phi [ %0, @B ], [ %1, @C ]
+```
+is illegal, because the `phi` node is in block `@C`, but its argument `%1` is defined earlier in the same block `@C`.
+
 ### Binary operations
 
 All binary operations have the form
