@@ -107,7 +107,7 @@ A-Mi also has *phony* (alias) instructions for convenience
 | Alias           | Purpose                  | Instruction     |
 |:----------------|:------------------------:|:----------------|
 | `%0 = -?1`      | negation                 | `%0 = 0 - ?1`   |
-| `%0 = ~?1`      | complement               | `%0 = 1 ^ ?1`   |
+| `%0 = ~?1`      | complement               | `%0 = -1 ^ ?1`  |
 | `%0 = ?1 > ?2`  | strictly greater than    | `%0 = ?2 < ?1`  |
 | `%0 = ?1 >= ?2` | greater than or equal to | `%0 = ?2 <= ?1` |
 

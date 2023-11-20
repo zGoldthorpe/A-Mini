@@ -59,83 +59,51 @@ class StatUI:
         self._relative = relative
         self._prec = prec
 
-    def print_stats(self, header, subjects:dict, params:list, ref=None, flip=False):
+    def print_data(self, header, data:dict, paramlist:list, ref=None, flip=False):
         """
-        subjects: dict mapping subj name to subj argument
-        params: list of pairs (param_name, param_func), where the latter
-                takes a subj argument as input.
-
-        ref must be one of the subjects, else None
-        If stats are relative, a non-None ref is required
-        
-        By default, larger values are considered \"better\". If stats are
-        relative, \"flip\" will reverse operands: comparisons default to
-        \"value - baseline\" and \"value / baseline\". If stats are absolute,
-        \"flip\" only affects output display.
+        data: dict [param][subj] -> value
+        header: title for params
+        ref: baseline, or None
+        flip: by default, larger is considered \"better\". `flip` switches this around.
+              If stats are relative to a baseline B, comparisons default to \"V - B\"
+              or \"V / B\"; `flip` in this case will reverse these operands.
         """
         if self._relative is not None and ref is None:
-            die("Relative statistics require specifying a baseline!")
+            die("Relative statistics require a baseline.")
+
+        if set(data.keys()) != set(paramlist):
+            die("Parameter list does not agree with data.")
+
+        subjects = list(list(data.items())[0][1].keys())
 
         if ref is not None:
             if ref not in subjects:
                 die(f"Statistic subjects do not include the baseline {ref}.")
-
-            baseline = { param : func(subjects[ref])
-                            for param, func in params }
+            # now, normalise the dictionary
+            table = {}
+            for param, pdata in data.items():
+                ndict = {}
+                baseline = pdata[ref]
+                for subj, value in pdata.items():
+                    match self._relative:
+                        case None:
+                            ndict[subj] = value
+                        case '+':
+                            ndict[subj] = baseline - value if flip else value - baseline
+                        case '+%':
+                            ndict[subj] = (baseline - value)/(baseline+1e-100) if flip else (value - baseline)/(baseline+1e-100)
+                        case 'x' | 'x%':
+                            ndict[subj] = baseline/(value+1e-100) if flip else value/(baseline+1e-100)
+                        case _:
+                            die(f"Unrecognised relativity specifier {self._relative}.")
+                table[param] = ndict
         else:
-            baseline = None
-        
-        def to_str(val):
-            mathmode = False
-            end = ''
-            modifier = ''
-            if isinstance(val, int):
-                mathmode = True
-                modifier = 'd'
-            if isinstance(val, float):
-                mathmode = True
-                modifier = f".{self._prec}f"
-                if val > 1e25:
-                    return r"$\infty$" if self._style == "latex" else "inf"
-            if self._relative is not None:
-                if self._relative.startswith('+'):
-                    modifier = '+' + modifier
-                if self._relative.startswith('x'):
-                    end = r'\times' if self._style == "latex" else 'x'
-                if self._relative.endswith('%'):
-                    val *= 100
-                    end = r'\%' if self._style == "latex" else '%'
-            out = f"{val:{modifier}}{end}"
-            if mathmode and self._style == "latex":
-                out = f"${out}$"
-            return out
+            table = {param : {subj : value for subj, value in pdata.items()}
+                        for param, pdata in data.items()}
 
-        def modify(param, func=lambda x: x):
-            # modify function if computation is relative
-            match self._relative:
-                case None:
-                    return func
-                case '+':
-                    if flip:
-                        return lambda arg: baseline[param] - func(arg)
-                    return lambda arg: func(arg) - baseline[param]
-                case '+%':
-                    if flip:
-                        return lambda arg: (baseline[param] - func(arg))/(baseline[param]+1e-100)
-                    return lambda arg: (func(arg) - baseline[param]) / (baseline[param]+1e-100)
-                case 'x' | 'x%':
-                    if flip:
-                        return lambda arg: baseline[param] / (func(arg)+1e-100)
-                    return lambda arg: func(arg) / (baseline[param]+1e-100)
-                case _:
-                    die(f"Unrecognised relativity specifier {self._relative}.")
-
-        table = { param : { subj : modify(param, func)(arg)
-                            for subj, arg in subjects.items() }
-                        for param, func in params }
-        printable = { param : { subj : to_str(value)
-                            for subj, value in data.items() }
-                        for param, data in table.items() }
+        printable = { param : { subj : self._to_str(value)
+                            for subj, value in pdata.items() }
+                        for param, pdata in table.items() }
         
         maxlen = { subj : max(len(subj),
                             max(len(printable[param][subj])
@@ -144,10 +112,10 @@ class StatUI:
 
         topval = { param : max(table[param][subj]
                         for subj in subjects if subj != ref)
-                    for param, _ in params }
+                    for param in paramlist }
         botval = { param : min(table[param][subj]
                         for subj in subjects if subj != ref)
-                    for param, _ in params }
+                    for param in paramlist }
 
         if flip and self._relative is None:
             # only in this case, the lowest value is the best
@@ -181,22 +149,23 @@ class StatUI:
             pstructure("-+-".join('-'*maxlen[subj]
                             for subj in subjects_sorted))
 
-        for param, _ in params:
+        flip &= not self._relative
+        for param in paramlist:
             print(end=f"{param: ^{maxparamlen}}")
-            data = table[param]
+            pdata = table[param]
             outs = printable[param]
             for subj in subjects_sorted:
                 pstructure(end=sep)
-                val = data[subj]
+                val = pdata[subj]
                 out = f"{outs[subj]: >{maxlen[subj]}}"
                 if subj == ref:
                     pstructure(end=out)
                     continue
                 pval(end=out,
                         good = ref is not None and
-                            (flip ^ (val > data[ref])),
+                            (flip ^ (val > pdata[ref])),
                         bad = ref is not None and
-                            (flip ^ (val < data[ref])),
+                            (flip ^ (val < pdata[ref])),
                         best = val == topval[param],
                         worst = val == botval[param])
             pstructure(end=end)
@@ -204,6 +173,31 @@ class StatUI:
         # wrap up
         if self._style == "latex":
             pstructure(r"\end{tabular}")
+
+    def _to_str(self, val):
+        mathmode = False
+        end = ''
+        modifier = ''
+        if isinstance(val, int):
+            mathmode = True
+            modifier = 'd'
+        if isinstance(val, float):
+            mathmode = True
+            modifier = f".{self._prec}f"
+            if val > 1e25:
+                return r"$\infty$" if self._style == "latex" else "inf"
+        if self._relative is not None:
+            if self._relative.startswith('+'):
+                modifier = '+' + modifier
+            if self._relative.startswith('x'):
+                end = r'\times' if self._style == "latex" else 'x'
+            if self._relative.endswith('%'):
+                val *= 100
+                end = r'\%' if self._style == "latex" else '%'
+        out = f"{val:{modifier}}{end}"
+        if mathmode and self._style == "latex":
+            out = f"${out}$"
+        return out
 
 def get_cfg_stats(cfg):
     """

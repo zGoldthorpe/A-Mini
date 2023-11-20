@@ -132,7 +132,7 @@ def batch_diff(tfmanager, multi):
 
     return multi.execute()
 
-def run_code_stats(tfmanager, multi, stats):
+def run_code_stats(tfmanager, multi, stats, *, ref):
     
     print("Code report")
     print()
@@ -161,6 +161,16 @@ def run_code_stats(tfmanager, multi, stats):
 
     nickname = ui.stats.name_compressor(optset)
 
+    if ref != '-':
+        if ref in nickname:
+            ref = nickname[ref]
+        elif ref not in nickname.values():
+            utils.printing.perror(f"{ref} is not a valid baseline.")
+            utils.printing.perror("The valid baselines are:\n\t-")
+            for opt, nick in nickname.items():
+                utils.printing.perror(f"\t{opt} or \"{nick}\"")
+            exit(1)
+
     nlen = max(len(nick) for opt, nick in nickname.items())
     print("Optimisations:")
     for opt, nick in sorted(nickname.items(), key=lambda t: t[1]):
@@ -173,24 +183,32 @@ def run_code_stats(tfmanager, multi, stats):
 
     for test in tfmanager.tests:
         print(test, '-'*len(test), sep='\n')
-        ref = "-"
 
         subjects = { ref : tfmanager.get_test_ami(test) }
         for opt in tfmanager.get_test_opts(test):
             subjects[nickname[opt]] = tfmanager.get_test_opt(test, opt)
 
-        stats.print_stats(header="stat", subjects=subjects,
-                params=[
-                    ("I", lambda src: code_stats[src]["num_instructions"]),
-                    ("B", lambda src: code_stats[src]["num_blocks"]),
-                    ("V", lambda src: code_stats[src]["num_vars"]),
-                    ("phi", lambda src: code_stats[src]["num_phi"])],
+        paramlist = (
+                ("I", "num_instructions"),
+                ("B", "num_blocks"),
+                ("V", "num_vars"),
+                ("phi", "num_phi"))
+        data = {key:{} for key, _ in paramlist}
+        if ref == '-':
+            for key, param in paramlist:
+                data[key][ref] = code_stats[tfmanager.get_test_ami(test)][param]
+        for opt in tfmanager.get_test_opts(test):
+            for key, param in paramlist:
+                data[key][nickname[opt]] = code_stats[
+                        tfmanager.get_test_opt(test, opt)][param]
+        stats.print_data(header="stat", data=data,
+                paramlist=[key for key, _ in paramlist],
                 ref=ref,
                 flip=True # the smaller, the better
                 )
         print()
 
-def run_trace_stats(tfmanager, multi, stats):
+def run_trace_stats(tfmanager, multi, stats, *, ref):
     
     print("Trace report")
     print()
@@ -226,6 +244,16 @@ def run_trace_stats(tfmanager, multi, stats):
 
     nickname = ui.stats.name_compressor(optset)
 
+    if ref != '-':
+        if ref in nickname:
+            ref = nickname[ref]
+        elif ref not in nickname.values():
+            utils.printing.perror(f"{ref} is not a valid baseline.")
+            utils.printing.perror("The valid baselines are:\n\t-")
+            for opt, nick in nickname.items():
+                utils.printing.perror(f"\t{opt} or \"{nick}\"")
+            exit(1)
+
     nlen = max(len(nick) for opt, nick in nickname.items())
     print("Optimisations:")
     for opt, nick in sorted(nickname.items(), key=lambda t: t[1]):
@@ -242,38 +270,31 @@ def run_trace_stats(tfmanager, multi, stats):
                 for inf in tfmanager.get_test_input_files(test)):
             continue
         print(test, '-'*len(test), sep='\n')
-        ref = "-"
+        paramlist = sum(([
+                (f"{inf}/I", inf, "num_instructions"),
+                (f"{inf}/BB", inf, "num_blocks"),
+                (f"{inf}/br", inf, "num_branches")
+                ] for inf in tfmanager.get_test_input_files(test)),
+                start=[])
 
-        subjects = { ref : None }
+        data = {key:{} for key, _, _ in paramlist}
+        if ref == "-":
+            for key, inf, param in paramlist:
+                data[key][ref] = trace_stats[
+                        tfmanager.get_test_corresponding_trace_fpath(
+                            test, inf)][param]
         for opt in tfmanager.get_test_opts(test):
             if any(tfmanager.get_test_opt_corresponding_trace_fpath(
                     test, opt, inf) not in trace_stats
                     for inf in tfmanager.get_test_input_files(test)):
                 continue
-            subjects[nickname[opt]] = opt
+            for key, inf, param in paramlist:
+                data[key][nickname[opt]] = trace_stats[
+                        tfmanager.get_test_opt_corresponding_trace_fpath(
+                            test, opt, inf)][param]
 
-        stats.print_stats(header="input", subjects=subjects,
-                params=sum(([
-                    (f"{inf}/I", lambda opt: trace_stats[
-                        tfmanager.get_test_opt_corresponding_trace_fpath(
-                            test, opt, inf)
-                        if opt is not None else
-                        tfmanager.get_test_corresponding_trace_fpath(
-                            test, inf)]["num_instructions"]),
-                    (f"{inf}/BB", lambda opt: trace_stats[
-                        tfmanager.get_test_opt_corresponding_trace_fpath(
-                            test, opt, inf)
-                        if opt is not None else
-                        tfmanager.get_test_corresponding_trace_fpath(
-                            test, inf)]["num_blocks"]),
-                    (f"{inf}/br", lambda opt: trace_stats[
-                        tfmanager.get_test_opt_corresponding_trace_fpath(
-                            test, opt, inf)
-                        if opt is not None else
-                        tfmanager.get_test_corresponding_trace_fpath(
-                            test, inf)]["num_branches"]),
-                        ] for inf in sorted(tfmanager.get_test_input_files(test))),
-                        start=[]),
+        stats.print_data(header="input", data=data,
+                paramlist=[key for key, _, _ in paramlist],
                 ref=ref,
                 flip=True # the smaller, the better
                 )
@@ -328,6 +349,11 @@ if __name__ == "__main__":
     stats_parser.add_argument("stat",
                     choices=("code", "trace"),
                     help="Specify which statistics to report on.")
+    stats_parser.add_argument("--baseline",
+                    dest="ref",
+                    metavar="OPT",
+                    default="-",
+                    help="Specify an optimisation to serve as the baseline for the remaining data (or use \"-\" to refer to the original source code).")
 
     args = argparser.parse_args()
     PrinterUI.arg_init(args)
@@ -368,6 +394,6 @@ if __name__ == "__main__":
         case "stats":
             stats = StatUI.arg_init(args)
             if args.stat == "code":
-                run_code_stats(tfmanager, multi, stats)
+                run_code_stats(tfmanager, multi, stats, ref=args.ref)
             else:
-                run_trace_stats(tfmanager, multi, stats)
+                run_trace_stats(tfmanager, multi, stats, ref=args.ref)
