@@ -111,7 +111,7 @@ A-Mi also has *phony* (alias) instructions for convenience
 | `%0 = ?1 > ?2`  | strictly greater than    | `%0 = ?2 < ?1`  |
 | `%0 = ?1 >= ?2` | greater than or equal to | `%0 = ?2 <= ?1` |
 
-The parser automatically reinterprets these aliases for their underlying instructions.
+The parser automatically reinterprets these aliases as their underlying instructions as specified above.
 
 ### Branch instructions
 
