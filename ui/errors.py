@@ -1,4 +1,5 @@
 import sys
+import traceback
 
 import utils.printing
 
@@ -10,4 +11,4 @@ def die(msg):
     exit(99)
 
 def unexpected(exception):
-    die(f"Unexpected {type(exception).__name__}:\n\t{exception}")
+    die(f"Unexpected {type(exception).__name__}:\n\t{exception}\n{traceback.format_exc()}")

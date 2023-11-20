@@ -166,28 +166,6 @@ class CFGWriter:
             for I_str in self._instruction_str(I):
                 yield I_str
 
-    @(Syntax(object, ampy.types.CFG) >> [iter, ampy.types.BasicBlock])
-    def _traverse_rpo(self, cfg):
-        """
-        Generate blocks of CFG in RPO
-
-        Note: unreachable blocks are automatically eliminated
-        """
-        seen = set()
-        postorder = []
-        
-        def dfs(block):
-            seen.add(block)
-            for child in block.children:
-                if child not in seen:
-                    dfs(child)
-            postorder.append(block)
-
-        dfs(cfg.entrypoint)
-
-        for block in reversed(postorder):
-            yield block
-
     @(Syntax(object, ampy.types.CFG) >> [iter, str])
     def generate(self, cfg):
         """
@@ -200,6 +178,6 @@ class CFGWriter:
                 for metadata in self._meta_str('#', var, val):
                     yield metadata
 
-        for block in self._traverse_rpo(cfg):
+        for block in reversed(cfg.postorder):
             for block_str in self._block_str(block):
                 yield block_str

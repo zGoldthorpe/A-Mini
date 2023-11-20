@@ -50,17 +50,7 @@ class RPO(RPO):
 
         # Step 1. Get blocks in reverse post-order
         # ----------------------------------------
-        postorder = []
-        
-        seen = set()
-        def build_postorder(block):
-            seen.add(block)
-            for child in block.children:
-                if child not in seen:
-                    build_postorder(child)
-            postorder.append(block)
-        
-        build_postorder(self.CFG.entrypoint)
+        postorder = self.CFG.postorder
 
         # Step 2. Value numbering
         # -----------------------

@@ -14,7 +14,7 @@ from utils.syntax import Syntax
 from opt.tools import Opt
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.domtree import DomTreeAnalysis
-from opt.gvn.rpo_simple import RPO
+from opt.gvn.rpo import RPO
 
 import ampy.types
 
@@ -31,7 +31,7 @@ class NaiveSimplify(NaiveSimplify):
     the value numbering.
     """
 
-    @NaiveSimplify.init("gvn-simplify-naive")
+    @NaiveSimplify.init("gvn-reduce")
     def __init__(self, /):
         pass
 
@@ -42,24 +42,10 @@ class NaiveSimplify(NaiveSimplify):
         """
         # Step 0. Compute value numbers
         # -----------------------------
-        # vn[var]: value number of variable
-        # const[i]: if applicable, the constant value of vn class
         gvn = self.require(RPO)
-        self._vn = {}
-        self._const = {}
-        number = 0
-        for var in gvn["classes"]:
-            if var == '$':
-                number += 1
-                continue
-            if not var.startswith('%'):
-                # this is a constant
-                self._const[number] = var
-                continue
-            self.debug(f"Assigning {var} to value number {number}")
-            self._vn[var] = number
-
+        self._vn = gvn.get_value_partitions()
         defs = self.require(DefAnalysis)
+        # remember locations of old defines, in case variables need to be revived
         defs.perform_opt()
 
         # Step 1. Perform substitutions
@@ -77,7 +63,13 @@ class NaiveSimplify(NaiveSimplify):
         # Step 2. Correct phi nodes
         # -------------------------
         # We ignore phi nodes in the previous step so that we know
-        # the dominating variable for each value at each block
+        # the dominating variable for each value at each block.
+        # After value numbering, the phi node may depend
+        # on a value class represented by a value that gets
+        # redefined earlier in its own block, which is incorrect.
+        # To correct this, we store the previous value before it gets
+        # redefined. The choice of storing variable is a previously-discarded
+        # copy, unless that is precisely the variable being copied
         revived = set()
         for block in self.CFG:
             assigns = set()
@@ -106,9 +98,23 @@ class NaiveSimplify(NaiveSimplify):
                 if isinstance(I, ampy.types.DefInstructionClass):
                     assigns.add(I.target)
 
+
         if self._changed:
             return tuple(opt for opt in self.opts if opt.ID in ("gvn-simplify-naive", "ssa", "domtree"))
         return self.opts
+
+    @(Syntax(object, str) >> str)
+    def _gen_new_phi_reg(self, var):
+        """
+        Generate a new register name (used for holding phi argument values)
+        """
+        ret = f"{var}.phi"
+        idx = -1
+        while ret in self._vn:
+            idx += 1
+            ret = f"{var}.phi.{idx}"
+        self._vn[ret] = self_vn[var] # so it doesn't get used again
+        return ret
 
     @(Syntax(object, str, ampy.types.BasicBlock) >> (str, None))
     def _get_dominating_var(self, var, block):
@@ -120,8 +126,8 @@ class NaiveSimplify(NaiveSimplify):
         if not var.startswith('%'):
             return var
         vn = self._vn[var]
-        if vn in self._const:
-            return self._const[vn]
+        if isinstance(vn, int):
+            return str(vn)
         if vn not in self._dommem.setdefault(block, {}):
             if block == self.CFG.entrypoint:
                 # this means the variable has never been defined
