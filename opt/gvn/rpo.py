@@ -70,12 +70,11 @@ class RPO(RPO):
                     if isinstance(I, ampy.types.MovInstruction):
                         expr = get_vn(I.operand)
                     elif isinstance(I, ampy.types.PhiInstruction):
-                        vals = set(get_vn(var) for var, _ in I.conds)
-                        if len(vals) == 1:
-                            expr = vals.pop()
-                        else:
-                            # operands are different; cannot be optimistic
-                            expr = Expr(I.target)
+                        args = []
+                        for val, label in I.conds:
+                            args.append(get_vn(val))
+                            args.append(Expr(label))
+                        expr = Expr(type(I), *args)
                     elif isinstance(I, ampy.types.BinaryInstructionClass):
                         op1, op2 = map(get_vn, I.operands)
                         expr = Expr(type(I), op1, op2)
@@ -87,7 +86,11 @@ class RPO(RPO):
                         # we do not handle non-def instructions
                         continue
 
-                    if self._number == "expr" or isinstance(expr.op, int):
+                    if ((self._number == "expr" and
+                            expr.op != ampy.types.PhiInstruction)
+                            or isinstance(expr.op, (int, str))):
+                        # do not expand phi instructions as expressions
+                        # or else you will face infinite loops
                         value = lookup.setdefault(expr, expr)
                     else:
                         value = lookup.setdefault(expr, Expr(I.target))

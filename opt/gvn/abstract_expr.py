@@ -22,7 +22,7 @@ class Expr(Expr):
     """
     @(Syntax(object, int, reduce=bool)
       | Syntax(object, str, reduce=bool)
-      | Syntax(object, ((type, Assertion(lambda T: issubclass(T, amt.BinaryInstructionClass))),), Expr, ..., reduce=bool))
+      | Syntax(object, ((type, Assertion(lambda T: issubclass(T, amt.DefInstructionClass))),), Expr, ..., reduce=bool))
     def __init__(self, op, *exprs, reduce=True):
         # an expression is an AST whose leaf nodes are constants / registers
         #
@@ -68,7 +68,16 @@ class Expr(Expr):
                 return f"({rep})"
             return rep
 
-        return "({})".format(f" {self.op.op} ".join(str(arg) for arg in self.args))
+        if issubclass(self.op, amt.BinaryInstructionClass):
+            return "({})".format(f" {self.op.op} ".join(str(arg) for arg in self.args))
+
+        if self.op == amt.PhiInstruction:
+            return "phi({})".format("; ".join(
+                "{}, {}".format(str(self.args[2*i]), str(self.args[2*i+1]))
+                for i in range(len(self.args)//2)))
+
+        # new definition instruction
+        return f"{self.op}({', '.join(str(arg) for arg in self.args)})"
 
     def __repr__(self):
         return f"Expr<{self}>"
@@ -123,6 +132,7 @@ class Expr(Expr):
                 amt.NeqInstruction,
                 amt.LtInstruction,
                 amt.LeqInstruction,
+                amt.PhiInstruction,
                 )
 
         for op in order:
@@ -181,6 +191,30 @@ class Expr(Expr):
         while True:
 
             match self.op:
+
+                case amt.PhiInstruction:
+                    # not much we can do with these
+                    # besides group its operands by label and hope things align
+                    #TODO: uses hashing
+                    mapping = {}
+                    for i in range(len(self.args)//2):
+                        val = self.args[2*i]
+                        label = self.args[2*i+1]
+                        mapping.setdefault(val, set()).add(label)
+                    if len(mapping) == 1:
+                        # phi is actually just a copy
+                        new, _ = mapping.popitem()
+                        self.op = new.op
+                        self.args = new.args
+                        return
+                    self.args = []
+                    for val, labelset in sorted(mapping.items()):
+                        self.args.append(val)
+                        self.args.append(Expr(amt.OrInstruction, *labelset))
+                    return
+
+
+
 
                 case amt.AddInstruction:
                     self._assoc()
