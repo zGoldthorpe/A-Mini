@@ -28,9 +28,6 @@ class NaiveSimplify(NaiveSimplify):
     Uses gvn-rpo or gvn-scc information to eliminate redundant definitions.
     Does not hoist or do anything advanced.
 
-    Pass gvn-simple with desired arguments prior to this pass to affect
-    the value numbering.
-
     number: "var" or "expr" or "any"
         Set if the value numbers are given by consts/registers or expressions.
     gvn: "rpo" or "scc" or "any"
