@@ -199,6 +199,8 @@ class TestFileUI:
 
             # check for updates in optimised code
             for opt in self.get_test_opts(ami):
+                if "@out" not in self._tests[ami][opt]:
+                    continue
                 optmtime = os.path.getmtime(self.get_test_opt(ami, opt))
                 out_fld = self.get_test_opt_output_folder(ami, opt)
                 outmtime = os.path.getmtime(out_fld)

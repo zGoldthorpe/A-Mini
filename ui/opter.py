@@ -95,7 +95,7 @@ class OptUI:
         """
         opt_args = []
         opt_kwargs = {}
-        m = re.fullmatch(rf"({Pass_ID_re})\((.*)\)", opt)
+        m = re.fullmatch(fr"({Pass_ID_re})\((.*)\)", opt)
         if m is not None:
             opt = m.group(1)
             passed = list(map(lambda s:s.strip(), m.group(2).split(',')))
@@ -111,6 +111,14 @@ class OptUI:
         if opt in OM:
             return OM[opt], opt_args, opt_kwargs
         die(f"Cannot recognise pass {opt}.")
+    
+    @classmethod
+    def parse_pipeline(cls, opts:str):
+        """
+        Parse a list of multiple passes and return the list of (Pass, args, kwargs) triples.
+        """
+        return [cls.parse_pass(opt) for opt in re.findall(
+            fr"{Pass_ID_re}(?:\([^()]*\)|(?=\s*(?:[^()]|$)))", opts)]
 
     @classmethod
     def arg_init(cls, parsed_args):
@@ -134,7 +142,7 @@ class OptUI:
 
         if passes_ls is None:
             passes_ls = ()
-        self._passes_ls = tuple(self.parse_pass(opt) for opt in passes_ls)
+        self._passes_ls = [self.parse_pass(opt) for opt in passes_ls]
 
     def load_cfg(self, cfg):
         """
@@ -145,6 +153,12 @@ class OptUI:
             for opt, args, kwargs in self._passes_ls:
                 self.add_pass(opt, args, kwargs)
 
+    def append_pass(self, Pass:type, args:tuple, kwargs:dict):
+        """
+        Append specified pass constructor to opter.
+        Do this *prior* to loading the CFG
+        """
+        self._passes_ls.append((Pass, args, kwargs))
 
     def add_pass(self, Pass:type, args:tuple, kwargs:dict):
         """

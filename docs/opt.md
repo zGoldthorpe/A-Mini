@@ -317,6 +317,19 @@ To delete these folders (without deleting the original `ami` files), run
 python3 batch_test.py --clear-vfy
 ```
 
+The passes given `--add-pass` flags append to the same single optimisation pipeline.
+To compile several pipelines (e.g. for testing), use the `--file` flag:
+```console
+python3 batch_test.py [...] opt --file passes.opt
+```
+where `passes.opt` might look something like
+```
+ssa dce branch-elim
+gvn-reduce(expr, gvn=scc) dce branch-elim
+gvn-reduce(var) reg-realloc
+```
+This would tell `batch_opt` to run three separate builds, one per line of `passes.opt`.
+
 ### The `run` test
 ```console
 python3 batch_test.py [...] run
