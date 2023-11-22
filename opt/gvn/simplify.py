@@ -50,8 +50,19 @@ class NaiveSimplify(NaiveSimplify):
         """
         # Step 0. Compute value numbers
         # -----------------------------
+        # The GVN algorithm will return a mapping from registers to
+        # expressions, but this is too much for this simple reduction algo.
+        # Therefore, we map these value numbers to a representative register
+        # or an integer constant (if the expression is a constant)
         gvn = self.require(self._gvn, self._number)
-        self._vn = gvn.get_value_partitions()
+        self._vn = {}
+        expr_rep = {} # lookup table for expression representative
+        for var, expr in gvn.get_value_partitions().items():
+            if isinstance(expr.op, str):
+                self._vn[var] = expr.op
+            else:
+                self._vn[var] = expr_rep.setdefault(expr, var)
+
         defs = self.require(DefAnalysis)
         # remember locations of old defines, in case variables need to be revived
         defs.perform_opt()
@@ -108,7 +119,7 @@ class NaiveSimplify(NaiveSimplify):
 
 
         if self._changed:
-            return tuple(opt for opt in self.opts if opt.ID in ("gvn-simplify-naive", "ssa", "domtree"))
+            return tuple(opt for opt in self.opts if opt.ID in ("gvn-reduce", "ssa", "domtree"))
         return self.opts
 
     @(Syntax(object, str) >> str)
@@ -134,8 +145,8 @@ class NaiveSimplify(NaiveSimplify):
         if not var.startswith('%'):
             return var
         vn = self._vn[var]
-        if isinstance(vn, int):
-            return str(vn)
+        if not vn.startswith('%'):
+            return vn
         if vn not in self._dommem.setdefault(block, {}):
             if block == self.CFG.entrypoint:
                 # this means the variable has never been defined

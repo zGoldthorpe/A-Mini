@@ -482,6 +482,9 @@ class Opt(Opt, RequiresOpt):
             arg = vv[0]
             vals = vv[1:]
         
+        # clean up whitespace in values
+        # (since data is whitespace-separated anyway)
+        vals = ' '.join(vals).split()
         if append:
             meta.setdefault(self.tagged(arg), []).extend(vals)
         else:

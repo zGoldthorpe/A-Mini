@@ -100,24 +100,29 @@ class Expr(Expr):
     @(Syntax(object, str) >> Expr)
     def read_polish(cls, polish):
         """
-        Parse polish notation
+        Parse Polish notation
         """
-        return cls._read_polish(polish.split(), 0)[0]
+        return cls.read_polish_ls(polish.split(), 0)[0]
 
     @classmethod
     @(Syntax(object, [str], int) >> ((), Expr, int))
-    def _read_polish(cls, polish, i):
+    def read_polish_ls(cls, polish, i):
+        """
+        Given the Polish expr as a list of terms, and a starting index i,
+        returns a pair (expr, j), where expr is the expression obtained by
+        parsing the terms in the interval [i, j).
+        """
         if '`' not in polish[i]:
             return Expr(polish[i]), i+1
 
-        op, arity = polish[i].split('`')
+        op, arity = polish[i].split('`', 1)
         arity = int(arity)
 
         # collect all arguments
         args = []
         j = i+1
         for _ in range(arity):
-            expr, j = Expr._read_polish(polish, j)
+            expr, j = Expr.read_polish_ls(polish, j)
             args.append(expr)
 
         match op:

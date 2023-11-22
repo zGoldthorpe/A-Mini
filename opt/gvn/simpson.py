@@ -109,42 +109,37 @@ class RPO(RPO):
         vnclasses = {}
         for var, val in vn.items():
             vnclasses.setdefault(val, set()).add(var)
-            if isinstance(val.op, int):
-                vnclasses[val].add(str(val.op)) # include constant if known
 
         self.assign("classes")
-        for _, vnclass in vnclasses.items():
+        for val, vnclass in vnclasses.items():
+            self.assign("classes", val.polish, append=True)
             self.assign("classes", *sorted(vnclass), append=True)
             self.assign("classes", '$', append=True)
 
         return self.opts
 
     @RPO.getter
-    @(Syntax(object) >> {str:(str,int)})
+    @(Syntax(object) >> {str:Expr})
     def get_value_partitions(self):
         """
         Returns a mapping from variable names to "value numbers".
-        If the VN class corresponds to an integer, then all variables will
-        map to this integer; otherwise, they will map to a selected
-        representative variable from the VN class (as a string).
+        The value number is always an Expr instance.
         """
         ret = {}
-        cls = []
-        rep = None
-        for var in self["classes"]:
-            if var == '$':
-                for v in cls:
-                    ret[v] = rep
-                rep = None
-                cls = []
+        expr = None
+        i = 0
+        cls_ls = self["classes"]
+        while i < len(cls_ls):
+            if cls_ls[i] == '$':
+                expr = None
+                i += 1
                 continue
-            if not var.startswith('%'):
-                # this is a constant
-                rep = int(var)
+            if expr is None:
+                expr, i = Expr.read_polish_ls(cls_ls, i)
                 continue
-            if rep is None:
-                rep = var
-            cls.append(var)
+            ret[cls_ls[i]] = expr
+            i += 1
+
         return ret
 
 class SCC(Opt):
@@ -264,23 +259,44 @@ class SCC(SCC):
             if var not in tarjannum:
                 tarjan(var)
 
-        # Step 3. Record value number classes
-        # -----------------------------------
+        # Step 3. Record  value number classes
+        # ------------------------------------
         self.debug("Value numbering complete")
         vnclasses = {}
         for var, val in self._vn.items():
             vnclasses.setdefault(val, set()).add(var)
-            if isinstance(val.op, int):
-                vnclasses[val].add(str(val.op)) # include constant, if known
 
         self.assign("classes")
-        for _, vnclass in vnclasses.items():
+        for val, vnclass in vnclasses.items():
+            self.assign("classes", val.polish, append=True)
             self.assign("classes", *sorted(vnclass), append=True)
             self.assign("classes", '$', append=True)
 
-
-        # analysis pass
         return self.opts
+
+    @SCC.getter
+    @(Syntax(object) >> {str:Expr})
+    def get_value_partitions(self):
+        """
+        Returns a mapping from variable names to "value numbers".
+        The value number is always an Expr instance.
+        """
+        ret = {}
+        expr = None
+        i = 0
+        cls_ls = self["classes"]
+        while i < len(cls_ls):
+            if cls_ls[i] == '$':
+                expr = None
+                i += 1
+                continue
+            if expr is None:
+                expr, i = Expr.read_polish_ls(cls_ls, i)
+                continue
+            ret[cls_ls[i]] = expr
+            i += 1
+
+        return ret
 
     @(Syntax(object, [list, str]) >> None)
     def _process_scc(self, scc):
@@ -347,31 +363,3 @@ class SCC(SCC):
             return True
 
         return False
-
-    @SCC.getter
-    @(Syntax(object) >> {str:(str,int)})
-    def get_value_partitions(self):
-        """
-        Returns a mapping from variable names to "value numbers".
-        If the VN class corresponds to an integer, then all variables will
-        map to this integer; otherwise, they will map to a selected
-        representative variable from the VN class (as a string).
-        """
-        ret = {}
-        cls = []
-        rep = None
-        for var in self["classes"]:
-            if var == '$':
-                for v in cls:
-                    ret[v] = rep
-                rep = None
-                cls = []
-                continue
-            if not var.startswith('%'):
-                # this is a constant
-                rep = int(var)
-                continue
-            if rep is None:
-                rep = var
-            cls.append(var)
-        return ret

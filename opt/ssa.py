@@ -98,8 +98,6 @@ class SSA(SSA):
                     break
                 self._idf[var] = new
 
-        self.debug("IDFs:", {var:{B.label for B in self._idf[var]} for var in self._idf})
-
         # Step 3. Insert phi nodes
         # ------------------------
         # Phi nodes are inserted in the iterated dominance frontier
@@ -117,6 +115,7 @@ class SSA(SSA):
 
         changed = False
         for var, blocks in self._idf.items():
+            self.debug(f"IDF[{var}]:", ', '.join(block.label for block in blocks))
             # SSA_vars: list of new variables for substituting var
             # SSA_counter: key for uniqueness of variable
             # visited: set of basic blocks that have been visited
