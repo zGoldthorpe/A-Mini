@@ -156,7 +156,7 @@ class RequiresOpt:
         """
         return self._opts
 
-    @(Syntax(object, type, (str, type(any)), ...).set_allow_extra_kwargs(True, (str, type(any))) >> Opt)
+    @(Syntax(object, (type, (tuple, [tuple, type])), (str, type(any)), ...).set_allow_extra_kwargs(True, (str, type(any))) >> Opt)
     def require(self, opt_cls, *req_args, **req_kwargs):
         """
         Fetch data from a required opt with specified arguments.
@@ -184,6 +184,8 @@ class RequiresOpt:
             # opt cannot be found
             # so initalise a new opt
             # (this will also update opt list for next time)
+            if isinstance(opt_cls, tuple):
+                opt_cls = opt_cls[0]
             required = opt_cls(self.CFG, self.opts,
                     *(filter(lambda s: isinstance(s, str), req_args)),
                     **{key:arg for key, arg in req_kwargs.items() if isinstance(arg, str)})

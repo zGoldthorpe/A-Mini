@@ -24,7 +24,7 @@ from ui.writer      import WriterUI
 
 import ui.stats
 
-def batch_opt(tfmanager, multi, opter, *, meta=True):
+def batch_opt(tfmanager, multi, opter, *, meta=True, fresh=False):
     """
     This function is responsible for generating the optimised code files.
     """
@@ -48,7 +48,7 @@ def batch_opt(tfmanager, multi, opter, *, meta=True):
 
     # set up processes
     for test in tfmanager.tests:
-        if opt in tfmanager.get_test_opts(test):
+        if opt in tfmanager.get_test_opts(test) and not fresh:
             continue
         multi.prepare_process(
                 tfmanager.get_test_opt(test, opt),
@@ -323,6 +323,10 @@ if __name__ == "__main__":
                     dest="meta",
                     action="store_false",
                     help="Do not write metadata to optimised output code.")
+    opt_parser.add_argument("--fresh",
+                    dest="fresh_opt",
+                    action="store_true",
+                    help="Do a clean rebuild, and overwrite already existing files for this optimisation.")
     
     ### run arguments ###
     run_parser = subparsers.add_parser("run",
@@ -369,7 +373,7 @@ if __name__ == "__main__":
         case "opt":
             utils.printing.phidden("batch_opt :: updating optimised files")
             opter = OptUI.arg_init(args)
-            res = batch_opt(tfmanager, multi, opter, meta=args.meta)
+            res = batch_opt(tfmanager, multi, opter, meta=args.meta, fresh=args.fresh_opt)
             if any(ec for _, ec in res.items()):
                 exit(99)
 

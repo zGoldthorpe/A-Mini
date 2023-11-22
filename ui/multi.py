@@ -7,11 +7,13 @@ Goldthorpe
 import collections
 import multiprocessing
 import os
+import random
 import shutil
 import sys
 import time
 
 import utils.debug
+import utils.printing
 
 from ui.errors import perror, die, unexpected
 
@@ -84,6 +86,34 @@ class MultiUI:
 
         self._proc_queue.append((ID, wrapped_target))
 
+    @classmethod
+    def print_progressbar(cls, completed, queued, total):
+        if total == 0:
+            perc = 100
+            qperc = 0
+        else:
+            perc = (completed * 100) // total
+            qperc = (queued * 100) // total
+        msg = f"{completed} / {total}"
+        if utils.printing.Printing.can_format:
+            msg = f"{msg: ^100}"
+            utils.printing.Printing.formatted("\033[0G[\033[42;30m", "\033[m",
+                    msg[:perc], end='')
+            utils.printing.Printing.formatted("\033[43;30m", "\033[m", msg[perc:perc+qperc], end='')
+            utils.printing.Printing.formatted("\033[41;37m", "\033[m", msg[perc+qperc:], end='')
+
+            print(']', end='', flush=True)
+        else:
+            print('[', end='')
+            print("#"*perc, end='')
+            print("_"*qperc, end='')
+            if len(msg) + perc + qperc + 1 < 100:
+                print(' ', end=msg)
+                print(' '*(100-perc-qperc-len(msg)-1), end='')
+            else:
+                print(' '*(100-perc-qperc), end='')
+            print(']')
+
     def execute(self):
         """
         Run all prepared processes asynchronously.
@@ -93,7 +123,19 @@ class MultiUI:
         overall_time = time.time()
         exit_code = {}
         runtime = {}
+
+        # in case processes are inserted where all the slow processes are
+        # put together, shuffle things around to make the runtime more
+        # steady
+        random.shuffle(self._proc_queue)
+
+        total = len(self._proc_queue)
+        done = 0
+        if not utils.debug.enabled:
+            self.print_progressbar(done, 0, total)
         # NB: measures realtime passage, not processing time
+        newdone = 0
+        last_update = time.time()
         while True:
             if len(self._proc_queue) > 0:
                 if len(self._running_procs) < self.max_procs:
@@ -111,11 +153,27 @@ class MultiUI:
                     runtime[ID] = time.time() - runtime[ID]
                     exit_code[ID] = proc.exitcode
                     if exit_code[ID] != 0:
+                        if not utils.debug.enabled:
+                            # so output is not on same line as progress bar
+                            print()
                         perror(f"Process {ID} terminated with nonzero exit code {exit_code[ID]}.")
                     else:
                         utils.debug.print(ID, f"process terminated in {runtime[ID]:.3f}s.",
                                 print_func=utils.printing.psuccess)
                     del self._running_procs[ID]
+                    newdone += 1
+            if (newdone > 0
+                    and time.time() - last_update > (not utils.printing.Printing.can_format)):
+                # the timing is only for when we cannot refresh the
+                # progress bar (due to inability to format)
+                done += newdone
+                last_update = time.time()
+                newdone = 0
+                if not utils.debug.enabled:
+                    self.print_progressbar(done, len(self._running_procs), total)
+
+        if not utils.debug.enabled:
+            print()
 
         overall_time = time.time() - overall_time
         utils.debug.print("multi", f"multiprocessing terminated in {overall_time:.3f}s.")

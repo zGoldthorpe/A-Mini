@@ -26,6 +26,7 @@ OptManager.register("opt.simplify.phi_elim.PhiElim")
 OptManager.register("opt.simplify.reg_realloc.RR")
 
 OptManager.register("opt.ssa.SSA")
-OptManager.register("opt.gvn.rpo.RPO")
+OptManager.register("opt.gvn.simpson.RPO")
+OptManager.register("opt.gvn.simpson.SCC")
 OptManager.register("opt.gvn.simplify.NaiveSimplify")
 

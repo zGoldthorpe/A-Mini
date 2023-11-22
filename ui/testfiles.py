@@ -197,6 +197,16 @@ class TestFileUI:
                                 utils.debug.print("fileman", f"{fullout} is out of date.")
                                 os.remove(fullout)
 
+            # check for updates in optimised code
+            for opt in self.get_test_opts(ami):
+                optmtime = os.path.getmtime(self.get_test_opt(ami, opt))
+                out_fld = self.get_test_opt_output_folder(ami, opt)
+                outmtime = os.path.getmtime(out_fld)
+                if outmtime <= optmtime:
+                    del self._tests[ami][opt]["@out"]
+                    utils.debug.print("fileman", f"{out_fld} is out of date.")
+                    shutil.rmtree(out_fld)
+
             # now check for updates in source file
             out_fld = self.get_test_output_folder(ami)
             if os.path.exists(out_fld):

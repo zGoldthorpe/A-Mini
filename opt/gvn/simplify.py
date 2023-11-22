@@ -14,8 +14,9 @@ from utils.syntax import Syntax
 from opt.tools import Opt
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.domtree import DomTreeAnalysis
-from opt.gvn.rpo import RPO
+from opt.gvn.simpson import RPO, SCC
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
 
 class NaiveSimplify(Opt):
@@ -24,16 +25,26 @@ class NaiveSimplify(Opt):
 
 class NaiveSimplify(NaiveSimplify):
     """
-    Uses gvn-simple information to eliminate redundant definitions.
+    Uses gvn-rpo or gvn-scc information to eliminate redundant definitions.
     Does not hoist or do anything advanced.
 
     Pass gvn-simple with desired arguments prior to this pass to affect
     the value numbering.
+
+    number: "var" or "expr" or "any"
+        Set if the value numbers are given by consts/registers or expressions.
+    gvn: "rpo" or "scc" or "any"
+        Identify which GVN algorithm to use
     """
 
-    @NaiveSimplify.init("gvn-reduce")
-    def __init__(self, /):
-        pass
+    @NaiveSimplify.init("gvn-reduce", "any", gvn="any")
+    def __init__(self, number, *, gvn):
+        if number not in ("var", "expr", "any"):
+            raise BadArgumentException("`number` must be one of \"var\", \"expr\", or \"any\".")
+        self._number = any if number == "any" else number
+        if gvn not in ("rpo", "scc", "any"):
+            raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")
+        self._gvn = RPO if gvn == "rpo" else SCC if gvn == "scc" else (RPO, SCC)
 
     @NaiveSimplify.opt_pass
     def simplify(self):
@@ -42,7 +53,7 @@ class NaiveSimplify(NaiveSimplify):
         """
         # Step 0. Compute value numbers
         # -----------------------------
-        gvn = self.require(RPO)
+        gvn = self.require(self._gvn, self._number)
         self._vn = gvn.get_value_partitions()
         defs = self.require(DefAnalysis)
         # remember locations of old defines, in case variables need to be revived
