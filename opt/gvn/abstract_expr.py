@@ -36,11 +36,6 @@ class Expr(Expr):
     ### convenient getters/setters ###
 
     @property
-    @(Syntax(object) >> (int,str))
-    def value(self):
-        return self.op
-
-    @property
     @(Syntax(object) >> Expr)
     def left(self):
         return self.args[0]
@@ -63,7 +58,7 @@ class Expr(Expr):
     def __str__(self):
 
         if isinstance(self.op, (int, str)):
-            rep = str(self.value)
+            rep = str(self.op)
             if rep.startswith('-'):
                 return f"({rep})"
             return rep
@@ -81,6 +76,85 @@ class Expr(Expr):
 
     def __repr__(self):
         return f"Expr<{self}>"
+
+    ### for metadata ###
+
+    @property
+    @(Syntax(object) >> str)
+    def polish(self):
+        """
+        Convert expression into Polish notation.
+        All operations come with a specified arity as "op`arity"
+        """
+        if isinstance(self.op, (int, str)):
+            return f"{self.op}"
+        if issubclass(self.op, amt.BinaryInstructionClass):
+            op = self.op.op
+        elif self.op == amt.PhiInstruction:
+            op = "phi"
+        else: # should not be possible
+            op = "?"
+        return f"{op}`{len(self.args)} " + ' '.join(arg.polish for arg in self.args)
+
+    @classmethod
+    @(Syntax(object, str) >> Expr)
+    def read_polish(cls, polish):
+        """
+        Parse polish notation
+        """
+        return cls._read_polish(polish.split(), 0)[0]
+
+    @classmethod
+    @(Syntax(object, [str], int) >> ((), Expr, int))
+    def _read_polish(cls, polish, i):
+        if '`' not in polish[i]:
+            return Expr(polish[i]), i+1
+
+        op, arity = polish[i].split('`')
+        arity = int(arity)
+
+        # collect all arguments
+        args = []
+        j = i+1
+        for _ in range(arity):
+            expr, j = Expr._read_polish(polish, j)
+            args.append(expr)
+
+        match op:
+            case '+':
+                return Expr(amt.AddInstruction, *args), j
+            case '-':
+                return Expr(amt.SubInstruction, *args), j
+            case '*':
+                return Expr(amt.MulInstruction, *args), j
+            case '/':
+                return Expr(amt.DivInstruction, *args), j
+            case '%':
+                return Expr(amt.ModInstruction, *args), j
+            case '&':
+                return Expr(amt.AndInstruction, *args), j
+            case '|':
+                return Expr(amt.OrInstruction, *args), j
+            case '^':
+                return Expr(amt.XOrInstruction, *args), j
+            case "<<":
+                return Expr(amt.LShiftInstruction, *args), j
+            case ">>":
+                return Expr(amt.RShiftInstruction, *args), j
+            case "==":
+                return Expr(amt.EqInstruction, *args), j
+            case "!=":
+                return Expr(amt.NeqInstruction, *args), j
+            case '<':
+                return Expr(amt.LtInstruction, *args), j
+            case "<=":
+                return Expr(amt.LeqInstruction, *args), j
+            case "phi":
+                return Expr(amt.PhiInstruction, *args), j
+            case T:
+                # shouldn't happen
+                raise NotImplementedError(f"Unrecognised operand {T} of arity {arity}.")
+
 
     ### comparisons ###
     @(Syntax(object, Expr) >> int)
