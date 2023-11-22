@@ -66,23 +66,13 @@ class MultiUI:
         def wrapped_target():
             # multiprocessing processes close stdin by default
             # so we need to circumvent this
-            def subwrapped_target(*w_args, **w_kwargs):
-                if stdin is not None:
-                    sys.stdin = self.fopen(stdin, 'r')
-                target(*w_args, **w_kwargs)
-
+            if stdin is not None:
+                sys.stdin = self.fopen(stdin, 'r')
             if stdout is not None:
                 sys.stdout = self.fopen(stdout, 'w')
             if stderr is not None:
                 sys.stderr = self.fopen(stderr, 'w')
-
-            # for timing out, I don't know a better way than to
-            # spawn a second process, which seems insane
-            proc = multiprocessing.Process(target=subwrapped_target, args=args, kwargs=kwargs)
-            proc.start()
-            proc.join(timeout=self.timeout)
-            exit(proc.exitcode)
-
+            target(*args, **kwargs)
 
         self._proc_queue.append((ID, wrapped_target))
 
@@ -104,6 +94,7 @@ class MultiUI:
 
             print(']', end='', flush=True)
         else:
+            print('\b'*102, end='')
             print('[', end='')
             print("#"*perc, end='')
             print("_"*qperc, end='')
@@ -112,7 +103,7 @@ class MultiUI:
                 print(' '*(100-perc-qperc-len(msg)-1), end='')
             else:
                 print(' '*(100-perc-qperc), end='')
-            print(']')
+            print(']', end='', flush=True)
 
     def execute(self):
         """
@@ -135,15 +126,24 @@ class MultiUI:
             self.print_progressbar(done, 0, total)
         # NB: measures realtime passage, not processing time
         newdone = 0
-        last_update = time.time()
+        killed = set()
         while True:
             if len(self._proc_queue) > 0:
                 if len(self._running_procs) < self.max_procs:
                     ID, target = self._proc_queue.popleft()
                     utils.debug.print(ID, "initialising process.")
-                    self._running_procs[ID] = multiprocessing.Process(target=target)
-                    self._running_procs[ID].start()
-                    runtime[ID] = time.time()
+                    try:
+                        self._running_procs[ID] = multiprocessing.Process(target=target)
+                        self._running_procs[ID].start()
+                        runtime[ID] = time.time()
+                    except OSError:
+                        # too many processes open
+                        if ID in self._running_procs:
+                            del self._running_procs[ID]
+                        utils.debug.print(ID, "could not spawn; requeuing...",
+                                    print_func=utils.printing.perror)
+                        self._proc_queue.appendleft((ID, target))
+                        time.sleep(0.1)
             elif len(self._running_procs) == 0:
                 break
             
@@ -152,22 +152,32 @@ class MultiUI:
                 if not proc.is_alive():
                     runtime[ID] = time.time() - runtime[ID]
                     exit_code[ID] = proc.exitcode
-                    if exit_code[ID] != 0:
-                        if not utils.debug.enabled:
-                            # so output is not on same line as progress bar
-                            print()
-                        perror(f"Process {ID} terminated with nonzero exit code {exit_code[ID]}.")
-                    else:
-                        utils.debug.print(ID, f"process terminated in {runtime[ID]:.3f}s.",
-                                print_func=utils.printing.psuccess)
+                    if ID not in killed:
+                        if exit_code[ID] != 0:
+                            if not utils.debug.enabled:
+                                # so output is not on same line as progress bar
+                                print()
+                            perror(f"Process {ID} terminated with nonzero exit code {exit_code[ID]}.")
+                        else:
+                            utils.debug.print(ID, f"process terminated in {runtime[ID]:.3f}s.",
+                                    print_func=utils.printing.psuccess)
                     del self._running_procs[ID]
                     newdone += 1
-            if (newdone > 0
-                    and time.time() - last_update > (not utils.printing.Printing.can_format)):
+                    proc.close()
+                elif ID in killed:
+                    continue
+                elif self.timeout is not None:
+                    if time.time() - runtime[ID] > self.timeout:
+                        # process timed out
+                        if not utils.debug.enabled:
+                            print()
+                        perror(f"Process {ID} timed out.")
+                        proc.kill()
+                        killed.add(ID)
+            if newdone > 0:
                 # the timing is only for when we cannot refresh the
                 # progress bar (due to inability to format)
                 done += newdone
-                last_update = time.time()
                 newdone = 0
                 if not utils.debug.enabled:
                     self.print_progressbar(done, len(self._running_procs), total)
