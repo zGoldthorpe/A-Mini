@@ -1,7 +1,5 @@
 import sys
 
-from ampy.reader import CFGBuilder
-
 from opt.gvn.abstract_expr import ExprUI as E
 
 from tests.tools import TestSuite
