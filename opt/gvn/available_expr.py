@@ -44,7 +44,7 @@ class AvailAnalysis(AvailAnalysis):
     @AvailAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock)
       | Syntax(object, ampy.types.BasicBlock, int)
-      >> [tuple, Expr])
+      >> [Expr])
     def avail_in(self, block, idx=None, /):
         """
         Give the list of available expressions coming into a block or instruction.
@@ -59,12 +59,12 @@ class AvailAnalysis(AvailAnalysis):
         while i < len(ls):
             expr, i = Expr.read_polish_ls(ls, i)
             ret.append(expr)
-        return tuple(ret)
+        return ret
 
     @AvailAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock)
       | Syntax(object, ampy.types.BasicBlock, int)
-      >> [tuple, Expr])
+      >> [Expr])
     def avail_out(self, block, idx=None, /):
         """
         Give the list of available expressions coming out of a block or instruction.
@@ -79,7 +79,7 @@ class AvailAnalysis(AvailAnalysis):
         while i < len(ls):
             expr, i = Expr.read_polish_ls(ls, i)
             ret.append(expr)
-        return tuple(ret)
+        return ret
 
     @AvailAnalysis.opt_pass
     def flow_analysis(self):
@@ -115,7 +115,10 @@ class AvailAnalysis(AvailAnalysis):
                 if av_in != self._av_in.setdefault((block, 0), set()):
                     flow = True
                     self._av_in[block, 0] = av_in
-                self._av_out[block, 0] = av_in | self._defset(block[0])
+                if ((av_out := av_in | self._defset(block[0]))
+                        != self._av_out.setdefault((block, 0), set())):
+                    flow = True
+                    self._av_out[block, 0] = av_out
 
                 # now for the remaining instructions
                 for i in range(1, len(block)):
@@ -123,7 +126,10 @@ class AvailAnalysis(AvailAnalysis):
                             != self._av_in.setdefault((block, i), set())):
                         flow = True
                         self._av_in[block, i] = set(av_in)
-                    self._av_out[block, i] = av_in | self._defset(block[i])
+                    if ((av_out := av_in | self._defset(block[i]))
+                            != self._av_out.setdefault((block, i), set())):
+                        flow = True
+                        self._av_out[block, i] = av_out
 
                 # now summarise the flow analysis for the blocks
                 self._av_in[block] = self._av_in[block, 0]

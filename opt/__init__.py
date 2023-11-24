@@ -29,5 +29,6 @@ OptManager.register("opt.ssa.SSA")
 OptManager.register("opt.gvn.simpson.RPO")
 OptManager.register("opt.gvn.simpson.SCC")
 OptManager.register("opt.gvn.available_expr.AvailAnalysis")
+OptManager.register("opt.gvn.anticipatable.Anticipate")
 OptManager.register("opt.gvn.simplify.NaiveSimplify")
 

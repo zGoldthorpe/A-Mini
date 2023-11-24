@@ -53,6 +53,21 @@ class Expr(Expr):
     def right(self, expr):
         self.args[-1] = expr
 
+    @property
+    @(Syntax(object) >> [iter, Expr])
+    def subexpressions(self):
+        """
+        Yields subepressions in bottom-up order
+        """
+        outs = set()
+        def collect(node, depth):
+            outs.add((node, depth))
+            for arg in node.args:
+                collect(arg, depth+1)
+        collect(self, 0)
+        for node, _ in sorted(outs, key=lambda p: -p[1]):
+            yield node
+
     ### for printing ###
     
     def __str__(self):
