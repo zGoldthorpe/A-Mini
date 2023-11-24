@@ -1,8 +1,57 @@
 import sys
 
-from opt.gvn.abstract_expr import ExprUI as E
+from opt.gvn.abstract_expr import Expr
+
+import ampy.types as amt
 
 from tests.tools import TestSuite
+
+class E:
+    """
+    Wrapper for Expr for easy user testing
+    """
+    def __init__(self, expr):
+        if isinstance(expr, Expr):
+            self.expr = expr
+        else:
+            self.expr = Expr(expr)
+
+    def __repr__(self):
+        return repr(self.expr) + '~'
+
+    def _op(self, op, other):
+        return E(Expr(op, self.expr, other.expr))
+
+    def __add__(self, other):
+        return self._op(amt.AddInstruction, other)
+    def __sub__(self, other):
+        return self._op(amt.SubInstruction, other)
+    def __mul__(self, other):
+        return self._op(amt.MulInstruction, other)
+    def __truediv__(self, other):
+        return self._op(amt.DivInstruction, other)
+    def __mod__(self, other):
+        return self._op(amt.ModInstruction, other)
+    
+    def __and__(self, other):
+        return self._op(amt.AndInstruction, other)
+    def __or__(self, other):
+        return self._op(amt.OrInstruction, other)
+    def __xor__(self, other):
+        return self._op(amt.XOrInstruction, other)
+    def __lshift__(self, other):
+        return self._op(amt.LShiftInstruction, other)
+    def __rshift__(self, other):
+        return self._op(amt.RShiftInstruction, other)
+
+    def __eq__(self, other):
+        return self._op(amt.EqInstruction, other)
+    def __ne__(self, other):
+        return self._op(amt.NeqInstruction, other)
+    def __lt__(self, other):
+        return self._op(amt.LtInstruction, other)
+    def __le__(self, other):
+        return self._op(amt.LeqInstruction, other)
 
 class ExprAssessmentTestSuite(TestSuite):
 
@@ -12,13 +61,14 @@ class ExprAssessmentTestSuite(TestSuite):
     @TestSuite.test
     def check_equality(self, lhs, rhs):
         """
-        Takes two ExprUI objects and checks if their underlying
+        Takes two E objects and checks if their underlying
         expressions are equal.
         """
         if lhs.expr == rhs.expr:
             return True, dict(e=lhs)
         self._error(f"Expression mismatch: {lhs.expr} and {rhs.expr}")
         return False, dict(lhs=lhs, rhs=rhs)
+
 
 
 ts = ExprAssessmentTestSuite("abstract_expr")

@@ -1,10 +1,8 @@
 import sys
 import traceback
 
-from opt.gvn.abstract_expr import (
-        Expr as E,
-        Comparisons as C,
-        )
+from opt.gvn.abstract_expr import Expr as E
+from opt.gvn.predicates import Comparisons as C
 
 from tests.tools import TestSuite
 
@@ -43,7 +41,7 @@ class CompAssessmentTestSuite(TestSuite):
             try:
                 res = func(*args)
             except Exception as e:
-                self._error(f"Calling {func.__name__}{args} on line {i} of testing threw an exception {e.__name__}")
+                self._error(f"Calling {func.__name__}{args} on line {i} of testing threw an exception {type(e).__name__}")
                 return False, dict(
                         type="test-error",
                         exception=Exception(e),
@@ -62,8 +60,12 @@ class CompAssessmentTestSuite(TestSuite):
                         line=i)
         return True, {}
 
-ts = CompAssessmentTestSuite("abstract_comparisons")
+ts = CompAssessmentTestSuite("predicates")
 
+s = E('s')
+t = E('t')
+u = E('u')
+v = E('v')
 w = E('w')
 x = E('x')
 y = E('y')
@@ -88,6 +90,72 @@ ts.build_and_test(
             (c.eq, z, w, True),
             (c.leq, x, z, False),
             (c.is_consistent, True)
+        ])
+
+c = C()
+ts.build_and_test(
+        [
+            (c.assert_leq, u, v),
+            (c.assert_leq, u, w),
+            (c.assert_leq, v, x),
+            (c.assert_leq, w, x),
+            (c.assert_leq, x, y),
+            (c.assert_leq, x, z),
+            (c.assert_leq, z, u),
+        ],
+        [
+            (c.eq, v, w, True),
+            (c.eq, y, z, False),
+            (c.is_consistent, True),
+        ])
+
+c = C()
+ts.build_and_test(
+        [
+            (c.assert_leq, s, t),
+            (c.assert_leq, s, u),
+            (c.assert_leq, t, v),
+            (c.assert_leq, u, v),
+            (c.assert_leq, v, w),
+            (c.assert_leq, v, x),
+            (c.assert_leq, w, y),
+            (c.assert_leq, x, y),
+        ],
+        [
+            (c.leq, s, y, True),
+            (c.leq, t, w, True),
+            (c.leq, t, x, True),
+            (c.eq, t, u, False),
+            (c.eq, w, x, False),
+            (c.assert_leq, y, s, None),
+            (c.eq, t, u, True),
+            (c.eq, w, x, True),
+            (c.eq, s, y, True),
+        ])
+
+c = C()
+ts.build_and_test(
+        [
+            (c.assert_leq, u, v),
+            (c.assert_leq, v, w),
+            (c.assert_leq, w, x),
+            (c.assert_leq, x, y),
+            (c.assert_leq, y, z),
+            (c.assert_leq, z, E(5)),
+            (c.assert_leq, x, w),
+        ],
+        [
+            (c.eq, y, z, False),
+            (c.assert_leq, z, v, None),
+            (c.eq, y, v, True),
+            (c.eq, y, z, True),
+            (c.eq, u, z, False),
+            (c.eq, w, z, True),
+            (c.assert_leq, E(5), w, None),
+            (c.eq, w, z, True),
+            (c.eq, y, E(5), True),
+            (c.eq, u, E(5), False),
+            (c.is_consistent, True),
         ])
 
 c = C()
@@ -150,6 +218,20 @@ ts.build_and_test(
         ],
         [
             (c.eq, x, E(1), True),
+            (c.is_consistent, True),
+        ])
+
+c = C()
+ts.build_and_test(
+        [
+            (c.assert_leq, w, x),
+            (c.assert_leq, x, E(1)),
+            (c.assert_leq, E(0), w),
+            (c.assert_neq, w, x),
+        ],
+        [
+            (c.eq, x, E(1), True),
+            (c.eq, w, E(0), True),
             (c.is_consistent, True),
         ])
 
