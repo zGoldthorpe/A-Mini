@@ -28,6 +28,11 @@ class Expr(Expr):
         #
         # op: operation or constant
         # args: arguments
+        if isinstance(op, str):
+            try:
+                op = int(op)
+            except ValueError:
+                pass
         self.op = op
         self.args = list(exprs)
         if reduce:
