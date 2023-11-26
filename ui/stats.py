@@ -251,19 +251,23 @@ def name_compressor(names):
 
     returns dict mapping names to compressed strings
     """
+    names = set(names)
+    asc = {name : ''.join(filter(lambda c:c.isalnum(), name)) for name in names}
+    if len(set(asc.values())) != len(names):
+        asc = {name : name for name in names}
     if len(names) == 1:
-        return { name : name[0] for name in names }
+        return { name : asc[name][0] for name in names }
     # first, build trie with no info
     trie = {}
     for name in names:
         ptr = trie
-        for c in name:
+        for c in asc[name]:
             ptr = ptr.setdefault(c, {})
         ptr[0] = name # indicate that this is also a name
     def reduced(name):
         ptr = trie
         out = ""
-        for c in name:
+        for c in asc[name]:
             if len(ptr) > 1:
                 out += c
             ptr = ptr[c]
