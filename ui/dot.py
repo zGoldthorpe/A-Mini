@@ -35,14 +35,18 @@ class DotUI:
                         dest="DGUIphi",
                         action="store_true",
                         help="Hide the phi labels (NB: the order of arguments to the phi node will not necessarily correspond to the order of incoming edges to the node).")
+        parser.add_argument("--nice",
+                        dest="DGUInice",
+                        action="store_true",
+                        help="By default, shorthand for --math --simple-branch --hide-phi-labels; if --latex is enabled, then it is only shorthand for --math --simple")
 
     @classmethod
     def arg_init(cls, parsed_args):
         return cls(labels=parsed_args.DGUIlabels,
                     latex=parsed_args.DGUIlatex,
-                    math=parsed_args.DGUImath,
-                    branch=parsed_args.DGUIbranch,
-                    phi=parsed_args.DGUIphi)
+                    math=parsed_args.DGUImath | parsed_args.DGUInice,
+                    branch=parsed_args.DGUIbranch | parsed_args.DGUInice,
+                    phi=parsed_args.DGUIphi | (parsed_args.DGUInice and not parsed_args.DGUIlatex))
 
     def __init__(self, labels=False, latex=False, math=False, branch=False, phi=False):
         self.labels_only = labels

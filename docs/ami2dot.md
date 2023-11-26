@@ -30,6 +30,8 @@ There are a few options that you can pass that simplify the output (and move awa
 | [`--math`](#pseudocode) | rewrite code as pseudocode |
 | [`--simple-branch`](#hide-branch-instructions) | remove branch target labels |
 
+The `--nice` flag is shorthand for enabling some of the above, depending on if the output is a plain DOT file, or [TeX source](#latex-friendly-output).
+
 ### Hide phi labels
 
 The flag `--hide-phi-labels` converts a `phi` instruction such as
@@ -81,7 +83,7 @@ Combine `--latex` with the [other flags](#improving-cfg-readability) to improve 
 
 For example (and reference), a nice pipeline for producing (relatively) readable pseudocode from A-Mi source is
 ```console
-python3 ami2dot.py code.ami --latex --math --simple-branch \
+python3 ami2dot.py code.ami --latex --nice \
     | dot2tex --autosize -traw -ftikz --code > code.tex
 ```
 after which `code.tex` may be `\input` directly into a `tikzpicture` environment.
