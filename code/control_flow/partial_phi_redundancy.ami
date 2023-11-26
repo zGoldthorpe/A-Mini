@@ -1,0 +1,22 @@
+@main:
+    read %x
+    read %y
+    read %cond1
+    read %cond2
+    branch %cond1 ? @A : @B
+
+@A:
+    branch %cond2 ? @L : @M
+
+@B:
+    branch %cond2 ? @M : @R
+
+@L: goto @exit
+@M: %m = phi [ %x, @A ], [ %y, @B ]
+    goto @exit
+@R: goto @exit
+
+@exit:
+    %out = phi [ %x, @L ], [ %m, @M ], [ %y, @R ]
+    write %out
+    exit

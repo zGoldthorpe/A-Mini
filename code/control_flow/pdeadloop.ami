@@ -1,0 +1,14 @@
+@main:
+    read %x
+    %counter = 0
+    branch %x ? @deadloop : @print
+
+@deadloop:
+    %counter = %counter + 1
+    %x = %x + 1
+    %continue = %counter < 1000
+    branch %continue ? @deadloop : @print
+
+@print:
+    write %x
+    exit

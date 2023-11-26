@@ -15,6 +15,7 @@ R. Cytron, J. Ferrante, B.K. Rosen, M.N. Wegman, F.K. Zadeck. 1991.
     Vol. 13, No. 4.
     Pages 451--490.
 """
+#TODO: re-implement using a domtree DFS traversal to make substitutions
 
 from utils.syntax import Syntax
 

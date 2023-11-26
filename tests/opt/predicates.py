@@ -1,7 +1,7 @@
 import sys
 import traceback
 
-from opt.gvn.abstract_expr import Expr as E
+from opt.gvn.expr import Expr as E
 from opt.gvn.predicates import Comparisons as C
 
 from tests.tools import TestSuite
@@ -60,7 +60,7 @@ class CompAssessmentTestSuite(TestSuite):
                         line=i)
         return True, {}
 
-ts = CompAssessmentTestSuite("predicates")
+ts = CompAssessmentTestSuite("opt/predicates")
 
 s = E('s')
 t = E('t')

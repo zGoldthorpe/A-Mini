@@ -87,15 +87,83 @@ class Expr(Expr):
             return "({})".format(f" {self.op.op} ".join(str(arg) for arg in self.args))
 
         if self.op == amt.PhiInstruction:
-            return "phi({})".format("; ".join(
-                "{}, {}".format(str(self.args[2*i]), str(self.args[2*i+1]))
-                for i in range(len(self.args)//2)))
+            phiargs = "; ".join("{}, {}".format(str(self.args[2*i+1]), str(self.args[2*i+2]))
+                            for i in range(len(self.args)//2))
+            return f"phi[{self.args[0].op}]({phiargs})"
 
         # new definition instruction
         return f"{self.op}({', '.join(str(arg) for arg in self.args)})"
 
     def __repr__(self):
         return f"Expr<{self}>"
+
+    ### for emitting A-Mi instructions ###
+
+    @property
+    @(Syntax(object) >> tuple)
+    def recipe(self):
+        """
+        Emit the last instruction for a construction of this
+        expression in the form (op, *args)
+        """
+        if isinstance(self.op, (int, str)):
+            return (str(self.op),)
+
+        if self.op == amt.PhiInstruction:
+            # phi recipe is (Phi, (target, *conds))
+            # where conds are expr-str pairs
+            phiargs = []
+            for i in range(len(self.args)//2):
+                if isinstance(self.args[2*i+2].op, str):
+                    phiargs.append((self.args[2*i+1], self.args[2*i+2].op))
+                else:
+                    for labelexpr in self.args[2*i+2].args:
+                        phiargs.append((self.args[2*i+1], labelexpr.op))
+            return (self.op, (self.args[0].op, phiargs))
+
+        # undo some canonicalisations
+        if self.op == amt.AddInstruction:
+            # a - b = a + (-1)b
+            sums = []
+            subs = []
+            for arg in self.args:
+                if (arg.op == amt.MulInstruction
+                        and isinstance(arg.left.op, int)
+                        and arg.left.op < 0):
+                    subs.append(Expr(amt.MulInstruction,
+                                    Expr(-arg.left.op),
+                                    arg.right))
+                elif isinstance(arg.op, int) and arg.op < 0:
+                    subs.append(Expr(-arg.op))
+                else:
+                    sums.append(arg)
+            if len(subs) > 0:
+                return (amt.SubInstruction,
+                            (Expr(amt.AddInstruction, *sums),
+                             Expr(amt.AddInstruction, *subs)))
+        if issubclass(self.op, amt.CompInstructionClass):
+            # (a == b) = (0 == a - b) etc.
+            right = self.right.recipe
+            if right[0] == amt.SubInstruction:
+                return (self.op, (right[1][1], right[1][0]))
+
+        if len(self.args) > 2:
+            tail = Expr(self.op, *self.args[1:])
+            return (self.op, (self.left, tail))
+
+        # other canonicalisations
+        if (self.op == amt.MulInstruction
+                and isinstance(self.left.op, int)):
+            if self.left.op > 0:
+                b = bin(self.left.op)
+                if b.count('1') == 1:
+                    # (2**n * a) = (a << n)
+                    return (amt.LShiftInstruction,
+                                (self.right,
+                                    Expr(len(b)-3))) # len(bin(2**n)) = n+3
+
+        return (self.op, (self.left, self.right))
+            
 
     ### for metadata ###
 
@@ -287,6 +355,11 @@ class Expr(Expr):
         if isinstance(self.op, (int, str)):
             return
 
+        # nested phi nodes are prohibited
+        for i, arg in list(enumerate(self.args)):
+            if arg.op == amt.PhiInstruction:
+                self.args[i] = arg.args[0]
+
         while True:
 
             match self.op:
@@ -294,11 +367,15 @@ class Expr(Expr):
                 case amt.PhiInstruction:
                     # not much we can do with these
                     # besides group its operands by label and hope things align
+                    #
+                    # NB: nested phi instructions are prohibited
+                    # phi arguments are stored as:
+                    # (target, var1, lbl1, var2, lbl2, ...)
                     #TODO: uses hashing
                     mapping = {}
                     for i in range(len(self.args)//2):
-                        val = self.args[2*i]
-                        label = self.args[2*i+1]
+                        val = self.args[2*i+1]
+                        label = self.args[2*i+2]
                         mapping.setdefault(val, set()).add(label)
                     if len(mapping) == 1:
                         # phi is actually just a copy
@@ -306,14 +383,11 @@ class Expr(Expr):
                         self.op = new.op
                         self.args = new.args
                         return
-                    self.args = []
+                    self.args = [self.args[0]]
                     for val, labelset in sorted(mapping.items()):
                         self.args.append(val)
                         self.args.append(Expr(amt.OrInstruction, *labelset))
                     return
-
-
-
 
                 case amt.AddInstruction:
                     self._assoc()

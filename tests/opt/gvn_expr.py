@@ -1,6 +1,6 @@
 import sys
 
-from opt.gvn.abstract_expr import Expr
+from opt.gvn.expr import Expr
 
 import ampy.types as amt
 
@@ -71,7 +71,7 @@ class ExprAssessmentTestSuite(TestSuite):
 
 
 
-ts = ExprAssessmentTestSuite("abstract_expr")
+ts = ExprAssessmentTestSuite("opt/gvn_expr")
 
 a = E('a')
 b = E('b')

@@ -14,7 +14,7 @@ from utils.syntax import Syntax
 
 from opt.tools import Opt
 
-from opt.gvn.abstract_expr import Expr
+from opt.gvn.expr import Expr
 from opt.gvn.simpson import RPO, SCC
 
 from ampy.passmanager import BadArgumentException
@@ -30,12 +30,14 @@ class AvailAnalysis(AvailAnalysis):
 
     Indicates at each block and instruction which expressions are available
     for use, where expressions are identified by their value numbers.
+    An expression is available at a point P if the expression is defined prior
+    to P along all possible paths of execution leading to P.
 
     gvn: "rpo" or "scc" or "any"
         Identify which GVN algorithm to use
     """
 
-    @AvailAnalysis.init("avail-expr", gvn="any")
+    @AvailAnalysis.init("available", gvn="any")
     def __init__(self, *, gvn):
         if gvn not in ("rpo", "scc", "any"):
             raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")

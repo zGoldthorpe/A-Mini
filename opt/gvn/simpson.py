@@ -14,7 +14,7 @@ from utils.syntax import Syntax
 
 from opt.tools import Opt, OptError
 from opt.ssa import SSA
-from opt.gvn.abstract_expr import Expr
+from opt.gvn.expr import Expr
 
 from ampy.passmanager import BadArgumentException
 import ampy.types
@@ -58,7 +58,8 @@ class RPO(RPO):
         vn = {}
         def get_vn(var):
             if var.startswith('%'):
-                return vn.get(var, Expr('?'))
+                expr = vn.get(var, Expr('?'))
+                return expr
             return Expr(int(var))
 
         while True:
@@ -70,7 +71,7 @@ class RPO(RPO):
                     if isinstance(I, ampy.types.MovInstruction):
                         expr = get_vn(I.operand)
                     elif isinstance(I, ampy.types.PhiInstruction):
-                        args = []
+                        args = [Expr(I.target)]
                         for val, label in I.conds:
                             args.append(get_vn(val))
                             args.append(Expr(label))
@@ -86,16 +87,13 @@ class RPO(RPO):
                         # we do not handle non-def instructions
                         continue
 
-                    if ((self._number == "expr" and
-                            expr.op != ampy.types.PhiInstruction)
+                    if ((self._number == "expr")
                             or isinstance(expr.op, (int, str))):
-                        # do not expand phi instructions as expressions
-                        # or else you will face infinite loops
                         value = lookup.setdefault(expr, expr)
                     else:
                         value = lookup.setdefault(expr, Expr(I.target))
 
-                    if I.target not in vn or value != vn[I.target]:
+                    if value != get_vn(I.target):
                         changed = True
                         vn[I.target] = value
                         self.debug(f"{I.target} updated to {value}")
@@ -325,7 +323,8 @@ class SCC(SCC):
         """
         def get_vn(var):
             if var.startswith('%'):
-                return self._vn.get(var, Expr('?'))
+                expr = vn.get(var, Expr('?'))
+                return expr
             return Expr(int(var))
         
         op, args = self._ssa[var]
@@ -333,9 +332,11 @@ class SCC(SCC):
             case ampy.types.MovInstruction:
                 expr = get_vn(args[0])
             case ampy.types.PhiInstruction:
-                phiargs = []
+                phiargs = [Expr(I.target)]
                 for val, label in args:
                     vn = get_vn(val)
+                        # do not expand phi instructions as expressions
+                        # or else you will face infinite loops
                     if vn.op == '?': # optimistically discard unknown values
                         continue
                     phiargs.extend([vn, Expr(label)])
@@ -349,8 +350,7 @@ class SCC(SCC):
                 # cannot be optimistic in those cases
                 expr = Expr(var)
 
-        if ((self._number == "expr" and op != ampy.types.PhiInstruction)
-                or isinstance(expr.op, (int, str))):
+        if (self._number == "expr" or isinstance(expr.op, (int, str))):
             # do not expand phi instructions as expressions
             # or else you will face infinite loops
             value = lookup.setdefault(expr, expr)

@@ -9,7 +9,7 @@ expressions.
 
 from utils.syntax import Syntax
 
-from opt.gvn.abstract_expr import Expr
+from opt.gvn.expr import Expr
 
 import ampy.types as amt
 
