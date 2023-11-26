@@ -15,11 +15,10 @@ R. Cytron, J. Ferrante, B.K. Rosen, M.N. Wegman, F.K. Zadeck. 1991.
     Vol. 13, No. 4.
     Pages 451--490.
 """
-#TODO: re-implement using a domtree DFS traversal to make substitutions
 
 from utils.syntax import Syntax
 
-from opt.tools import Opt
+from opt.tools import Opt, OptError
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.live import LiveAnalysis
@@ -85,8 +84,9 @@ class SSA(SSA):
         # idf[var]: iterated dominance frontier of a variable
         self._idf = dict()
         defs = self.require(DefAnalysis)
+        self._vars = set(defs.vars)
 
-        for var in defs.vars:
+        for var in self._vars:
             blocks = defs.defs(var)
             if len(blocks) == 1:
                 # phi nodes are unnecessary if there is only a single assignment to begin with
@@ -103,8 +103,8 @@ class SSA(SSA):
         # ------------------------
         # Phi nodes are inserted in the iterated dominance frontier
         # This handles "where", but to figure out "how", we traverse
-        # the CFG via DFS to track which definition of each variable
-        # is "last used"
+        # the dominator tree to figure out the dominating use of each
+        # variable prior to entering a "join" node.
         #
         # live_in[block]: set of all variables that are live coming in
         
@@ -113,124 +113,111 @@ class SSA(SSA):
                 block : set(live.live_in(block))
                 for block in self.CFG
                 }
+        self._reg = {var : 0 for var in self._idf} # for renaming
+        self._dommem = {} # memoisation
 
-        changed = False
-        for var, blocks in self._idf.items():
-            self.debug(f"IDF[{var}]:", ', '.join(block.label for block in blocks))
-            # SSA_vars: list of new variables for substituting var
-            # SSA_counter: key for uniqueness of variable
-            # visited: set of basic blocks that have been visited
-            # phi[B]: phi node conditions for var at block B
-            # phi_idx[B]: name of phi variable defined at B, if any
-            self._ssa_vars = []
-            self._ssa_counter = -1
-            self._visited = set()
-            self._phi = {block : [] for block in blocks}
-            self._phi_idx = {}
+        self._changed = False
+        self._dfs_and_sub(self.CFG.entrypoint)
 
-            changed |= self._prepare_phi_nodes(var, -1, self.CFG.entrypoint)
+        # Step 4. Adjust phi node arguments
+        # ---------------------------------
+        # Now that the phi nodes are inserted, and dominating
+        # names are calculated, we can use them to correct the phi nodes.
+        #
+        # NB. We need to be careful of when phi nodes are asking for arguments
+        # which are redefined by a phi node inserted earlier in the same block.
+        for block in self.CFG:
+            assigns = set()
+            for I in block:
+                if isinstance(I, ampy.types.PhiInstruction):
+                    conds = []
+                    for var, label in I.conds:
+                        parent = self.CFG[label]
+                        reg = self._get_dominating_var(var, parent)
+                        if reg in assigns:
+                            # conflict!
+                            tmp = self._new_reg(var)
+                            parent._instructions.insert(
+                                    ampy.types.MovInstruction(tmp, reg))
+                            reg = tmp
+                        conds.append((reg, label))
+                    I.conds = tuple(conds)
+                if isinstance(I, ampy.types.DefInstructionClass):
+                    assigns.add(I.target)
 
-            # now that the phi nodes are prepared, we can actually add them
-            for block, conds in self._phi.items():
-                if len(conds) == 0:
-                    # there is no phi node
-                    continue
-                changed = True
-                newvar = self._ssa_vars[self._phi_idx[block]]
-                block._instructions.insert(0,
-                        ampy.types.PhiInstruction(newvar, *conds))
-
-        if changed:
+        if self._changed:
             # I don't have any analyses on the CFG shape, which is the only thing that gets preserved
-            return tuple(opt for opt in self.opts
-                        if isinstance(opt, SSA))
+            return tuple(opt for opt in self.opts if opt.ID in ("ssa", "domtree"))
         return self.opts
 
-    @(Syntax(object, str) >> int)
-    def _gen_register(self, var):
+    @(Syntax(object, ampy.types.BasicBlock) >> None)
+    def _dfs_and_sub(self, block):
         """
-        Generates register names for converting var into SSA
-        and stores them in SSA_vars
-        Returns index of new register
+        DFS traversal of dominator tree
         """
-        defs = self.require(DefAnalysis)
+        # first, check if we need to define phi nodes
+        for var, idf in self._idf.items():
+            if block in idf and var in self._live_in[block]:
+                conds = []
+                for parent in block.parents:
+                    # we will deal with which variable to use in a second pass
+                    conds.append((var, parent.label))
+                block._instructions.insert(0, ampy.types.PhiInstruction(var, *conds))
+        # now, adjust variable definitions
+        def sub(var):
+            return self._get_dominating_var(var, block)
 
-        while True:
-            self._ssa_counter += 1
-            reg = f"{var}.{self._ssa_counter}"
-            if reg not in defs.vars:
-                self._ssa_vars.append(reg)
-                return len(self._ssa_vars)-1
+        for i, I in enumerate(block):
+            # substitute operands with dominating names
+            match type(I):
+                case T if issubclass(T, ampy.types.BinaryInstructionClass):
+                    I.operands = tuple(map(sub, I.operands))
+                case ampy.types.MovInstruction | ampy.types.WriteInstruction:
+                    I.operand = sub(I.operand)
+                case ampy.types.BranchInstruction:
+                    I.cond = sub(I.cond)
+                case _:
+                    # read, goto, exit, brkpt
+                    # we deal with phi nodes later
+                    pass
 
+            # now create new definition, if necessary
+            if isinstance(I, ampy.types.DefInstructionClass):
+                var = self._new_reg(I.target)
+                self._dommem.setdefault(block, {})[I.target] = var
+                I.target = var
 
-    @(Syntax(object, str, int, ampy.types.BasicBlock, src=ampy.types.BasicBlock) >> bool)
-    def _prepare_phi_nodes(self, var, cur_idx, block, *, src=None):
+        for child in self.require(DomTreeAnalysis).children(block):
+            self._dfs_and_sub(child)
+
+    @(Syntax(object, str) >> str)
+    def _new_reg(self, var):
+        if var not in self._reg:
+            # this means the variable is only defined once
+            return var
+        self._changed = True
+        while (label := f"{var}.{self._reg[var]}") in self._vars:
+            self._reg[var] += 1
+        self._vars.add(label)
+        return label
+
+    @(Syntax(object, str, ampy.types.BasicBlock) >> str)
+    def _get_dominating_var(self, var, block):
         """
-        Performs a DFS to build phi nodes and update variable names
-        However, does not insert phi nodes yet.
-
-        Returns True if preparation changes the CFG
+        Returns the dominating name for a variable.
         """
-        changed = False
-        if block in self._idf[var]:
-            if var in self._live_in[block]:
-                # variable is actually used
-                # so phi node is necessary
-                if src.label not in (lbl for _, lbl in self._phi[block]):
-                    self._phi[block].append((self._ssa_vars[cur_idx], src.label))
-                if block not in self._phi_idx:
-                    self._phi_idx[block] = self._gen_register(var)
-                    self.debug(f"Inserting new phi variable {self._ssa_vars[self._phi_idx[block]]} in {block.label}")
-
-        prev = (cur_idx := self._phi_idx.get(block, cur_idx))
-        for I in block:
-            cur_idx = self._replace_and_update(I, var, cur_idx, src=src)
-            changed |= prev != (prev := cur_idx)
-
-        if block not in self._visited:
-            self._visited.add(block)
-            for child in block.children:
-                changed |= self._prepare_phi_nodes(var, cur_idx, child, src=block)
-        return changed
-
-    @(Syntax(object, ampy.types.InstructionClass, str, int, src=(ampy.types.BasicBlock, None)) >> int)
-    def _replace_and_update(self, I, var, idx, src=None):
-        """
-        Replace all uses of var with _ssa_vars[idx].
-        If var is redefined, replaces redefinition with _ssa_vars[_ssa_idx+1].
-
-        Returns the current index of _ssa_vars
-        """
-        def sub(v):
-            if v != var:
-                return v
-            if idx < 0 or idx >= len(self._ssa_vars):
-                raise IndexError(f"Did not prepare enough substitutes for {var} (requesting index {idx})")
-            return self._ssa_vars[idx]
-
-        if isinstance(I, ampy.types.BinaryInstructionClass):
-            I.operands = tuple(map(sub, I.operands))
-        elif isinstance(I, ampy.types.MovInstruction):
-            I.operand = sub(I.operand)
-        elif isinstance(I, ampy.types.PhiInstruction):
-            label = "" if src is None else src.label
-            I.conds = tuple(map(
-                lambda t: (sub(t[0]) if t[1] == label else t[0],
-                    t[1]), I.conds))
-        elif isinstance(I, ampy.types.BranchInstruction):
-            I.cond = sub(I.cond)
-        elif isinstance(I, ampy.types.WriteInstruction):
-            I.operand = sub(I.operand)
-        else: # read, goto, exit, brkpt
-            pass
-
-        if isinstance(I, ampy.types.DefInstructionClass) and I.target == var:
-            # redefinition needs a new variable
-            idx = self._gen_register(var)
-            I.target = sub(I.target)
-            self.debug(f"Inserting new variable {I.target}")
-
-        return idx
+        if not var.startswith('%'):
+            return var
+        if var not in self._dommem.setdefault(block, {}):
+            if block == self.CFG.entrypoint:
+                # all uses must be dominated by a definition
+                # (this is also ensured by phi-node insertions)
+                # this should be impossible, since liveness analysis is
+                # run prior to SSA
+                raise OptError(block, 0, f"{var} does not have a dominating name at {block.label}")
+            idom = self.require(DomTreeAnalysis).idom(block)
+            self._dommem[block][var] = self._get_dominating_var(var, idom)
+        return self._dommem[block][var]
 
     @(Syntax(object, ampy.types.BasicBlock, ...) >> [set, ampy.types.BasicBlock])
     def dominance_frontier(self, *blocks):
