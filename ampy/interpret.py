@@ -25,8 +25,9 @@ class RegDict:
     counts as syntax-checking and is expected to be handled by
     the reader.
     """
-    def __init__(self):
+    def __init__(self, bits):
         self._dict = {}
+        self._bits = bits # number of bits per register (0 for infinite)
 
     @(Syntax(object, str) >> bool)
     def __contains__(self, key):
@@ -52,7 +53,7 @@ class RegDict:
         if key in self._dict:
             return self._dict[key]
         try:
-            return int(key)
+            return self._overflow(int(key))
         except ValueError:
             pass
 
@@ -61,7 +62,15 @@ class RegDict:
 
     @(Syntax(object, str, int) >> None)
     def __setitem__(self, key, value):
-        self._dict[key] = value
+        self._dict[key] = self._overflow(value)
+
+    @(Syntax(object, int) >> int)
+    def _overflow(self, value):
+        if self._bits > 0:
+            value = value % (1 << self._bits)
+            if value > 1 << (self._bits-1):
+                value -= 1 << self._bits
+        return value
 
     def __repr__(self):
         if len(self._dict) == 0:
@@ -83,12 +92,13 @@ class RegDict:
 
 class Interpreter:
 
-    def __init__(self):
+    def __init__(self, bits=128):
         self._cfg = None
         self._rd = None
         self._block = None # points to current block in cfg
         self._block_i = None # current block instruction index
         self._prev_block = None
+        self._bits = bits
 
     @property
     @(Syntax(object) >> bool)
@@ -133,7 +143,7 @@ class Interpreter:
         Load CFG for execution.
         """
         self._cfg = cfg
-        self._rd = RegDict()
+        self._rd = RegDict(self._bits)
         self._block = self._cfg.entrypoint
         self._block_i = 0
         self._prev_label = None
@@ -212,9 +222,15 @@ class Interpreter:
                         case ampy.types.XOrInstruction:
                             res = op0 ^ op1
                         case ampy.types.LShiftInstruction:
-                            res = op0 << op1
+                            if op1 >= 0:
+                                res = op0 << op1
+                            else:
+                                res = op0 >> -op1
                         case ampy.types.RShiftInstruction:
-                            res = op0 >> op1
+                            if op1 >= 0:
+                                res = op0 >> op1
+                            else:
+                                res = op0 << -op1
                         case _:
                             raise UnknownInstructionError("Unimplemented bitwise instruction.")
                 else:

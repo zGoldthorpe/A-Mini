@@ -28,25 +28,37 @@ class TestFileUI:
                         dest="TFUIclear_out",
                         action="store_true",
                         help="Delete .out folders.")
+        parser.add_argument("-Xfuzz", "--clear-fuzz",
+                        dest="TFUIclear_fuzz",
+                        action="store_true",
+                        help="Delete all fuzz ami files.")
+        parser.add_argument("-Xin", "--clear-fuzz-input",
+                        dest="TFUIclear_fuzz_input",
+                        action="store_true",
+                        help="Delete all fuzz input files.")
         parser.add_argument("-X", "--clear",
                         dest="TFUIclear",
                         action="store_true",
-                        help="Equivalent to -Xvfy -Xout")
+                        help="Delete all generated files.")
 
     @classmethod
     def arg_init(cls, parsed_args):
         return cls(folders=parsed_args.TFUIfolders,
                 clear_vfy=parsed_args.TFUIclear_vfy,
                 clear_out=parsed_args.TFUIclear_out,
+                clear_fuzz=parsed_args.TFUIclear_fuzz,
+                clear_fuzz_input=parsed_args.TFUIclear_fuzz_input,
                 clear=parsed_args.TFUIclear)
 
 
-    def __init__(self, folders=None, clear_vfy=False, clear_out=False, clear=False):
+    def __init__(self, folders=None, clear_vfy=False, clear_out=False, clear_fuzz=False, clear_fuzz_input=False, clear=False):
 
         if folders is None:
             self.folders = ["code/"]
         else:
             self.folders = folders
+
+        self._fuzzpath = "code/.fuzz"
 
         self.rescan()
         
@@ -54,6 +66,10 @@ class TestFileUI:
             self.delete_vfy()
         if clear_out or clear:
             self.delete_out()
+        if clear_fuzz or clear:
+            self.delete_fuzz_ami()
+        if clear_fuzz_input or clear:
+            self.delete_fuzz_in()
 
     def rescan(self):
         """
@@ -120,6 +136,59 @@ class TestFileUI:
                 if "@in" in self._tests[ami]:
                     die(f"Expected file\n\t{amif}\ndoes not exist for corresponding input folder {ami}.in/")
                 die(f"Expected file\n\t{amif}\ndoes not exist for corresponding vfy folder {ami}.vfy/")
+
+    def new_fuzz_ami(self):
+        """
+        Prepare fuzz folder, and return path to
+        non-existing file
+        """
+        if not hasattr(self, "_fuzz"):
+            self._fuzz = 0
+        if not os.path.exists(self._fuzzpath):
+            os.makedirs(self._fuzzpath)
+        while True:
+            ffname = os.path.join(self._fuzzpath, f"{self._fuzz}.fuzz.ami")
+            self._fuzz += 1
+            if not os.path.exists(ffname):
+                return ffname
+
+    def new_fuzz_input(self, test):
+        if not hasattr(self, "_fuzzin"):
+            self._fuzzin = {}
+        self._fuzzin.setdefault(test, 0)
+        fld = self.get_test_input_folder(test)
+        if not os.path.exists(fld):
+            os.makedirs(fld)
+        while True:
+            inf = f".fuzz.{self._fuzzin[test]}.in"
+            fname = self.get_test_input_fpath(test, inf)
+            self._fuzzin[test] += 1
+            if not os.path.exists(fname):
+                return inf
+
+    def delete_fuzz_ami(self):
+        """
+        Delete all fuzz folders
+        """
+        if os.path.exists(self._fuzzpath):
+            utils.debug.print("fileman", "Deleting", self._fuzzpath)
+            shutil.rmtree(self._fuzzpath)
+            self.rescan()
+
+    def delete_fuzz_in(self):
+        """
+        Delete all fuzz inputs
+        """
+        for test, data in self._tests.items():
+            if "@in" in data:
+                for inf in data["@in"]:
+                    if inf.startswith(".fuzz"):
+                        fname = self.get_test_input_fpath(test, inf)
+                        utils.debug.print("fileman", "Deleting", fname)
+                        os.remove(fname)
+        # now, rescan
+        self.rescan()
+                
 
     def delete_vfy(self):
         """

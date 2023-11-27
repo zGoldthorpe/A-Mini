@@ -102,13 +102,13 @@ class NaiveSimplify(NaiveSimplify):
                             if ret != val:
                                 if val not in revived:
                                     src = defs.defs(val)[0]
-                                    src._instructions.insert(-1, ampy.types.MovInstruction(val, ret))
+                                    src.insert(-1, ampy.types.MovInstruction(val, ret))
                                     revived.add(val)
                                 conds.append((val, label))
                             else:
                                 # otherwise, we need to create a new copy
                                 new = self._gen_new_phi_reg(ret)
-                                self.CFG[label]._instructions.insert(-1,
+                                self.CFG[label].insert(-1,
                                         ampy.types.MovInstruction(new, ret))
                                 conds.append((new, label))
                         else:

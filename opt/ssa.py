@@ -137,8 +137,7 @@ class SSA(SSA):
                         if reg in assigns:
                             # conflict!
                             tmp = self._new_reg(var)
-                            parent._instructions.insert(
-                                    ampy.types.MovInstruction(tmp, reg))
+                            parent.insert(ampy.types.MovInstruction(tmp, reg))
                             reg = tmp
                         conds.append((reg, label))
                     I.conds = tuple(conds)
@@ -162,7 +161,7 @@ class SSA(SSA):
                 for parent in block.parents:
                     # we will deal with which variable to use in a second pass
                     conds.append((var, parent.label))
-                block._instructions.insert(0, ampy.types.PhiInstruction(var, *conds))
+                block.insert(0, ampy.types.PhiInstruction(var, *conds))
         # now, adjust variable definitions
         def sub(var):
             return self._get_dominating_var(var, block)

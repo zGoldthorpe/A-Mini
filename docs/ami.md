@@ -81,6 +81,7 @@ The supported arithmetic operations are
     %0 = ?1 / ?2    ; integer division
     %0 = ?1 % ?2    ; remainder (modulo)
 ```
+> *Note.* Division or taking remainder by zero throws an exception, which will lead to the program exiting.
 
 #### Bitwise operations
 The supported bitwise operations are
@@ -91,6 +92,9 @@ The supported bitwise operations are
     %0 = ?1 << ?2   ; bitshift left
     %0 = ?1 >> ?2   ; bitshift right
 ```
+> *Note.* Bitshifting by a negative amount is interpreted as bitshifting the same magnitude in the opposite direction.
+> Since integers may have arbitrary bitlength, the integers are viewed via their embedding into 2-adic numbers; that is, negative integers have infinitely many set bits going left.
+> Even if run with finite-length registers, this behaviour is still simulated via sign-extension.
 
 #### Comparison operations
 The supported comparison instructions are
@@ -186,6 +190,13 @@ python3 ami.py path/to/code.ami
 ```
 The interpreter has several command-line options to control its behaviour.
 For instance, the `--trace` option has the interpreter output the program execution trace to `stderr`.
+More importantly, A-Mi code is simulated with 128-bit registers by default.
+This can be changed via the `-i` flag; for instance,
+```console
+python3 ami.py -i32 path/to/code.ami
+```
+will run with 32-bit registers instead.
+Using `-i0` will simulate with unbounded registers (giving Python-like integers).
 
 The interpreter also supports passing the input code through optimisations:
 ```console

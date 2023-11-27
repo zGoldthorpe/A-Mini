@@ -6,8 +6,9 @@ __pycache__/
 # Vim
 *.swp
 
-# Makefile tests
+# Testing
 *.vfy
+*.fuzz*
 
 # Prerequisites
 *.d

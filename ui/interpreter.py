@@ -22,10 +22,11 @@ class InterpreterUI:
     @classmethod
     def add_arguments(cls, parser):
 
-        parser.add_argument("-i", "--prompt",
-                dest="IUIprompt",
-                action="store_true",
-                help="Enable prompt messages when A-Mi code calls a 'read' or a 'write'.")
+        parser.add_argument("-i", "--integer",
+                dest="IUIbits",
+                type=int,
+                default=128,
+                help="Specify the number of bits per register (default: 128). Use 0 for infinite bits.")
         parser.add_argument("-t", "--trace",
                 dest="IUItrace",
                 action="store_true",
@@ -34,6 +35,10 @@ class InterpreterUI:
                 dest="IUIbrkpts",
                 action="store_false",
                 help="Ignore breakpoints in code")
+        parser.add_argument("--prompt",
+                dest="IUIprompt",
+                action="store_true",
+                help="Enable prompt messages when A-Mi code calls a 'read' or a 'write'.")
         parser.add_argument("--interrupt",
                 dest="IUIinterrupt",
                 choices=("never", "instructions", "blocks"),
@@ -44,14 +49,15 @@ class InterpreterUI:
 
     @classmethod
     def arg_init(cls, parsed_args):
-        return cls(trace=parsed_args.IUItrace,
+        return cls(bits=parsed_args.IUIbits,
+                trace=parsed_args.IUItrace,
                 prompt=parsed_args.IUIprompt,
                 interrupt=parsed_args.IUIinterrupt,
                 brkpts=parsed_args.IUIbrkpts)
 
-    def __init__(self, trace=False, prompt=False, interrupt="never", brkpts=True):
-        self._interpreter = ampy.interpret.Interpreter()
-
+    def __init__(self, bits=128, trace=False, prompt=False, interrupt="never", brkpts=True):
+        self._interpreter = ampy.interpret.Interpreter(bits)
+        
         self.trace = trace
         self.prompt = prompt
         self.interrupt = interrupt

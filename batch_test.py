@@ -13,6 +13,7 @@ import multiprocessing
 import utils.printing
 
 from ui.diff        import DiffUI
+from ui.fuzz        import FuzzUI
 from ui.interpreter import InterpreterUI
 from ui.multi       import MultiUI
 from ui.printer     import PrinterUI
@@ -22,6 +23,7 @@ from ui.testfiles   import TestFileUI
 from ui.opter       import OptUI
 from ui.writer      import WriterUI
 
+import ui.fuzz
 import ui.stats
 
 def batch_opt(tfmanager, multi, opter, *, meta=True, fresh=False):
@@ -57,6 +59,62 @@ def batch_opt(tfmanager, multi, opter, *, meta=True, fresh=False):
                 stderr=tfmanager.get_test_opt_log(test, opt))
 
     return multi.execute()
+
+def batch_fuzz_ami(tfmanager, multi, fuzz, *, num):
+    """
+    This function is responsible for generating ami source fuzz.
+    """
+    def build_fuzz(fname):
+        PrinterUI(can_format=False, debug=False)
+        writer = WriterUI(meta=False, frame=None,
+                fname=fname)
+        writer.write(fuzz.generate())
+        
+    for _ in range(num):
+        fname = tfmanager.new_fuzz_ami()
+        multi.prepare_process(
+                fname,
+                target=build_fuzz,
+                args=(fname,))
+
+    return multi.execute()
+
+def batch_fuzz_input(tfmanager, multi, *, num, intmin, intmax):
+    """
+    This function is responsible for generating input fuzz.
+    Also produces the corresponding trace for the input.
+    """
+    def say_and_write(fname):
+        PrinterUI(can_format=False, debug=True)
+        reader = ReaderUI(fname=fname)
+        interpreter = InterpreterUI(prompt=False,
+                                trace=True,
+                                brkpts=False,
+                                interrupt="never")
+        # parse
+        reader.fetch_input()
+        cfg = reader.build_cfg()
+        # run
+        interpreter.load_cfg(cfg)
+        interpreter.run()
+
+    for test in tfmanager.tests:
+
+        for _ in range(num):
+            inf = tfmanager.new_fuzz_input(test)
+            outf = tfmanager.get_test_corresponding_output(test, inf)
+            infile = tfmanager.get_test_input_fpath(test, inf)
+
+            multi.prepare_process(
+                    tfmanager.get_test_output_fpath(test, outf),
+                    target=say_and_write,
+                    args=(tfmanager.get_test_ami(test),),
+                    stdin=ui.fuzz.FuzzWriter(infile, intmin, intmax),
+                    stdout=tfmanager.get_test_output_fpath(test, outf),
+                    stderr=tfmanager.get_test_corresponding_trace_fpath(test, inf))
+
+    return multi.execute()
+
 
 def batch_run(tfmanager, multi):
     """
@@ -331,6 +389,46 @@ if __name__ == "__main__":
                     dest="fresh_opt",
                     action="store_true",
                     help="Do a clean rebuild, and overwrite already existing files for this optimisation.")
+
+    ### fuzz arguments ###
+    fuzz_parser = subparsers.add_parser("fuzz",
+                    description="A-Mi fuzzer",
+                    help="Generate more code or inputs.")
+    fuzz_sub = fuzz_parser.add_subparsers(title="fuzz types", dest="fuzz_type")
+    fuzz_ami = fuzz_sub.add_parser("ami",
+                    description="A-Mi source fuzzer",
+                    help="Generate more A-Mi source code.")
+    fuzz_input = fuzz_sub.add_parser("input",
+                    description="A-Mi input fuzzer",
+                    help="Generate input to existing A-Mi code.")
+
+    FuzzUI.add_arguments(fuzz_ami)
+    fuzz_ami.add_argument("-n", "--num",
+                    dest="fuzz_ami_num",
+                    type=int,
+                    default=32,
+                    metavar="NUM",
+                    help="The number of new programs to generate (default: 32).")
+    
+    fuzz_input.add_argument("-n", "--num",
+                    dest="fuzz_input_num",
+                    type=int,
+                    default=8,
+                    metavar="NUM",
+                    help="The number of new inputs to generate per program (default: 8).")
+    fuzz_input.add_argument("--min",
+                    dest="fuzz_input_min",
+                    type=int,
+                    default=-64,
+                    metavar="NUM",
+                    help="The minimum integer that may be generated for a program input (default: -64).")
+    fuzz_input.add_argument("--max",
+                    dest="fuzz_input_max",
+                    type=int,
+                    default=64,
+                    metavar="NUM",
+                    help="The maximum integer that may be generated for a program input (default: 64).")
+
     
     ### run arguments ###
     run_parser = subparsers.add_parser("run",
@@ -395,6 +493,17 @@ if __name__ == "__main__":
                 res = batch_opt(tfmanager, multi, opter, meta=args.meta, fresh=args.fresh_opt)
                 if any(ec for _, ec in res.items()):
                     exit(99)
+
+        case "fuzz":
+
+            match args.fuzz_type:
+
+                case "ami":
+                    fuzz = FuzzUI.arg_init(args)
+                    batch_fuzz_ami(tfmanager, multi, fuzz, num=args.fuzz_ami_num)
+
+                case "input":
+                    batch_fuzz_input(tfmanager, multi, num=args.fuzz_input_num, intmin=args.fuzz_input_min, intmax=args.fuzz_input_max)
 
         case "run":
             utils.printing.phidden("batch_run :: updating output files")

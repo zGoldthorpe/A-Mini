@@ -365,6 +365,18 @@ class BasicBlock(BasicBlock):
 
     ### Block modification ###
 
+    @(Syntax(object, int, InstructionClass) >> None)
+    def insert(self, idx, I):
+        """
+        Insert instruction at the specified index.
+        Insert at -1 to insert just before the branch instruction.
+        """
+        if isinstance(I, BranchInstructionClass):
+            raise BranchError(self.label, "Cannot insert branch instruction; use `add_child` for this functionality.")
+
+        self.branch_instruction # ensure branch instruction is present
+        self._instructions.insert(idx, I)
+
     @(Syntax(object, BasicBlock) >> None)
     def add_parent(self, parent):
         self._parents.add(parent)

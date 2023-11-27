@@ -218,7 +218,7 @@ class VDCM(VDCM):
                             # predecessor
                             self._changed = True
                             new = self._new_register(vn)
-                            self.CFG[label]._instructions.insert(-1,
+                            self.CFG[label].insert(-1,
                                     ampy.types.MovInstruction(new, reg))
                             reg = new
 
@@ -337,7 +337,7 @@ class VDCM(VDCM):
         target = self.vnrep.get(expr, None)
         if target is None:
             target = self._new_register(expr)
-        block._instructions.insert(-1, op(target, lhs, rhs))
+        block.insert(-1, op(target, lhs, rhs))
         self._dommem[block][expr] = target
         return target
 

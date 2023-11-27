@@ -152,7 +152,7 @@ _opcodes = dict(
             ampy.types.AndInstruction,
             ),
         lor = OperationReader(
-            rf"{_var} = {_op} | {_op}",
+            rf"{_var} = {_op} \| {_op}",
             ampy.types.OrInstruction,
             ),
         xor = OperationReader(

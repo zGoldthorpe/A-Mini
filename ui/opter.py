@@ -24,7 +24,7 @@ from opt.tools import Opt, OptList, OptError
 class OptUI:
 
     @classmethod
-    def add_arguments(self, parser):
+    def add_arguments(cls, parser):
         parser.add_argument("-p", "--add-pass",
                 dest="OUIpasses",
                 action="append",

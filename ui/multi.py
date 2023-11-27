@@ -39,12 +39,14 @@ class MultiUI:
 
     @classmethod
     def fopen(cls, file, mode='r'):
-        folder = os.path.split(file)[0]
+        folder = os.path.split(str(file))[0]
         try:
             shutil.os.makedirs(folder)
         except FileExistsError:
             pass
-        return open(file, mode)
+        if isinstance(file, str):
+            return open(file, mode)
+        return file # assumes file is already opened
 
     @classmethod
     def arg_init(cls, parsed_args):

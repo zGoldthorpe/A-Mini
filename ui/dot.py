@@ -137,7 +137,7 @@ class DotUI:
             if not var.startswith('%'):
                 return var
             if var[1].isdigit():
-                return f"({var[1:]})"
+                return f"[{var[1:]}]"
             return var[1:]
 
         match type(I):

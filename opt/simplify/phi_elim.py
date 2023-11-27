@@ -43,7 +43,7 @@ class PhiElim(PhiElim):
 
                 for val, lbl in I.conds:
                     # move value to target in parent block
-                    self.CFG[lbl]._instructions.insert(-1,
+                    self.CFG[lbl].insert(-1,
                             ampy.types.MovInstruction(reg, val))
 
                 block._instructions[i] = ampy.types.MovInstruction(I.target, reg)

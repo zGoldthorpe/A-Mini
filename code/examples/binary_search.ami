@@ -3,9 +3,9 @@
 ; You are asked to pick a number in [0, 1023].
 ; The program has 10 guesses to find your number.
 ; The program will guess numbers, and expect an answer of
-;  1: guess is too high
-; -1: guess is too low
-;  0: guess is correct
+; +: guess is too high
+; -: guess is too low
+; 0: guess is correct
 ;
 ; If the program outputs -1, it means that your input makes no sense
 
@@ -57,7 +57,7 @@
     branch %win ? @win : @learn
 
 @learn:
-    %too_big = %response == 1
+    %too_big = %response > 0
     branch %too_big ? @too_big : @not_too_big
 
 @too_big:
@@ -65,7 +65,7 @@
     goto @main_loop
 
 @not_too_big:
-    %too_small = %response == -1
+    %too_small = %response < 0
     branch %too_small ? @too_small : @invalid
 
 @too_small:
