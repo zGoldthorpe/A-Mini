@@ -20,9 +20,11 @@ from utils.syntax import Syntax
 
 from opt.tools import Opt, OptError
 from opt.analysis.domtree import DomTreeAnalysis
+from opt.analysis.djgraph import DJGraph
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.live import LiveAnalysis
 
+from ampy.passmanager import BadArgumentException
 import ampy.types
 
 class SSA(Opt):
@@ -33,23 +35,26 @@ class SSA(SSA):
     """
     Runs the Cytron-Ferrante algorithm for converting code
     into static single assignment form.
+
+    method: "CF" or "DJ"
+        compute the SSA graph using Cytron-Ferrante or the
+        DJ graph of Sreedhar-Gao.
     """
 
-    @SSA.init("ssa")
-    def __init__(self, /):
-        pass
+    @SSA.init("ssa", "CF")
+    def __init__(self, method, /):
+        if method not in ("CF", "DJ"):
+            raise BadArgumentError("Positional argument must be either \"CF\" or \"DJ\".")
+        self.method = method
 
-    @SSA.opt_pass
-    def cytron_ferrante(self):
+    @(Syntax(object) >> None)
+    def _cytron_ferrante(self):
         """
-        Cytron-Ferrante SSA form pass
+        Compute the iterated dominance frontier using Cytron-Ferrante, and store
+        the result in self._idf
         """
-
         # Step 1. Dominance frontier
         # --------------------------
-        # The dominance frontier of a basic block B consists of all blocks B'
-        # for which B dominates a parent of B', but B does not strictly
-        # dominate B' itself.
         # Cytron-Ferrante computes the dominance frontier recursively.
         # Given the dominance frontier of all children of B in the dominator
         # tree, the dominance frontier of B is given as the union of:
@@ -77,29 +82,75 @@ class SSA(SSA):
 
         # Step 2. Iterated dominance frontier
         # -----------------------------------
-        # The iterated dominance frontier of a set S is the result of taking
-        # the limit of S_n, where S_0 := S, S_{n+1} := DF[S_0 + S_n].
-        # We want the iterated dominance frontier for the set def[x] of
-        # definitions of each variable x in the CFG
-        # idf[var]: iterated dominance frontier of a variable
         self._idf = dict()
-        defs = self.require(DefAnalysis)
-        self._vars = set(defs.vars)
 
         for var in self._vars:
-            blocks = defs.defs(var)
+            blocks = self._defs.defs(var)
             if len(blocks) == 1:
                 # phi nodes are unnecessary if there is only a single assignment to begin with
                 continue
             S = set(blocks)
             self._idf[var] = S
             while True:
-                new = self.dominance_frontier(*(S | self._idf[var]))
+                new = self._dominance_frontier(*(S | self._idf[var]))
                 if self._idf[var] == new:
                     break
                 self._idf[var] = new
 
-        # Step 3. Insert phi nodes
+    @(Syntax(object) >> None)
+    def _sreedhar_gao(self):
+        """
+        Compute the iterated dominance frontier using the DJ graph
+        """
+        self._dj = DJGraph(self.CFG, self.opts)
+        self._idf = {}
+        for var in self._vars:
+            blocks = self._defs.defs(var)
+            if len(blocks) == 1:
+                continue # no phi nodes necessary for variables defined just once
+            self._idf[var] = self._dj.iterated_dominance_frontier(*blocks)
+
+    @(Syntax(object, ampy.types.BasicBlock) >> (ampy.types.BasicBlock, None))
+    def _idom(self, block):
+        if self.method == "CF":
+            return self.require(DomTreeAnalysis).idom(block)
+        return self._dj.idom(block)
+    
+    @(Syntax(object, ampy.types.BasicBlock) >> [tuple, ampy.types.BasicBlock])
+    def _domchildren(self, block):
+        if self.method == "CF":
+            return self.require(DomTreeAnalysis).children(block)
+        return self._dj.D_children(block)
+
+
+    @SSA.opt_pass
+    def ssa(self):
+        """
+        SSA form pass
+        """
+        self._defs = self.require(DefAnalysis)
+        self._vars = set(self._defs.vars)
+
+        # Step 1. Compute iterated dominance frontier
+        # -------------------------------------------
+        # The dominance frontier of a basic block B consists of all blocks B'
+        # for which B dominates a parent of B', but B does not strictly
+        # dominate B' itself. The dominance frontier of a set of blocks is just
+        # the union of the dominance frontiers for each element.
+        # The iterated dominance frontier of a set S is the result of taking
+        # the limit of S_n, where S_0 := S, S_{n+1} := DF[S_0 + S_n].
+        # We want the iterated dominance frontier for the set def[x] of
+        # definitions of each variable x in the CFG
+        # idf[var]: iterated dominance frontier of a variable
+        if self.method == "CF":
+            self._cytron_ferrante()
+        else:
+            self._sreedhar_gao()
+
+        for var in self._idf:
+            self.debug(f"IDF[{var}]:", ", ".join(block.label for block in self._idf[var]))
+
+        # Step 2. Insert phi nodes
         # ------------------------
         # Phi nodes are inserted in the iterated dominance frontier
         # This handles "where", but to figure out "how", we traverse
@@ -119,7 +170,7 @@ class SSA(SSA):
         self._changed = False
         self._dfs_and_sub(self.CFG.entrypoint)
 
-        # Step 4. Adjust phi node arguments
+        # Step 3. Adjust phi node arguments
         # ---------------------------------
         # Now that the phi nodes are inserted, and dominating
         # names are calculated, we can use them to correct the phi nodes.
@@ -145,7 +196,6 @@ class SSA(SSA):
                     assigns.add(I.target)
 
         if self._changed:
-            # I don't have any analyses on the CFG shape, which is the only thing that gets preserved
             return tuple(opt for opt in self.opts if opt.ID in ("ssa", "domtree"))
         return self.opts
 
@@ -186,7 +236,7 @@ class SSA(SSA):
                 self._dommem.setdefault(block, {})[I.target] = var
                 I.target = var
 
-        for child in self.require(DomTreeAnalysis).children(block):
+        for child in self._domchildren(block):
             self._dfs_and_sub(child)
 
     @(Syntax(object, str) >> str)
@@ -214,20 +264,20 @@ class SSA(SSA):
                 # this should be impossible, since liveness analysis is
                 # run prior to SSA
                 raise OptError(block, 0, f"{var} does not have a dominating name at {block.label}")
-            idom = self.require(DomTreeAnalysis).idom(block)
+            idom = self._idom(block)
             self._dommem[block][var] = self._get_dominating_var(var, idom)
         return self._dommem[block][var]
 
     @(Syntax(object, ampy.types.BasicBlock, ...) >> [set, ampy.types.BasicBlock])
-    def dominance_frontier(self, *blocks):
+    def _dominance_frontier(self, *blocks):
         """
         Returns the dominance frontier of the given set of blocks
         """
         if len(blocks) == 0:
             return set()
         if len(blocks) > 1:
-            return self.dominance_frontier(blocks[0]
-                    ).union(self.dominance_frontier(*blocks[1:]))
+            return self._dominance_frontier(blocks[0]
+                    ).union(self._dominance_frontier(*blocks[1:]))
 
         block = blocks[0]
         if self._df[block] is None:
@@ -248,7 +298,7 @@ class SSA(SSA):
                     # PDF[B] = {B' in DF[B] | B' not strictly dominated by idom[B]}
                     self._pdf[dtchild] = set()
                     idom = domtree.idom(dtchild)
-                    for dfblock in self.dominance_frontier(dtchild):
+                    for dfblock in self._dominance_frontier(dtchild):
                         if idom is None or idom == dfblock or not domtree.dominates(idom, dfblock):
                             self._pdf[dtchild].add(dfblock)
 

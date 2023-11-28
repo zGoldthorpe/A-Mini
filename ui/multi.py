@@ -35,7 +35,7 @@ class MultiUI:
                     metavar="FLOAT",
                     action="store",
                     type=float,
-                    help="Specify timeout (in seconds) for each process.")
+                    help="Specify timeout (in seconds) for each process (default: no timeout).")
 
     @classmethod
     def fopen(cls, file, mode='r'):

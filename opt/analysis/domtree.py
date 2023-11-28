@@ -126,7 +126,7 @@ class DomTreeAnalysis(DomTreeAnalysis):
                 for block in self.CFG
                 }
         self._child = {
-                block : -1
+                block : None
                 for block in self.CFG
                 }
         self._size = {
@@ -138,9 +138,9 @@ class DomTreeAnalysis(DomTreeAnalysis):
                 for block in self.CFG
                 }
 
-        self._semi[-1] = -1
-        self._label[-1] = -1
-        self._size[-1] = 0 # edge case definitions for convenience in LINK
+        self._semi[None] = -1
+        self._label[None] = None
+        self._size[None] = 0 # edge case definitions for convenience in LINK
 
         for i in range(len(self._vertex)-1, 0, -1):
             block = self._vertex[i]
@@ -190,27 +190,27 @@ class DomTreeAnalysis(DomTreeAnalysis):
         self._vertex.append(block)
 
         for child in block.children:
-            if self._semi[child] > -1:
-                continue
-            self._dfs_parent[child] = block
-            self._DFS(child)
+            if self._semi[child] == -1:
+                self._dfs_parent[child] = block
+                self._DFS(child)
 
     @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> None)
     def _link(self, src, tgt):
+        self._ancestor[tgt] = src # this line is missing from the original paper
         block = tgt
-        while self._semi[self._label[block]] < self._semi[self._label[self._child[block]]]:
+        while self._semi[self._label[tgt]] < self._semi[self._label[self._child[block]]]:
             # rebalance tree
             if self._size[block] + self._size[self._child[self._child[block]]] >= 2*self._size[self._child[block]]:
                 self._dfs_parent[self._child[block]] = block
                 self._child[block] = self._child[self._child[block]]
             else:
                 self._dfs_parent[block] = self._child[block]
-                s = self._dfs_parent[block]
+                block = self._dfs_parent[block]
 
         self._label[block] = self._label[tgt]
         self._size[src] += self._size[tgt]
         if self._size[src] <= 2*self._size[tgt]:
-            (block, self._child[block]) = (self._child[block], block)
+            (block, self._child[src]) = (self._child[src], block)
         while isinstance(block, ampy.types.BasicBlock):
             self._dfs_parent[block] = src
             block = self._child[block]
