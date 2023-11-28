@@ -53,6 +53,7 @@ class DJGraph(RequiresOpt):
                 dfs(child, level+1)
                 self._D[node].add(child)
                 self._up_dict[child, 0] = node
+                self._up_valid[child] = 0 # to manage updates
         dfs(self._root, 0)
 
     @(Syntax(object) >> None)
@@ -71,12 +72,13 @@ class DJGraph(RequiresOpt):
         """
         if block is None or block == self._root:
             return None
-        if (block, e) not in self._up_dict:
+        if (block, e) not in self._up_dict or self._up_valid[block] < e:
             if e == 0:
                 # node is not in the dominator tree
                 return None
             h = e >> 1
             self._up_dict[block, e] = self._up(self._up(block, h), h)
+            self._up_valid[block] = max(e, self._up_valid[block])
         return self._up_dict[block, e]
 
 
@@ -216,3 +218,48 @@ class DJGraph(RequiresOpt):
             visit(block)
 
         return idf
+
+    @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> None)
+    def insert_edge(self, A, B):
+        """
+        Update the DJ-graph after inserting an edge between two nodes.
+        The assumption is that at least A is already in the dominator tree.
+        """
+        if B not in self._D:
+            # this node does not yet exist in the dominator
+            # therefore, A is its immediate dominator
+            self._D[A].add(B)
+            self._D[B] = set()
+            self._J[B] = set()
+            self._level[B] = self._level[A] + 1
+            self._up_dict[B, 0] = A
+            self._up_valid[B] = 0
+
+        lcd = self.least_common_dominator(A, B)
+        if lcd != A:
+            # if A dominates B already, then the dominator tree does not change
+            # otherwise, we have inserted a J-edge
+            self._J[A].add(B)
+
+        affected = self.iterated_dominance_frontier(B, _minlevel = self._level[ldc]+1)
+        if self._level[B] > self._level[lcd] + 1:
+            affected.add(B)
+
+        def correct_level(node, level):
+            self._level[node] = level
+            for dtchild in self._D[node]:
+                correct_level(dtchild, level+1)
+
+        for block in affected:
+            # the entrypoint will never be in affected
+            # because of the level requirement
+            idom = self.idom(block)
+            self._D[idom].remove(block)
+            if block in idom.children:
+                self._J[idom].add(block)
+
+            self._D[lcd].add(block)
+            self._up_dict[block, 0] = lcd
+            self._up_valid[block] = 0 # invalidate the higher entries, if any
+            correct_level(block, self._level[lcd]+1)
+
