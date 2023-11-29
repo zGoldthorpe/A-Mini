@@ -37,6 +37,25 @@ class Comparisons:
         self._rheight = {} # approximation for longest chain to the right
         self._consistent = True
 
+    def copy(self):
+        """
+        Create a separate Comparisons object with identical data
+        (deep copy)
+        """
+        ret = Comparisons()
+        if not self._consistent:
+            ret._consistent = False
+            return ret
+        for node in self:
+            ret._eq[node] = self._eq[node]
+            ret._leq[node] = set(self._leq[node])
+            ret._geq[node] = set(self._geq[node])
+            ret._int_range[node] = self._int_range[node]
+            ret._lheight[node] = self._lheight[node]
+            ret._rheight[node] = self._rheight[node]
+        return ret
+
+
     @(Syntax(object, Expr) >> bool)
     def __in__(self, node):
         return node in self._eq
@@ -67,6 +86,8 @@ class Comparisons:
             self._rheight[node] = 0
             if isinstance(node.op, int):
                 self._int_range[node] = (node.op, node.op)
+            elif isinstance(node.op, type) and issubclass(node.op, amt.CompInstructionClass):
+                self._int_range[node] = (0, 1) # True / False
             else:
                 self._int_range[node] = (None, None)
 
@@ -98,7 +119,7 @@ class Comparisons:
 
         if self.leq(b, a):
             # they now form an equivalence class
-            rep = a if isinstance(a.op, int) else b
+            rep = min(a, b) # expressions have a canonical order (with consts as mins)
             self._update_eqclass(a, b, rep)
         else:
             self._update_leq(a, b)
@@ -327,3 +348,361 @@ class Comparisons:
         for n in cls:
             self._update_eq(n, rep)
 
+class PredicatedState:
+    """
+    Data structure for managing simple predicated expression
+    simplification.
+    """
+
+    def __init__(self):
+        self._comparisons = Comparisons()
+
+    def copy(self):
+        ret = PredicatedState()
+        ret._comparisons = self._comparisons.copy()
+        return ret
+
+    @property
+    def consistent(self):
+        return self._comparisons.is_consistent()
+
+    @(Syntax(object, Expr) >> Expr)
+    def simplify(self, expr):
+        """
+        Attempt to simplify an expression with the information provided
+        by predicates.
+        """
+        # e.g. if expression is given by a comparison, then its value is bounded between 0 and 1
+        # or if it is a division/mod, then its second argument is nonzero
+        # first, simplify its arguments
+        expr = Expr(expr.op, *map(self.simplify, expr.args))
+        # then take the "representative" for the expression
+        expr = self._comparisons.eqclass(expr)
+
+        match expr.op:
+
+            case amt.AddInstruction:
+                if len(expr.args) == 2:
+                    # otherwise, expressions are too complicated
+                    nleft = Expr(amt.MulInstruction, Expr(-1), expr.left)
+                    if self._comparisons.leq(expr.right, nleft):
+                        self._comparisons.assert_leq(expr, Expr(0))
+                    if self._comparisons.leq(nleft, expr.right):
+                        self._comparisons.assert_leq(Expr(0), expr)
+                    if self._comparisons.leq(Expr(0), expr.left):
+                        self._comparisons.assert_leq(expr.right, expr)
+                    if self._comparisons.leq(expr.left, Expr(0)):
+                        self._comparisons.assert_leq(expr, expr.right)
+                    if self._comparisons.leq(Expr(0), expr.right):
+                        self._comparisons.assert_leq(expr.left, expr)
+                    if self._comparisons.leq(expr.right, Expr(0)):
+                        self._comparisons.assert_leq(expr, expr.left)
+
+            case amt.MulInstruction:
+                positives = len(list(filter(lambda arg: self._comparisons.leq(Expr(0), arg), expr.args)))
+                negatives = len(list(filter(lambda arg: self._comparisons.leq(arg, Expr(0)), expr.args)))
+                if positives + negatives == len(expr.args):
+                    if negatives % 2 == 0:
+                        self._comparisons.assert_leq(Expr(0), expr)
+                    else:
+                        self._comparisons.assert_leq(expr, Expr(0))
+
+            case amt.ModInstruction:
+                nleft = Expr(amt.MulInstruction, Expr(-1), expr.left)
+                if self._comparisons.leq(Expr(0), expr.right):
+                    # by convention a % b is nonnegative iff b is
+                    self._comparisons.assert_leq(Expr(0), expr)
+                    if self._comparisons.leq(Expr(0), expr.left):
+                        if self._comparisons.leq(expr.left, expr.right):
+                            # a % b = a if 0 <= a < b
+                            self._comparisons.assert_eq(expr, expr.left)
+                    elif self._comparisons.leq(Expr(0), nleft):
+                        if self._comparisons.leq(nleft, expr.right):
+                            self._comparisons.assert_eq(expr, Expr(amt.AddInstruction, expr.right, expr.left))
+                elif self._comparisons.leq(expr.right, Expr(0)):
+                    self._comparisons.assert_leq(expr, Expr(0))
+                    if self._comparisons.leq(expr.left, Expr(0)):
+                        if self._comparisons.leq(expr.right, expr.left):
+                            # a % b = a if b < a <= 0
+                            self._comparisons.assert_eq(expr, expr.left)
+                    elif self._comparisons.leq(nleft, Expr(0)):
+                        if self._comparisons.leq(expr.right, nleft):
+                            self._comparisons.assert_eq(expr, Expr(amt.AddInstruction, expr.left, expr.right))
+
+            case amt.DivInstruction:
+                # because of expr simplifications, we already know
+                # that a != b and a,b != 0
+                nleft = Expr(amt.MulInstruction, Expr(-1), expr.left)
+                if self._comparisons.eq(nleft, expr.right):
+                    self._comparisons.assert_eq(expr, Expr(-1))
+                if self._comparisons.leq(Expr(0), expr.right):
+                    if self._comparisons.leq(Expr(0), expr.left):
+                        self._comparisons.assert_leq(Expr(0), expr)
+                        if self._comparisons.leq(expr.left, expr.right):
+                            # 0 <= a < b, so a / b = 0
+                            self._comparisons.assert_eq(Expr(0), expr)
+                    elif self._comparisons.leq(Expr(0), nleft):
+                        self._comparisons.assert_leq(expr, Expr(0))
+                        if self._comparisons.leq(nleft, expr.right):
+                            self._comparisons.assert_eq(Expr(0), expr)
+                elif self._comparisons.leq(expr.right, Expr(0)):
+                    # opposite of above work
+                    if self._comparisons.leq(expr.left, Expr(0)):
+                        self._comparisons.assert_leq(Expr(0), expr)
+                        if self._comparisons.leq(expr.right, expr.left):
+                            self._comparisons.assert_eq(Expr(0), expr)
+                    elif self._comparisons.leq(nleft, Expr(0)):
+                        self._comparisons.assert_leq(expr, Expr(0))
+                        if self._comparisons.leq(expr.right, nleft):
+                            self._comparisons.assert_eq(Expr(0), expr)
+
+            case amt.AndInstruction:
+                # a & b is positive unless both a and b are negative
+                if any(self._comparisons.leq(Expr(0), arg) for arg in expr.args):
+                    self._comparisons.assert_leq(Expr(0), expr)
+                elif all(self._comparisons.leq(arg, Expr(0)) for arg in expr.args):
+                    self._comparisons.assert_leq(expr, Expr(0))
+
+            case amt.OrInstruction:
+                # a | b is negative unless both a and b are positive
+                if any(self._comparisons.leq(arg, Expr(0)) for arg in expr.args):
+                    self._comparisons.assert_leq(expr, Expr(0))
+                elif all(self._comparisons.leq(Expr(0), arg) for arg in expr.args):
+                    self._comparisons.assert_leq(Expr(0), expr)
+
+            case amt.XOrInstruction:
+                if len(expr.args) == 2:
+                    # otherwise, it's too complicated
+                    if self._comparisons.neq(expr.left, expr.right):
+                        # we know the arguments are not provably equal already
+                        self._comparisons.assert_neq(expr, Expr(0))
+
+            case amt.LShiftInstruction | amt.RShiftInstruction:
+                if self._comparisons.leq(Expr(0), expr.left):
+                    self._comparisons.assert_leq(Expr(0), expr)
+                elif self._comparisons.leq(expr.left, Expr(0)):
+                    self._comparisons.assert_leq(expr, Expr(0))
+
+            case T if isinstance(T, type) and issubclass(T, amt.CompInstructionClass):
+                self._comparisons.assert_leq(expr, Expr(1))
+                self._comparisons.assert_leq(Expr(0), expr)
+
+                right, left = self._split_subtraction(expr.right)
+                # 0 < [B] - [A] iff [A] < [B], so left = [A], right = [B]
+
+                match T:
+                    case amt.EqInstruction:
+                        if self._comparisons.neq(left, right):
+                            self._comparisons.assert_eq(expr, Expr(0))
+                    case amt.NeqInstruction:
+                        if self._comparisons.neq(left, right):
+                            self._comparisons.assert_eq(expr, Expr(1))
+                    case amt.LeqInstruction:
+                        if self._comparisons.leq(left, right):
+                            self._comparisons.assert_eq(expr, Expr(1))
+                        elif self._comparisons.leq(right, left) and self._comparisons.neq(right, left):
+                            self._comparisons.assert_eq(expr, Expr(0))
+                    case amt.LtInstruction:
+                        if self._comparisons.eq(left, right):
+                            self._comparisons.assert_eq(expr, Expr(0))
+                        elif self._comparisons.neq(left, right):
+                            if self._comparisons.leq(left, right):
+                                self._comparisons.assert_eq(expr, Expr(1))
+                            elif self._comparisons.leq(right, left):
+                                self._comparisons.assert_eq(expr, Expr(0))
+
+            case _:
+                # the following do not have any nontrivial simplifications
+                # (that aren't already done automatically at this point)
+                # consts
+                # phis
+                pass
+
+        return self._comparisons.eqclass(expr)
+    
+    @classmethod
+    @(Syntax(object, Expr) >> ((), Expr, Expr))
+    def _split_subtraction(cls, expr):
+        """
+        Try to split the expression into [A] - [B]
+        and return (A, B)
+        """
+        if expr.op != amt.AddInstruction:
+            return (expr, Expr(0))
+        def negated(e):
+            return e.op == amt.MulInstruction and e.left.op == -1
+        return (Expr(amt.AddInstruction, *filter(lambda e: not negated(e), expr.args)),
+                Expr(amt.AddInstruction, *map(lambda e: e.right, filter(negated, expr.args))))
+
+    @(Syntax(object, Expr) >> None)
+    def assert_nonzero(self, expr):
+        """
+        Try to infer elementary consequences from the fact
+        that the provided expression is nonzero.
+
+        Assumes variables in expr are atomic; for instance,
+        if (a == 0) is asserted, and (a == b - c) is already
+        known, this will not infer that (b == c).
+        To do this, assert that (b - c == 0) is nonzero instead.
+        """
+        expr = Expr(expr.op, *map(self.simplify, expr.args))
+        match expr.op:
+
+            case T if isinstance(T, int):
+                if T == 0:
+                    # contradiction
+                    self._comparisons._consistent = False
+                # either way, nothing to infer
+            
+            case T if isinstance(T, str):
+                self._comparisons.assert_neq(expr, Expr(0))
+
+            case amt.AddInstruction:
+                # a + b != 0 iff a != -b
+                #TODO: do you want exponentially many inferences?
+                if len(expr.args) > 2:
+                    # do nothing; too many cases
+                    self._comparisons.assert_neq(expr, Expr(0))
+                else:
+                    self._comparisons.assert_neq(expr.left,
+                            Expr(amt.MulInstruction, Expr(-1), expr.right))
+                    self._comparisons.assert_neq(expr.right,
+                            Expr(amt.MulInstruction, Expr(-1), expr.left))
+
+            case amt.MulInstruction:
+                # a * b != 0 iff a != 0 and b != 0
+                for arg in expr.args:
+                    self.assert_nonzero(arg)
+
+            case amt.DivInstruction:
+                # a / b != 0 iff a != 0 and b != 0
+                self.assert_nonzero(expr.left)
+                self.assert_nonzero(expr.right)
+
+            case amt.ModInstruction:
+                # a % b != 0 implies a != b, b != 0, and a != 0
+                self.assert_nonzero(Expr(amt.EqInstruction,
+                    expr.left, expr.right))
+                self.assert_nonzero(expr.left)
+                self.assert_nonzero(expr.right)
+                self._comparisons.assert_neq(expr, Expr(0))
+
+            case amt.AndInstruction:
+                # a & b != 0 iff a != 0 and b != 0
+                for arg in expr.args:
+                    self.assert_nonzero(arg)
+            
+            case amt.XOrInstruction:
+                # a ^ b != 0 iff a != b
+                if len(expr.args) > 2:
+                    # too many to handle
+                    self._comparisons.assert_neq(expr, Expr(0))
+                else:
+                    self.assert_nonzero(Expr(amt.NeqInstruction, expr.left, expr.right))
+
+            case amt.EqInstruction:
+                # (0 == a) != 0 iff a == 0
+                # recall that canonical form puts 0 on the left
+                self.assert_zero(expr.right)
+                self.assert_zero(Expr(amt.MulInstruction, Expr(-1), expr.right))
+
+            case amt.NeqInstruction:
+                # (0 != a) != 0 iff a != 0
+                self.assert_nonzero(expr.right)
+                self.assert_nonzero(Expr(amt.MulInstruction, Expr(-1), expr.right))
+
+            case amt.LeqInstruction | amt.LtInstruction:
+                # (0 <= a - b) != 0 iff b <= a iff -b >= -a
+                lhs, rhs = self._split_subtraction(expr.right)
+                self._comparisons.assert_leq(rhs, lhs)
+                if expr.op == amt.LtInstruction:
+                    self._comparisons.assert_neq(lhs, rhs)
+                lhs, rhs = map(lambda e: Expr(amt.MulInstruction, Expr(-1), e), (lhs, rhs))
+                self._comparisons.assert_leq(lhs, rhs)
+                if expr.op == amt.LtInstruction:
+                    self._comparisons.assert_neq(lhs, rhs)
+
+            case _:
+                # phi instructions
+                # or  instructions
+                # lsh instructions
+                # rsh instructions
+                # nothing nontrivial to infer
+                self._comparisons.assert_neq(expr, Expr(0))
+
+    @(Syntax(object, Expr) >> None)
+    def assert_zero(self, expr):
+        """
+        Try to infer elementary consequences from the fact
+        that the provided expression is zero.
+        """
+        expr = Expr(expr.op, *map(self.simplify, expr.args))
+        match expr.op:
+
+            case T if isinstance(T, int):
+                if T != 0:
+                    # contradiction
+                    self._comparisons._consistent = False
+                # otherwise, nothing to infer
+
+            case T if isinstance(T, str):
+                self._comparisons.assert_eq(expr, Expr(0))
+
+            case amt.AddInstruction:
+                # a + b == 0 iff a == -b
+                #TODO: do you want exponentially many inferences?
+                if len(expr.args) > 2:
+                    # do nothing; too many cases
+                    self._comparisons.assert_eq(expr, Expr(0))
+                else:
+                    self._comparisons.assert_eq(expr.left,
+                            Expr(amt.MulInstruction, Expr(-1), expr.right))
+                    self._comparisons.assert_eq(expr.right,
+                            Expr(amt.MulInstruction, Expr(-1), expr.left))
+
+            case amt.DivInstruction:
+                # a / b == 0 iff a == 0
+                self.assert_zero(expr.left)
+
+            case amt.OrInstruction:
+                # a | b == 0 iff a == 0 and b == 0
+                for arg in expr.args:
+                    self.assert_zero(arg)
+
+            case amt.XOrInstruction:
+                # a ^ b == 0 iff a == b
+                if len(expr.args) > 2:
+                    # too many to handle
+                    self._comparisons.assert_eq(expr, Expr(0))
+                else:
+                    self.assert_nonzero(Expr(amt.EqInstruction, expr.left, expr.right))
+
+            case amt.EqInstruction:
+                # (0 == a) == 0 iff a != 0
+                # recall that canonical form puts 0 on the left
+                self.assert_nonzero(expr.right)
+
+            case amt.NeqInstruction:
+                # (0 != a) == 0 iff a == 0
+                self.assert_zero(expr.right)
+
+            case amt.LeqInstruction | amt.LtInstruction:
+                # (0 <= a - b) == 0 iff a < b iff -a > -b
+                lhs, rhs = self._split_subtraction(expr.right)
+                self._comparisons.assert_leq(lhs, rhs)
+                if expr.op == amt.LeqInstruction:
+                    self._comparisons.assert_neq(lhs, rhs)
+                lhs, rhs = map(lambda e: Expr(amt.MulInstruction, Expr(-1), e), (lhs, rhs))
+                self._comparisons.assert_leq(rhs, lhs)
+                if expr.op == amt.LeqInstruction:
+                    self._comparisons.assert_neq(lhs, rhs)
+
+            case _:
+                # phi instructions
+                # mul instructions
+                # mod instructions
+                # and instructions
+                # lsh instructions
+                # rsh instructions
+                # nothing nontrivial to infer
+                self._comparisons.assert_eq(expr, Expr(0))

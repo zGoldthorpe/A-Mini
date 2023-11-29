@@ -25,7 +25,8 @@ EXEC=$(patsubst %,execution/%,\
 OPT=$(patsubst %,opt/%,\
 		 example_analysis.py \
 		 gvn_expr.py \
-		 predicates.py)
+		 predicates.py \
+		 predicated_state.py)
 
 TESTS=ensuretypes.py \
 	  $(CFG) \
