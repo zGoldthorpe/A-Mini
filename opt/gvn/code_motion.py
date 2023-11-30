@@ -19,6 +19,7 @@ from opt.analysis.domtree import DomTreeAnalysis
 from opt.gvn.expr import Expr
 from opt.gvn.anticipatable import Anticipate
 from opt.gvn.simpson import RPO, SCC
+from opt.gvn.gargi import GVN
 
 from ampy.passmanager import BadArgumentException
 import ampy.types
@@ -27,28 +28,41 @@ class VDCM(Opt):
     # forward declaration
     pass
 
+acc = {"rpo": (RPO, ()),
+        "rpo-expr": (RPO, ("expr",)),
+        "rpo-var": (RPO, ("var",)),
+        "scc": (SCC, ()),
+        "scc-expr": (SCC, ("expr",)),
+        "scc-var": (SCC, ("var",)),
+        "gargi": (GVN, ()),
+        "any": ((RPO, SCC, GVN), ())}
+acc_str = ", ".join(f'"{key}"' for key in acc)
+
 class VDCM(VDCM):
-    """
+    __doc__ = f"""
     Value-driven code motion
 
     Reorganises computations of expressions in an attempt to minimise
     (partial) redundancy via value-based lazy code motion described
     in Simpson's PhD Thesis.
+
+    gvn: {acc_str}
+        Identify which GVN algorithm to use
     """
     
     @VDCM.init("vdcm", gvn="any")
     def __init__(self, *, gvn):
-        if gvn not in ("rpo", "scc", "any"):
-            raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")
-        self._gvnarg = gvn
-        self._gvn = RPO if gvn == "rpo" else SCC if gvn == "scc" else (RPO, SCC)
+        if gvn not in acc:
+            raise BadArgumentException(f"`gvn` must be one of {acc_str}")
+        self._gvnarg=gvn
+        self._gvn, self._args = acc[gvn]
 
 
     @VDCM.opt_pass
     def lazy_code_motion(self):
         # Step 0. Get value numbering and anticipatability
         # ------------------------------------------------
-        self._vn = self.require(self._gvn, "expr").get_value_partitions()
+        self._vn = self.require(self._gvn, *self._args).get_value_partitions()
         antic = self.require(Anticipate, gvn=self._gvnarg)
         earliest = {}
         for block in self.CFG:

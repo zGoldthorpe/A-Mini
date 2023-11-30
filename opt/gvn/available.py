@@ -16,6 +16,7 @@ from opt.tools import Opt
 
 from opt.gvn.expr import Expr
 from opt.gvn.simpson import RPO, SCC
+from opt.gvn.gargi import GVN
 
 from ampy.passmanager import BadArgumentException
 import ampy.types
@@ -24,8 +25,18 @@ class AvailAnalysis(Opt):
     # forward declaration
     pass
 
+acc = {"rpo": (RPO, ()),
+        "rpo-expr": (RPO, ("expr",)),
+        "rpo-var": (RPO, ("var",)),
+        "scc": (SCC, ()),
+        "scc-expr": (SCC, ("expr",)),
+        "scc-var": (SCC, ("var",)),
+        "gargi": (GVN, ()),
+        "any": ((RPO, SCC, GVN), ())}
+acc_str = ", ".join(f'"{key}"' for key in acc)
+
 class AvailAnalysis(AvailAnalysis):
-    """
+    __doc__ = f"""
     Availability analysis
 
     Indicates at each block and instruction which expressions are available
@@ -33,15 +44,15 @@ class AvailAnalysis(AvailAnalysis):
     An expression is available at a point P if the expression is defined prior
     to P along all possible paths of execution leading to P.
 
-    gvn: "rpo" or "scc" or "any"
+    gvn: {acc_str}
         Identify which GVN algorithm to use
     """
 
     @AvailAnalysis.init("available", gvn="any")
     def __init__(self, *, gvn):
-        if gvn not in ("rpo", "scc", "any"):
-            raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")
-        self._gvn = RPO if gvn == "rpo" else SCC if gvn == "scc" else (RPO, SCC)
+        if gvn not in acc:
+            raise BadArgumentException(f"`gvn` must be one of {acc_str}")
+        self._gvn, self._args = acc[gvn]
 
     @AvailAnalysis.getter
     @(Syntax(object, ampy.types.BasicBlock)
@@ -87,7 +98,7 @@ class AvailAnalysis(AvailAnalysis):
     def flow_analysis(self):
         # Step 0. Compute value numbers
         # -----------------------------
-        gvn = self.require(self._gvn, "expr")
+        gvn = self.require(self._gvn, *self._args)
         self._vn = gvn.get_value_partitions()
 
         # Step 1. Find available expressions

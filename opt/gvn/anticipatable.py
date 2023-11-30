@@ -17,6 +17,7 @@ from opt.tools import Opt
 from opt.gvn.expr import Expr
 from opt.gvn.available import AvailAnalysis
 from opt.gvn.simpson import RPO, SCC
+from opt.gvn.gargi import GVN
 
 from ampy.passmanager import BadArgumentException
 import ampy.types
@@ -25,8 +26,18 @@ class Anticipate(Opt):
     # forward declaration
     pass
 
+acc = {"rpo": (RPO, ()),
+        "rpo-expr": (RPO, ("expr",)),
+        "rpo-var": (RPO, ("var",)),
+        "scc": (SCC, ()),
+        "scc-expr": (SCC, ("expr",)),
+        "scc-var": (SCC, ("var",)),
+        "gargi": (GVN, ()),
+        "any": ((RPO, SCC, GVN), ())}
+acc_str = ", ".join(f'"{key}"' for key in acc)
+
 class Anticipate(Anticipate):
-    """
+    __doc__ = f"""
     Anticipatability analysis
     
     Indicates at each block and instruction which expressions are anticipatable,
@@ -35,16 +46,16 @@ class Anticipate(Anticipate):
     available along any path out of P, and definitions of this expression can
     be placed anywhere along these paths.
 
-    gvn: "rpo" or "scc" or "any"
+    gvn: {acc_str}
         Identify which GVN algorithm to use
     """
 
     @Anticipate.init("anticipatable", gvn="any")
     def __init__(self, *, gvn):
-        if gvn not in ("rpo", "scc", "any"):
-            raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")
-        self._gvnarg = gvn
-        self._gvn = RPO if gvn == "rpo" else SCC if gvn == "scc" else (RPO, SCC)
+        if gvn not in acc:
+            raise BadArgumentException(f"`gvn` must be one of {acc_str}")
+        self._gvnarg=gvn
+        self._gvn, self._args = acc[gvn]
 
     @Anticipate.getter
     @(Syntax(object, ampy.types.BasicBlock) >> [Expr])
@@ -114,7 +125,7 @@ class Anticipate(Anticipate):
     def flow_analysis(self):
         # Step 0. Get value numbers and available expressions
         # ---------------------------------------------------
-        self._vn = self.require(self._gvn, "expr").get_value_partitions()
+        self._vn = self.require(self._gvn, *self._args).get_value_partitions()
         avail = self.require(AvailAnalysis, gvn=self._gvnarg)
 
         # Step 1. Track altered expressions

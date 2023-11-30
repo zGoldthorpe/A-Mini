@@ -381,6 +381,7 @@ class PredicatedState:
             return Expr(0)
 
         conj = []
+        exprs = list(filter(lambda e: not isinstance(e.op, int), exprs))
         for lhs in exprs:
             lo, hi = self._comparisons.int_range(lhs)
             if lo == hi:

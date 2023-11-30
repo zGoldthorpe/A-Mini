@@ -139,7 +139,7 @@ class GVN(GVN):
         #
         # predicate[B]: conditions necessary for B to be reachable
         # predicate[B, C]: conditions necessary for edge B -> C to be reachable
-        # pred_supp[B[, C]]: values used for computing the conditions above
+        # pred_supp[B[, C]]: local values used for computing the conditions above
         # phi[v][B]: assuming v is defined by a phi node, and B is one of the
         #            parent blocks, this gives a pair (state, cond), where
         #            `state` is the predicated state of coming via B, and
@@ -207,24 +207,23 @@ class GVN(GVN):
                     if isinstance(I, ampy.types.GotoInstruction):
                         # unconditional branch
                         self._predicate[block, self.CFG[I.target]] = self._predicate[block]
-                        self._pred_supp[block, self.CFG[I.target]] = set()#TODO:self._pred_supp[block]
+                        self._pred_supp[block, self.CFG[I.target]] = set()
                     else:
                         # conditional branch
                         predicate = self._predicate[block]
-                        #TODO:pred_supp = set(self._pred_supp[block])
                         cond = predicate.simplify(self._get_vn(I.cond))
 
                         iftrue = predicate.copy()
                         iftrue.assert_nonzero(cond)
                         if iftrue.consistent:
                             self._predicate[block, self.CFG[I.iftrue]] = iftrue
-                            self._pred_supp[block, self.CFG[I.iftrue]] = set(cond.args)#set(cond.subexpressions)#TODO: pred_supp
+                            self._pred_supp[block, self.CFG[I.iftrue]] = self._cond_args(cond)
 
                         iffalse = predicate.copy()
                         iffalse.assert_zero(cond)
                         if iffalse.consistent:
                             self._predicate[block, self.CFG[I.iffalse]] = iffalse
-                            self._pred_supp[block, self.CFG[I.iffalse]] = set(cond.args)#set(cond.subexpressions)#TODO:pred_supp
+                            self._pred_supp[block, self.CFG[I.iffalse]] = self._cond_args(cond)
 
                     for child in block.children:
                         if (block, child) not in self._predicate:
@@ -255,7 +254,7 @@ class GVN(GVN):
                         dom = self.CFG[self._DJ.idom(child).label]
                         for idx, var in self._phivar.get((block, child), []):
                             predicate = self._predicate[block, child]
-                            self.debug("Collecting predicate arguments along path", child.label, block.label, "->", dom.label, "in dominator tree")
+                            self.debug("Collecting predicate arguments along path", child.label, "->", block.label, "->", dom.label, "in dominator tree")
                             pred_supp = self._cond_support(block, dom) # collect predicate variables
                             pred_supp |= self._pred_supp[block, child]
                             expr = predicate.simplify(self._get_vn(var))
@@ -330,7 +329,9 @@ class GVN(GVN):
         if isinstance(cond.op, (int, str)) or cond.op == ampy.types.PhiInstruction:
             return {cond}
         if issubclass(cond.op, ampy.types.CompInstructionClass):
-            return cls._cond_args(cond.right)
+            lhs, rhs = PredicatedState.split_subtraction(cond.right)
+            return cls._cond_args(lhs) | cls._cond_args(rhs)
+        
         return set(cond.args)
 
     @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> [set, Expr])
@@ -353,8 +354,7 @@ class GVN(GVN):
 
         idom = self.CFG[self._DJ.idom(rcur).label]
         self.debug("-> immediate dominator", idom.label)
-        supp = self._cond_support(idom, dominator)
-        return supp
+        return self._cond_support(idom, dominator)
 
     @(Syntax(object, ampy.types.BasicBlock)
       | Syntax(object, ampy.types.BasicBlock, int)
