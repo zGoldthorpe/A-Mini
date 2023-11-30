@@ -266,7 +266,14 @@ class Expr(Expr):
                 return 0
             if (res := cmp(len(self.args), len(other.args))) != 0:
                 return res
+            mulligan = self.op == amt.PhiInstruction
+            # phi instructions should be identified even if their target
+            # registers are different (since that is just for avoiding
+            # nesting)
             for L, R in zip(self.args, other.args):
+                if mulligan:
+                    mulligan = False
+                    continue
                 if (res := L.compare(R)) != 0:
                     return res
             return 0
@@ -707,7 +714,7 @@ class Expr(Expr):
                         self.args = []
                         break
                     if isinstance(self.left.op, int) and isinstance(self.right.op, int):
-                        self.op = self.left.op < self.right.op
+                        self.op = int(self.left.op < self.right.op)
                         self.args = []
                         break
                     if self.left.op != 0:
@@ -721,7 +728,7 @@ class Expr(Expr):
                         self.args = []
                         break
                     if isinstance(self.left.op, int) and isinstance(self.right.op, int):
-                        self.op = self.left.op <= self.right.op
+                        self.op = int(self.left.op <= self.right.op)
                         self.args = []
                         break
                     if self.left.op != 0:

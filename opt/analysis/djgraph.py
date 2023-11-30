@@ -46,6 +46,7 @@ class DJGraph(RequiresOpt):
         self._D = {}
         self._level = {}
         self._up_dict = {} # data structure for least common ancestor
+        self._up_valid = {} # for coherence of up_dict
         def dfs(node, level):
             self._level[node] = level
             self._D[node] = set()
@@ -112,7 +113,7 @@ class DJGraph(RequiresOpt):
         count = 0
         while diff > 0:
             if diff & 1:
-                A = self._up(A, count)
+                B = self._up(B, count)
             diff >>= 1
             count += 1
 
@@ -125,7 +126,7 @@ class DJGraph(RequiresOpt):
             count += 1
             level >>= 1
 
-        while count > 0:
+        while count >= 0:
             if self._up(A, count) == self._up(B, count):
                 count -= 1
                 continue
@@ -239,14 +240,18 @@ class DJGraph(RequiresOpt):
         if lcd != A:
             # if A dominates B already, then the dominator tree does not change
             # otherwise, we have inserted a J-edge
+            if B in self._J[A]:
+                # the J-edge is already present, so we can just quit
+                return
             self._J[A].add(B)
 
-        affected = self.iterated_dominance_frontier(B, _minlevel = self._level[ldc]+1)
+        affected = self.iterated_dominance_frontier(B, _minlevel = self._level[lcd]+1)
         if self._level[B] > self._level[lcd] + 1:
             affected.add(B)
 
         def correct_level(node, level):
             self._level[node] = level
+            self._up_valid[node] = 0 # invalidate the higher entries, if any
             for dtchild in self._D[node]:
                 correct_level(dtchild, level+1)
 
@@ -260,6 +265,5 @@ class DJGraph(RequiresOpt):
 
             self._D[lcd].add(block)
             self._up_dict[block, 0] = lcd
-            self._up_valid[block] = 0 # invalidate the higher entries, if any
             correct_level(block, self._level[lcd]+1)
 

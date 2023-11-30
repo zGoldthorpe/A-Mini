@@ -48,11 +48,13 @@ class Comparisons:
             return ret
         for node in self:
             ret._eq[node] = self._eq[node]
-            ret._leq[node] = set(self._leq[node])
-            ret._geq[node] = set(self._geq[node])
-            ret._int_range[node] = self._int_range[node]
-            ret._lheight[node] = self._lheight[node]
-            ret._rheight[node] = self._rheight[node]
+            if self._eq[node] == node:
+                ret._neq[node] = set(self._neq[node])
+                ret._leq[node] = set(self._leq[node])
+                ret._geq[node] = set(self._geq[node])
+                ret._int_range[node] = self._int_range[node]
+                ret._lheight[node] = self._lheight[node]
+                ret._rheight[node] = self._rheight[node]
         return ret
 
 
@@ -87,7 +89,7 @@ class Comparisons:
             if isinstance(node.op, int):
                 self._int_range[node] = (node.op, node.op)
             elif isinstance(node.op, type) and issubclass(node.op, amt.CompInstructionClass):
-                self._int_range[node] = (0, 1) # True / False
+                self._int_range[node] = (0, 1) # False / True
             else:
                 self._int_range[node] = (None, None)
 
@@ -123,7 +125,6 @@ class Comparisons:
             self._update_eqclass(a, b, rep)
         else:
             self._update_leq(a, b)
-
 
     @(Syntax(object, Expr, Expr) >> None)
     def assert_eq(self, a, b):
@@ -234,6 +235,14 @@ class Comparisons:
             self.assert_neq(a, b)
             return True
         return False
+
+    @(Syntax(object, Expr) >> ((), (int, None), (int, None)))
+    def int_range(self, expr):
+        """
+        Give the integer range of an expression, if known
+        """
+        expr = self.eqclass(expr)
+        return self._int_range[expr]
     
     @(Syntax(object, Expr, Expr) >> None)
     def _update_eq(self, node, head):
@@ -362,6 +371,37 @@ class PredicatedState:
         ret._comparisons = self._comparisons.copy()
         return ret
 
+    @(Syntax(object, [set, Expr]) >> Expr)
+    def expr(self, exprs):
+        """
+        Summarises all relations between elements of `expr_set` as a large
+        conjunction
+        """
+        if not self.consistent:
+            return Expr(0)
+
+        conj = []
+        for lhs in exprs:
+            lo, hi = self._comparisons.int_range(lhs)
+            if lo == hi:
+                if lo is not None:
+                    conj.append(Expr(amt.EqInstruction, Expr(lo), lhs))
+            else:
+                if lo is not None:
+                    conj.append(Expr(amt.LeqInstruction, Expr(lo), lhs))
+                if hi is not None:
+                    conj.append(Expr(amt.LeqInstruction, lhs, Expr(hi)))
+            for rhs in exprs:
+                if self._comparisons.eq(lhs, rhs):
+                    conj.append(Expr(amt.EqInstruction, lhs, rhs))
+                else:
+                    if self._comparisons.leq(lhs, rhs):
+                        conj.append(Expr(amt.LeqInstruction, lhs, rhs))
+                    if self._comparisons.neq(lhs, rhs):
+                        conj.append(Expr(amt.NeqInstruction, lhs, rhs))
+        return Expr(amt.AndInstruction, *filter(lambda e: not isinstance(e.op, int), conj))
+    
+
     @property
     def consistent(self):
         return self._comparisons.is_consistent()
@@ -487,7 +527,7 @@ class PredicatedState:
                 self._comparisons.assert_leq(expr, Expr(1))
                 self._comparisons.assert_leq(Expr(0), expr)
 
-                right, left = self._split_subtraction(expr.right)
+                right, left = self.split_subtraction(expr.right)
                 # 0 < [B] - [A] iff [A] < [B], so left = [A], right = [B]
 
                 match T:
@@ -522,7 +562,7 @@ class PredicatedState:
     
     @classmethod
     @(Syntax(object, Expr) >> ((), Expr, Expr))
-    def _split_subtraction(cls, expr):
+    def split_subtraction(cls, expr):
         """
         Try to split the expression into [A] - [B]
         and return (A, B)
@@ -531,8 +571,12 @@ class PredicatedState:
             return (expr, Expr(0))
         def negated(e):
             return e.op == amt.MulInstruction and e.left.op == -1
-        return (Expr(amt.AddInstruction, *filter(lambda e: not negated(e), expr.args)),
-                Expr(amt.AddInstruction, *map(lambda e: e.right, filter(negated, expr.args))))
+        negs = Expr(amt.AddInstruction, *map(lambda e: e.right, filter(negated, expr.args)))
+        if negs.op == 0:
+            # no "negatives"
+            return (Expr(amt.AddInstruction, *expr.args[1:]),
+                    Expr(amt.MulInstruction, Expr(-1), expr.left))
+        return (Expr(amt.AddInstruction, *filter(lambda e: not negated(e), expr.args)), negs)
 
     @(Syntax(object, Expr) >> None)
     def assert_nonzero(self, expr):
@@ -613,7 +657,7 @@ class PredicatedState:
 
             case amt.LeqInstruction | amt.LtInstruction:
                 # (0 <= a - b) != 0 iff b <= a iff -b >= -a
-                lhs, rhs = self._split_subtraction(expr.right)
+                lhs, rhs = self.split_subtraction(expr.right)
                 self._comparisons.assert_leq(rhs, lhs)
                 if expr.op == amt.LtInstruction:
                     self._comparisons.assert_neq(lhs, rhs)
@@ -688,7 +732,7 @@ class PredicatedState:
 
             case amt.LeqInstruction | amt.LtInstruction:
                 # (0 <= a - b) == 0 iff a < b iff -a > -b
-                lhs, rhs = self._split_subtraction(expr.right)
+                lhs, rhs = self.split_subtraction(expr.right)
                 self._comparisons.assert_leq(lhs, rhs)
                 if expr.op == amt.LeqInstruction:
                     self._comparisons.assert_neq(lhs, rhs)

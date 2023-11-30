@@ -1,0 +1,22 @@
+; from Gargi, figure 6
+
+@main:
+    read %i
+    read %j
+    read %k
+    %y = %i + 1
+
+    %eq = %k == %j
+    branch %eq ? @continue : @finish
+
+@continue:
+    %eq = %j == %i
+    branch %eq ? @compute_X : @finish
+
+@compute_X:
+    %x = %k + 1
+    goto @finish
+
+@finish:
+    %result = phi [ %y, @main ], [ %y, @continue ], [ %x, @compute_X ]
+    write %result

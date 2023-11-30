@@ -15,6 +15,7 @@ from opt.tools import Opt
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.domtree import DomTreeAnalysis
 from opt.gvn.simpson import RPO, SCC
+from opt.gvn.gargi import GVN
 
 from ampy.passmanager import BadArgumentException
 import ampy.types
@@ -23,25 +24,30 @@ class NaiveSimplify(Opt):
     # forward declaration
     pass
 
+acc = {"rpo": (RPO, ()),
+        "rpo-expr": (RPO, ("expr",)),
+        "rpo-var": (RPO, ("var",)),
+        "scc": (SCC, ()),
+        "scc-expr": (SCC, ("expr",)),
+        "scc-var": (SCC, ("var",)),
+        "gargi": (GVN, ()),
+        "any": ((RPO, SCC, GVN), ())}
+acc_str = ", ".join(f'"{key}"' for key in acc)
+
 class NaiveSimplify(NaiveSimplify):
-    """
+    __doc__ = f"""
     Uses gvn-rpo or gvn-scc information to eliminate redundant definitions.
     Does not hoist or do anything advanced.
 
-    number: "var" or "expr" or "any"
-        Set if the value numbers are given by consts/registers or expressions.
-    gvn: "rpo" or "scc" or "any"
+    gvn: {acc_str}
         Identify which GVN algorithm to use
     """
 
-    @NaiveSimplify.init("gvn-reduce", "any", gvn="any")
-    def __init__(self, number, *, gvn):
-        if number not in ("var", "expr", "any"):
-            raise BadArgumentException("`number` must be one of \"var\", \"expr\", or \"any\".")
-        self._number = any if number == "any" else number
-        if gvn not in ("rpo", "scc", "any"):
-            raise BadArgumentException("`gvn` must be one of \"rpo\", \"scc\", or \"any\".")
-        self._gvn = RPO if gvn == "rpo" else SCC if gvn == "scc" else (RPO, SCC)
+    @NaiveSimplify.init("gvn-reduce", gvn="any")
+    def __init__(self, *, gvn):
+        if gvn not in acc:
+            raise BadArgumentException(f"`gvn` must be one of {acc_str}")
+        self._gvn, self._args = acc[gvn]
 
     @NaiveSimplify.opt_pass
     def simplify(self):
@@ -54,12 +60,12 @@ class NaiveSimplify(NaiveSimplify):
         # expressions, but this is too much for this simple reduction algo.
         # Therefore, we map these value numbers to a representative register
         # or an integer constant (if the expression is a constant)
-        gvn = self.require(self._gvn, self._number)
+        gvn = self.require(self._gvn, *self._args)
         self._vn = {}
         expr_rep = {} # lookup table for expression representative
         for var, expr in gvn.get_value_partitions().items():
-            if isinstance(expr.op, str):
-                self._vn[var] = expr.op
+            if isinstance(expr.op, int):
+                self._vn[var] = str(expr.op)
             else:
                 self._vn[var] = expr_rep.setdefault(expr, var)
 
@@ -188,6 +194,10 @@ class NaiveSimplify(NaiveSimplify):
             # handle definitions
             if isinstance(I, ampy.types.DefInstructionClass):
                 vn = self._vn[I.target]
+                if not vn.startswith('%'):
+                    # constant; remove definition
+                    to_delete.append(i)
+                    continue
                 rep = self._get_dominating_var(I.target, block)
                 if rep is None:
                     # value has not been computed yet
