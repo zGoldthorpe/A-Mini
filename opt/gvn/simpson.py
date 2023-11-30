@@ -323,7 +323,7 @@ class SCC(SCC):
         """
         def get_vn(var):
             if var.startswith('%'):
-                expr = vn.get(var, Expr('?'))
+                expr = self._vn.get(var, Expr('?'))
                 return expr
             return Expr(int(var))
         
@@ -332,11 +332,9 @@ class SCC(SCC):
             case ampy.types.MovInstruction:
                 expr = get_vn(args[0])
             case ampy.types.PhiInstruction:
-                phiargs = [Expr(I.target)]
+                phiargs = [Expr(var)]
                 for val, label in args:
                     vn = get_vn(val)
-                        # do not expand phi instructions as expressions
-                        # or else you will face infinite loops
                     if vn.op == '?': # optimistically discard unknown values
                         continue
                     phiargs.extend([vn, Expr(label)])
