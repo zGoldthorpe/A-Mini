@@ -282,8 +282,20 @@ class DotUI:
             # group letters into words
             # (but single letters will be left in "math mode")
             var = re.sub(r"([a-zA-Z][a-zA-Z0-9]+)", r"\\mathrm{\1}", var)
+            # replace greek letters
+            for ltr in ("alpha", "beta", "gamma", "delta",
+                        "epsilon", "varepsilon", "zeta", "eta",
+                        "theta", "vartheta", "iota", "kappa",
+                        "varkappa", "lambda", "mu", "nu", "xi",
+                        "pi", "varpi", "rho", "varrho",
+                        "sigma", "varsigma", "tau", "upsilon",
+                        "phi", "varphi", "chi", "psi", "omega",
+                        "Gamma", "Delta", "Theta", "Lambda",
+                        "Xi", "Pi", "Sigma", "Upsilon",
+                        "Phi", "Psi", "Omega"):
+                var = var.replace(fr"\mathrm{{{ltr}}}", fr"\{ltr}")
             # handle "anonymous" vars
-            var = re.sub(r"%(\d)(.*)", r"\\varrho_{\1\2}", var)
+            var = re.sub(r"%(\d)(.*)", r"\\mathsf{R}_{\1\2}", var)
             # treat '.' as an underscore
             # (but only if var is not anonymous)
             var = re.sub(r"%([^._]*)\.(.+)", r"{\1}_{\2}", var)
