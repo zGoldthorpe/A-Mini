@@ -1,0 +1,20 @@
+@enter:
+    read %x
+    %y = %x
+    %i = 0
+    goto @loop
+
+@loop:
+    %x = %x + %i
+    %i = %i + 1
+    %y = %y + %i
+    %x = %x + 1
+    %cond = %i < 10
+    branch %cond ? @loop : @exit
+
+@exit:
+    write %x
+    write %y
+    exit
+    
+

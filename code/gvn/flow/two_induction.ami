@@ -1,0 +1,27 @@
+@enter:
+    read %N
+    %i = 0
+    %j = 0
+
+@while:
+    branch %N ? @check_bit : @stop
+
+@check_bit:
+    %bit = %N % 2
+    %N = %N / 2
+    branch %bit ? @set : @reset
+
+@set:
+    %i = %i + 1
+    %j = %j + 1
+    goto @while
+
+@reset:
+    %i = %i - 1
+    %j = %j - 1
+    goto @while
+
+@stop:
+    write %i
+    write %j
+    exit

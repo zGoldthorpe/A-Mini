@@ -337,6 +337,8 @@ class Expr(Expr):
     def __hash__(self):
         #TODO: don't hash; this data structure is inefficient to
         # hash and then check equality with
+        if self.op == amt.PhiInstruction:
+            return hash((self.op, tuple(self.args[1:])))
         return hash((self.op, tuple(self.args)))
 
     ### rewriting ###

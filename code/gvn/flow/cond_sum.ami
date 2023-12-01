@@ -1,0 +1,22 @@
+@A:
+    read %x
+    read %y
+    %Sigma.0 = %x + %y
+    read %cond
+    branch %cond ? @B : @C
+
+@B:
+    %a = %x
+    %b = %y
+    goto @D
+
+@C:
+    %a = %y
+    %b = %x
+    goto @D
+
+@D:
+    %Sigma.1 = %a + %b
+    write %Sigma.0
+    write %Sigma.1
+    exit
