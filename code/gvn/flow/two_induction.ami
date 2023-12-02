@@ -2,6 +2,8 @@
     read %N
     %i = 0
     %j = 0
+    %neg = %N < 0
+    branch %neg ? @stop : @while
 
 @while:
     branch %N ? @check_bit : @stop

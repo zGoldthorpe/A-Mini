@@ -248,6 +248,7 @@ class GVN(GVN):
                                 rblock.add_child(rchild)
 
                             self._DJ.insert_edge(rblock, rchild)
+                            self._touch(child)
 
 
                         # scan for phi nodes in child
@@ -421,8 +422,18 @@ class GVN(GVN):
                 for var, cond in phiargs:
                     flat.append(var)
                     flat.append(cond)
+                if Expr(I.target) in self._vn:
+                    # pop old representative
+                    oldphi = self._vn[Expr(I.target)]
+                    if oldphi.op == ampy.types.PhiInstruction:
+                        old = []
+                        for i in range(len(oldphi.args)//2):
+                            old.append((oldphi.args[2*i+1], oldphi.args[2*i+2]))
+                        old = tuple(sorted(old))
+                        if old in self._phi_rep:
+                            del self._phi_rep[old]
                 self._phi_rep[phiargs] = (
-                        expr :=Expr(type(I), self._atomic_reg(I.target), *flat))
+                        expr := Expr(type(I), self._atomic_reg(I.target), *flat))
             else:
                 expr = self._phi_rep[phiargs]
 

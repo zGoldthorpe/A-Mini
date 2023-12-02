@@ -400,6 +400,9 @@ class PredicatedState:
                         conj.append(Expr(amt.LeqInstruction, lhs, rhs))
                     if self._comparisons.neq(lhs, rhs):
                         conj.append(Expr(amt.NeqInstruction, lhs, rhs))
+            for rhs in self._comparisons._neq.get(lhs, ()):
+                if isinstance(rhs.op, int):
+                    conj.append(Expr(amt.NeqInstruction, lhs, rhs))
         return Expr(amt.AndInstruction, *filter(lambda e: not isinstance(e.op, int), conj))
     
 
@@ -485,7 +488,8 @@ class PredicatedState:
                     elif self._comparisons.leq(Expr(0), nleft):
                         self._comparisons.assert_leq(expr, Expr(0))
                         if self._comparisons.leq(nleft, expr.right):
-                            self._comparisons.assert_eq(Expr(0), expr)
+                            # if a < 0, then a / b = -1 if b >= |a|
+                            self._comparisons.assert_eq(Expr(-1), expr)
                 elif self._comparisons.leq(expr.right, Expr(0)):
                     # opposite of above work
                     if self._comparisons.leq(expr.left, Expr(0)):
@@ -495,7 +499,7 @@ class PredicatedState:
                     elif self._comparisons.leq(nleft, Expr(0)):
                         self._comparisons.assert_leq(expr, Expr(0))
                         if self._comparisons.leq(expr.right, nleft):
-                            self._comparisons.assert_eq(Expr(0), expr)
+                            self._comparisons.assert_eq(Expr(-1), expr)
 
             case amt.AndInstruction:
                 # a & b is positive unless both a and b are negative
