@@ -68,6 +68,7 @@ class DotUI:
         return list(reversed(postorder))
 
     def print_dot(self, cfg):
+        cfg.tidy()
         if self.latex:
             return self.tex_dot(cfg)
         return self.plain_dot(cfg)

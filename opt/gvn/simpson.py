@@ -73,8 +73,11 @@ class RPO(RPO):
                     elif isinstance(I, ampy.types.PhiInstruction):
                         args = [Expr(I.target)]
                         for val, label in I.conds:
-                            args.append(get_vn(val))
-                            args.append(Expr(label))
+                            arg = get_vn(val)
+                            if arg.op == '?':
+                                # be optimistic
+                                continue
+                            args.extend([arg, Expr(label)])
                         expr = Expr(type(I), *args)
                     elif isinstance(I, ampy.types.BinaryInstructionClass):
                         op1, op2 = map(get_vn, I.operands)

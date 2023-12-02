@@ -66,6 +66,7 @@ class WriterUI:
         self._fname = fname
 
     def write(self, cfg):
+        cfg.tidy()
         if self._fname is not None:
             with open(self._fname, 'w') as file:
                 for line in self._writer.generate(cfg):

@@ -650,6 +650,9 @@ class CFG(CFG):
         for block in untouched:
             self.remove_block(block.label, ignore_keyerror=True)
 
+        rpo_num = {}
+        for block in reversed(self.postorder):
+            rpo_num[block.label] = len(rpo_num)
         for block in self:
             for parent in block.parents:
                 if block not in parent.children:
@@ -661,9 +664,9 @@ class CFG(CFG):
             for i, I in instructions:
                 if isinstance(I, PhiInstruction):
                     # we will just passively clean up phi nodes
-                    I.conds = tuple(filter(
+                    I.conds = tuple(sorted(filter(
                         lambda p: p[1] in parent_labels,
-                        I.conds))
+                        I.conds), key=lambda p: rpo_num[p[1]]))
                     if any(val in assigns for val, _ in I.conds):
                         raise BadPhiError(block, i, f"Phi node in {block.label}:{i} has argument that is defined earlier in {block.label}.")
                     lbls = {lbl for _, lbl in I.conds}
