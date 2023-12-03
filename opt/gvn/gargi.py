@@ -165,7 +165,10 @@ class GVN(GVN):
                 continue
             if idx == -1:
                 # the block is touched, so update its predicate
-                parents = self._reachable[block.label].parents # get reachable parents
+
+                # get reachable parents from non-back-edges
+                parents = list(filter(lambda p: self._rpo_num[p] <= self._rpo_num[block],
+                            self._reachable[block.label].parents))
                 if len(parents) == 0:
                     # block is entrypoint; no predication
                     self._predicate[block] = PredicatedState()
@@ -345,9 +348,10 @@ class GVN(GVN):
         if cur_block == dominator:
             return set()
         rcur = self._reachable[cur_block.label]
-        parents = rcur.parents
+        parents = list(filter(lambda p: self._rpo_num[p] <= self._rpo_num[cur_block],
+            rcur.parents))
         if len(parents) == 1:
-            parent = self.CFG[list(parents)[0].label]
+            parent = self.CFG[parents[0].label]
             self.debug("-> parent", parent.label)
             supp = self._cond_support(parent, dominator)
             supp |= self._pred_supp[parent, cur_block]
