@@ -630,7 +630,7 @@ class PredicatedState:
 
             case amt.ModInstruction:
                 # a % b != 0 implies a != b, b != 0, and a != 0
-                self.assert_nonzero(Expr(amt.EqInstruction,
+                self.assert_zero(Expr(amt.EqInstruction,
                     expr.left, expr.right))
                 self.assert_nonzero(expr.left)
                 self.assert_nonzero(expr.right)
