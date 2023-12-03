@@ -137,9 +137,10 @@ class GVN(GVN):
         # simplified using information provided by the predicates assumed of the
         # block.
         #
-        # predicate[B]: conditions necessary for B to be reachable
+        # predicate[B]: conditions necessary for B to be reachable (partial predicate)
         # predicate[B, C]: conditions necessary for edge B -> C to be reachable
         # pred_supp[B[, C]]: local values used for computing the conditions above
+        # pred_expr[B[, C]]: expression for the predicate, for update checking
         # phi[v][B]: assuming v is defined by a phi node, and B is one of the
         #            parent blocks, this gives a pair (state, cond), where
         #            `state` is the predicated state of coming via B, and
@@ -151,6 +152,7 @@ class GVN(GVN):
         self._touchset = set()
         self._predicate = {}
         self._pred_supp = {}
+        self._pred_expr = {}
         self._phi = {}
         self._phi_rep = {}
 
@@ -193,6 +195,13 @@ class GVN(GVN):
                 # with predicate recomputed, we may need to see the effect on
                 # phi instructions, so touch the branch instruction
                 self._touch(block, len(block)-1)
+
+                if ((expr := self._predicate[block].expr(self._pred_supp[block]))
+                        != self._pred_expr.setdefault(block, Expr(0))):
+                    # predicate has changed; update predicate downstream
+                    self._pred_expr[block] = expr
+                    for i in range(self._rpo_num[block]+1, len(self._rpo_num)):
+                        self._touch(self._rpo[i], len(self._rpo[i])-1)
             else:
                 # an instruction is touched
                 I = block[idx]
