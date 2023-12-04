@@ -1,0 +1,23 @@
+@enter:
+    read %x
+    read %y
+    %flip = %x > %y
+    branch %flip ? @flip : @loop
+
+@flip:
+    %x = %x ^ %y
+    %y = %x ^ %y
+    %x = %x ^ %y
+    goto @loop
+
+@loop:
+    %delta = %x < %y
+    branch %delta ? @iterate : @done
+
+@iterate:
+    %x = %x + 1
+    goto @loop
+
+@done:
+    write %x
+    write %y

@@ -202,6 +202,7 @@ class DiffUI:
             utils.printing.psubtle(rhs, end='')
         utils.printing.psubtle('|', rline)
 
+
     def dyn_diff(self):
         """
         After the two files are read, compute their difference.
@@ -211,24 +212,34 @@ class DiffUI:
         of line i of the left file gets matched on the right, and vice versa
         for rmask.
         """
-        table = [[None]*len(self._right) for _ in self._left]
-        def dp(li, ri):
-            """
-            Match assuming everything prior to li in self._left and ri in self._right
-            have been matched.
-            Score is tracked by total number of matches
-            """
-            if li == len(self._left) or ri == len(self._right):
-                return 0
-            if table[li][ri] is None:
-                table[li][ri] = max(
-                            dp(li, ri+1), # discard self._right char
-                            dp(li+1, ri), # discard self._left char
-                            dp(li+1, ri+1) + int(self._left[li] == self._right[ri]))
-            return table[li][ri]
+        table = [[None]*(len(self._right)+1) for _ in range(len(self._left)+1)]
+        stack = [(0, 0)] # emulate recursion
 
-        score = dp(0, 0)
-        # now that the best score is known, rebuild the match
+        while len(stack) > 0:
+            li, ri = stack.pop()
+            if table[li][ri] is None:
+                if li == len(self._left) or ri == len(self._right):
+                    table[li][ri] = 0
+                    continue
+                if table[li][ri+1] is None:
+                    stack.append((li, ri))
+                    stack.append((li, ri+1))
+                    continue
+                if table[li+1][ri] is None:
+                    stack.append((li, ri))
+                    stack.append((li+1, ri))
+                    continue
+                if table[li+1][ri+1] is None:
+                    stack.append((li, ri))
+                    stack.append((li+1, ri+1))
+                    continue
+                table[li][ri] = max(
+                        table[li][ri+1], # discard self._right char
+                        table[li+1][ri], # discard self._left char
+                        table[li+1][ri+1] + int(self._left[li] == self._right[ri]))
+
+        # now that the best score is known, build the match
+        score = table[0][0]
         rescore = 0
         lmask = [False]*len(self._left)
         rmask = [False]*len(self._right)
@@ -242,7 +253,7 @@ class DiffUI:
                 ri += 1
                 rescore += 1
                 continue
-            if rescore + dp(li+1, ri) == score:
+            if rescore + table[li+1][ri] == score:
                 li += 1
                 continue
             ri += 1

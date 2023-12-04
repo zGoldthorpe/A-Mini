@@ -1,0 +1,41 @@
+@A:
+    read %x
+    read %y
+    goto @B
+
+@B:
+    %eq = %x == %y
+    branch %eq ? @C : @D
+
+@D:
+    %alpha = 0
+    goto @H
+
+@C:
+    %cond = %x < 5
+    branch %cond ? @F : @E
+
+@E:
+    %alpha = %x - %y
+    %cond = %y > 0
+    branch %cond ? @H : @G
+
+@G:
+    %y = 0
+    goto @B
+
+@F:
+    %cond = %y < 7
+    branch %cond ? @I : @J
+
+@I:
+    %alpha = 0
+    goto @H
+
+@J:
+    %alpha = 1
+    goto @H
+
+@H:
+    write %alpha
+    exit
