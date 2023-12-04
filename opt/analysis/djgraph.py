@@ -73,11 +73,11 @@ class DJGraph(RequiresOpt):
         """
         if block is None or block == self._root:
             return None
-        if (block, e) not in self._up_dict or self._up_valid[block] < e:
+        if (self._up_valid[block] < e or block, e) not in self._up_dict:
             if e == 0:
                 # node is not in the dominator tree
                 return None
-            h = e >> 1
+            h = e - 1
             self._up_dict[block, e] = self._up(self._up(block, h), h)
             self._up_valid[block] = max(e, self._up_valid[block])
         return self._up_dict[block, e]
@@ -109,6 +109,7 @@ class DJGraph(RequiresOpt):
         """
         if self._level[A] > self._level[B]:
             return self.least_common_dominator(B, A)
+        
         diff = self._level[B] - self._level[A]
         count = 0
         while diff > 0:

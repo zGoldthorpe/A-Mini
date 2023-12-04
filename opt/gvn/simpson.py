@@ -31,13 +31,24 @@ class RPO(RPO):
     number: "var" or "expr"
         If "var", then value numbers are given by registers or constants.
         If "expr", then value numbers are given by expressions.
+        (default: var)
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
 
-    @RPO.init("gvn-rpo", "var")
-    def __init__(self, number, /):
+    @RPO.init("gvn-rpo", "var", i="-1")
+    def __init__(self, number, *, i):
         if number not in ("var", "expr"):
             raise BadArgumentException("`number` must be one of \"var\" or \"expr\".")
         self._number = number
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
 
     @RPO.opt_pass
     def rpo_pass(self):
@@ -96,10 +107,10 @@ class RPO(RPO):
                     else:
                         value = lookup.setdefault(expr, Expr(I.target))
 
-                    if value != get_vn(I.target):
+                    if value != (old := get_vn(I.target)):
+                        self.debug(f"{I.target} updated from {old} to {value}")
                         changed = True
                         vn[I.target] = value
-                        self.debug(f"{I.target} updated to {value}")
 
             if not changed:
                 break
@@ -155,13 +166,23 @@ class SCC(SCC):
     number: "var" or "expr"
         If "var", then value numbers are given by registers or constants.
         If "expr", then value numbers are given by expressions.
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
 
-    @SCC.init("gvn-scc", "var")
-    def __init__(self, number, /):
+    @SCC.init("gvn-scc", "var", i="-1")
+    def __init__(self, number, *, i):
         if number not in ("var", "expr"):
             raise BadArgumentException("`number` must be one of \"var\" or \"expr\".")
         self._number = number
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
 
     @SCC.opt_pass
     def gvn(self):
@@ -358,9 +379,9 @@ class SCC(SCC):
         else:
             value = lookup.setdefault(expr, Expr(var))
 
-        if var not in self._vn or value != self._vn[var]:
+        if value != (old := get_vn(var)):
+            self.debug(f"{var} updated from {old} to {value}")
             self._vn[var] = value
-            self.debug(f"{var} updated to {value}")
             return True
 
         return False

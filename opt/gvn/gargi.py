@@ -31,11 +31,21 @@ class GVN(Opt):
 class GVN(GVN):
     """
     Runs a variant of Gargi's GVN algorithm.
+
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
 
-    @GVN.init("gargi-gvn")
-    def __init__(self, /):
-        pass
+    @GVN.init("gargi-gvn", i="-1")
+    def __init__(self, *, i):
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
     
 
     @GVN.opt_pass
@@ -157,8 +167,6 @@ class GVN(GVN):
         self._phi_rep = {}
 
         self._touch(self.CFG.entrypoint)
-        for i in range(len(self.CFG.entrypoint)):
-            self._touch(self.CFG.entrypoint, i)
 
         while len(self._touched) > 0:
             block, idx = self._pop_touch()
@@ -192,14 +200,13 @@ class GVN(GVN):
                     self._predicate[block] = self._predicate[idom]
                     self._pred_supp[block] = self._pred_supp[idom]
 
-                # with predicate recomputed, we may need to see the effect on
-                # phi instructions, so touch the branch instruction
-                self._touch(block, len(block)-1)
-
                 if ((expr := self._predicate[block].expr(self._pred_supp[block]))
-                        != self._pred_expr.setdefault(block, Expr(0))):
+                        != self._pred_expr.get(block, Expr(0))):
                     # predicate has changed; update predicate downstream
+                    self.debug("Partial predicate of block", block.label, "has changed")
                     self._pred_expr[block] = expr
+                    for i in range(len(block)):
+                        self._touch(block, i)
                     for i in range(self._rpo_num[block]+1, len(self._rpo_num)):
                         self._touch(self._rpo[i], len(self._rpo[i])-1)
             else:
@@ -296,7 +303,7 @@ class GVN(GVN):
         # ----------------------------
         vnclasses = {}
         for var, expr in self._vn.items():
-            vnclasses.setdefault(expr, set()).add(var.op)
+            vnclasses.setdefault(self._unsub_rpo_nums(expr), set()).add(var.op)
 
         self.assign("classes")
         for expr, vnclass in vnclasses.items():
@@ -331,6 +338,19 @@ class GVN(GVN):
             i += 1
 
         return ret
+
+    @(Syntax(object, Expr) >> Expr)
+    def _unsub_rpo_nums(self, expr):
+        """
+        Rewrite the registers in an expression from those given by RPO
+        numbers to the original register names
+        """
+        if isinstance(expr.op, int):
+            return expr
+        if isinstance(expr.op, str):
+            num = int(expr.op[1:])
+            return Expr(self._reg[num])
+        return Expr(expr.op, *(self._unsub_rpo_nums(arg) for arg in expr.args))
     
     @classmethod
     @(Syntax(object, Expr) >> [set, Expr])
@@ -454,11 +474,11 @@ class GVN(GVN):
             # nothing we can do about reads
             expr = self._atomic_reg(I.target)
 
-        if expr == self._get_vn(I.target):
+        if expr == (old := self._get_vn(I.target)):
             return
 
         self._vn[Expr(I.target)] = expr
-        self.debug("Updating value number of", I.target, "to", str(expr))
+        self.debug("Updating value number of", I.target, "from", str(old), "to", str(expr))
 
         # value of I.target changed, so all instructions using I.target
         # may need updating

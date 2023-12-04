@@ -456,22 +456,30 @@ class PredicatedState:
                 if self._comparisons.leq(Expr(0), expr.right):
                     # by convention a % b is nonnegative iff b is
                     self._comparisons.assert_leq(Expr(0), expr)
+                    self._comparisons.assert_leq(expr, expr.right)
                     if self._comparisons.leq(Expr(0), expr.left):
                         if self._comparisons.leq(expr.left, expr.right):
                             # a % b = a if 0 <= a < b
                             self._comparisons.assert_eq(expr, expr.left)
+                            expr = expr.left
                     elif self._comparisons.leq(Expr(0), nleft):
                         if self._comparisons.leq(nleft, expr.right):
-                            self._comparisons.assert_eq(expr, Expr(amt.AddInstruction, expr.right, expr.left))
+                            new = Expr(amt.AddInstruction, expr.right, expr.left)
+                            self._comparisons.assert_eq(expr, new)
+                            expr = new
                 elif self._comparisons.leq(expr.right, Expr(0)):
                     self._comparisons.assert_leq(expr, Expr(0))
+                    self._comparisons.assert_leq(expr.right, expr)
                     if self._comparisons.leq(expr.left, Expr(0)):
                         if self._comparisons.leq(expr.right, expr.left):
                             # a % b = a if b < a <= 0
                             self._comparisons.assert_eq(expr, expr.left)
+                            expr = expr.left
                     elif self._comparisons.leq(nleft, Expr(0)):
                         if self._comparisons.leq(expr.right, nleft):
-                            self._comparisons.assert_eq(expr, Expr(amt.AddInstruction, expr.left, expr.right))
+                            new = Expr(amt.AddInstruction, expr.left, expr.right)
+                            self._comparisons.assert_eq(expr, new)
+                            expr = new
 
             case amt.DivInstruction:
                 # because of expr simplifications, we already know

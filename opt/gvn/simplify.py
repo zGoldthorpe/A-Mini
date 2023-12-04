@@ -14,6 +14,7 @@ from utils.syntax import Syntax
 from opt.tools import Opt
 from opt.analysis.defs import DefAnalysis
 from opt.analysis.domtree import DomTreeAnalysis
+from opt.gvn.expr import Expr
 from opt.gvn.simpson import RPO, SCC
 from opt.gvn.gargi import GVN
 
@@ -41,13 +42,23 @@ class NaiveSimplify(NaiveSimplify):
 
     gvn: {acc_str}
         Identify which GVN algorithm to use
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
 
-    @NaiveSimplify.init("gvn-reduce", gvn="any")
-    def __init__(self, *, gvn):
+    @NaiveSimplify.init("gvn-reduce", gvn="any", i="-1")
+    def __init__(self, *, gvn, i):
         if gvn not in acc:
             raise BadArgumentException(f"`gvn` must be one of {acc_str}")
         self._gvn, self._args = acc[gvn]
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
 
     @NaiveSimplify.opt_pass
     def simplify(self):

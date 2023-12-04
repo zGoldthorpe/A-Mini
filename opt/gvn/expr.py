@@ -14,7 +14,9 @@ import ampy.types as amt
 
 class Expr:
     # forward declaration
-    pass
+
+    # constant declaring the number of bits used for ints
+    intsize = 128
 
 class Expr(Expr):
     """
@@ -30,7 +32,7 @@ class Expr(Expr):
         # args: arguments
         if isinstance(op, str):
             try:
-                op = int(op)
+                op = self._int(int(op))
             except ValueError:
                 pass
         self.op = op
@@ -295,17 +297,17 @@ class Expr(Expr):
                 amt.AddInstruction,
                 amt.SubInstruction,
                 amt.MulInstruction,
-                amt.DivInstruction,
-                amt.ModInstruction,
                 amt.AndInstruction,
                 amt.OrInstruction,
                 amt.XOrInstruction,
-                amt.LShiftInstruction,
-                amt.RShiftInstruction,
                 amt.EqInstruction,
                 amt.NeqInstruction,
                 amt.LtInstruction,
                 amt.LeqInstruction,
+                amt.LShiftInstruction,
+                amt.RShiftInstruction,
+                amt.DivInstruction,
+                amt.ModInstruction,
                 amt.PhiInstruction,
                 )
 
@@ -340,6 +342,18 @@ class Expr(Expr):
         if self.op == amt.PhiInstruction:
             return hash((self.op, tuple(self.args[1:])))
         return hash((self.op, tuple(self.args)))
+    
+    @classmethod
+    @(Syntax(object, int) >> int)
+    def _int(cls, x):
+        """
+        Ensure integer is within the specified bit range
+        """
+        if cls.intsize > 0:
+            x = x % (1 << cls.intsize)
+            if x > 1 << (cls.intsize-1):
+                x -= 1 << cls.intsize
+        return x
 
     ### rewriting ###
     @(Syntax(object) >> None)
@@ -464,7 +478,13 @@ class Expr(Expr):
 
                 case amt.DivInstruction:
                     if self.right.op == 0:
-                        raise OptError("Division by zero discovered.")
+                        # division by zero!
+                        #TODO: can we do something about this
+                        # (maybe an "undef" expression value)
+                        # for now, treat as zero
+                        self.op = 0
+                        self.args = []
+                        break
                     if self.right.op == 1:
                         # a / 1 = a
                         self.op = self.left.op
@@ -493,7 +513,12 @@ class Expr(Expr):
 
                 case amt.ModInstruction:
                     if self.right.op == 0:
-                        raise OptError("Modulo zero discovered.")
+                        # modulo zero!
+                        #TODO: can we do something about this
+                        # for now, treat as zero
+                        self.op = 0
+                        self.args = []
+                        break
                     if (self.left.op == 0
                             or (isinstance(self.right.op, int)
                                 and abs(self.right.op) == 1)
@@ -626,7 +651,10 @@ class Expr(Expr):
 
                     if isinstance(self.right.op, int):
                         if isinstance(self.left.op, int):
-                            self.op = self.left.op << self.right.op
+                            if self.right.op >= 0:
+                                self.op = self.left.op << self.right.op
+                            else:
+                                self.op = self.left.op >> -self.right.op
                             self.args = []
                             break
                         if (n := self.right.op) >= 0:
@@ -636,7 +664,7 @@ class Expr(Expr):
                             self.left = Expr(2**n)
                             continue
                         # a << (-n) = a >> n
-                        self.right.op *= -1
+                        self.right = Expr(-self.right.op)
                         self.op = amt.RShiftInstruction
 
                 case amt.RShiftInstruction:
@@ -673,13 +701,16 @@ class Expr(Expr):
 
                     if isinstance(self.right.op, int):
                         if isinstance(self.left.op, int):
-                            self.op = self.left.op >> self.right.op
+                            if self.right.op >= 0:
+                                self.op = self.left.op >> self.right.op
+                            else:
+                                self.op = self.left.op << -self.right.op
                             self.args = []
                             break
                         if self.right.op <= 0:
                             # a >> (-n) = a << n
                             self.op = amt.LShiftInstruction
-                            self.right.op *= -1
+                            self.right = Expr(-self.right.op)
                             continue
 
                 case amt.EqInstruction:
@@ -744,6 +775,10 @@ class Expr(Expr):
 
             # after all the reductions happen, exit the loop
             break
+
+        if isinstance(self.op, int):
+            # cap the bitsize of integers
+            self.op = self._int(self.op)
     
 
     ## associativity ##

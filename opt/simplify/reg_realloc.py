@@ -92,6 +92,8 @@ class RR(RR):
                 if isinstance(I, ampy.types.MovInstruction):
                     if I.operand.startswith('%') and I.operand != I.target:
                         self.debug("mov:", I.target, "===", I.operand)
+                        self.RIG.setdefault(I.target, set())
+                        self.RIG.setdefault(I.operand, set())
                         self.cp.setdefault(I.target, set()).add(I.operand)
                         self.cp.setdefault(I.operand, set()).add(I.target)
                 elif isinstance(I, ampy.types.PhiInstruction):
@@ -99,6 +101,8 @@ class RR(RR):
                         if not reg.startswith('%') or reg == I.target:
                             continue
                         self.debug("phi:", I.target, "===", reg)
+                        self.RIG.setdefault(I.target, set())
+                        self.RIG.setdefault(reg, set())
                         self.cp.setdefault(I.target, set()).add(reg)
                         self.cp.setdefault(reg, set()).add(I.target)
 
@@ -225,6 +229,7 @@ class RR(RR):
         neighbours = self.RIG.pop(var)
         for reg in neighbours:
             self.RIG[reg].remove(var)
+
         # no need to handle copies, because the RIG cannot simplify
         # copy instructions
 

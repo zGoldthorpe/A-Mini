@@ -48,14 +48,24 @@ class Anticipate(Anticipate):
 
     gvn: {acc_str}
         Identify which GVN algorithm to use
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
 
-    @Anticipate.init("anticipatable", gvn="any")
-    def __init__(self, *, gvn):
+    @Anticipate.init("anticipatable", gvn="any", i="-1")
+    def __init__(self, *, gvn, i):
         if gvn not in acc:
             raise BadArgumentException(f"`gvn` must be one of {acc_str}")
         self._gvnarg=gvn
         self._gvn, self._args = acc[gvn]
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
 
     @Anticipate.getter
     @(Syntax(object, ampy.types.BasicBlock) >> [Expr])

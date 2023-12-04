@@ -48,14 +48,24 @@ class VDCM(VDCM):
 
     gvn: {acc_str}
         Identify which GVN algorithm to use
+    i: int
+        Indicate number of bits used for integers. Use 0 for infinite bits, or
+        -1 for the default established by an earlier pass.
+        (default: -1)
     """
     
-    @VDCM.init("vdcm", gvn="any")
-    def __init__(self, *, gvn):
+    @VDCM.init("vdcm", gvn="any", i="-1")
+    def __init__(self, *, gvn, i):
         if gvn not in acc:
             raise BadArgumentException(f"`gvn` must be one of {acc_str}")
         self._gvnarg=gvn
         self._gvn, self._args = acc[gvn]
+        try:
+            i = int(i)
+        except ValueError:
+            raise BadArgumentException("`i` must be an integer.")
+        if i >= 0:
+            Expr.intsize = i
 
 
     @VDCM.opt_pass
@@ -115,7 +125,7 @@ class VDCM(VDCM):
 
         for key, exprs in sorted(later.items(), key=lambda p: p[0].label if not isinstance(p[0], tuple) else p[0][0].label):
             if isinstance(key, ampy.types.BasicBlock):
-                self.debug("later", key.label,":", ", ".join(str(expr) for expr in exprs))
+                self.debug("later", key.label, ":", ", ".join(str(expr) for expr in exprs))
             else:
                 self.debug("later", key[0].label, key[1].label, ":", ", ".join(str(expr) for expr in exprs))
 
@@ -125,8 +135,8 @@ class VDCM(VDCM):
         # until B -> C, but cannot be delayed further.
         #
         # Delete an expression from B if it its computation from the entrypoint
-        # cannot be delayed to just before B, as this would mean that the
-        # expression computation at B is necessary.
+        # cannot be delayed to just before B, as this would otherwise mean that
+        # the expression computation at B is necessary.
         #
         # insert[B, C]: set of expressions to insert between B and C
         # insert[B]: set of expressions to insert at the end of B
@@ -172,7 +182,8 @@ class VDCM(VDCM):
             if isinstance(key, ampy.types.BasicBlock):
                 # insertions in insert[B] can be made at the end
                 # of the block B
-                self.debug(key.label, "insert", ", ".join(str(expr) for expr in self._insert[key]))
+                if len(self._insert[key]) > 0:
+                    self.debug(key.label, "insert", ", ".join(str(expr) for expr in self._insert[key]))
                 continue
             block, child = key
             inserts = self._insert.pop(key)
@@ -194,7 +205,7 @@ class VDCM(VDCM):
         # depth-first, and decide representatives as we go.
         #
         # NB. Code motion breaks SSA form, but not completely!
-        # Value numbers will correspond to unique registers, but may
+        # Registers will correspond to unique value numbers, but may
         # be defined in several places.
         self._changed = False
         self._dommem = {} # memoisation for substitutions
@@ -279,7 +290,11 @@ class VDCM(VDCM):
         """
         def sub(var):
             expr = self._vn.get(var, Expr(var))
-            ret = self._get_dominating_var(expr, block)
+            if isinstance(expr.op, int):
+                return str(expr.op)
+            ret = self.vnrep.get(expr, None)
+            if ret is None:
+                raise Exception(f"{var}, with value {expr},  has no value number class")
             self._changed |= ret != var
             return ret
         
