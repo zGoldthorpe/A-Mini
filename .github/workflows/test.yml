@@ -7,7 +7,23 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build:
+  
+  Makefile:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: "3.10"
+
+    - name: Makefile tests
+      run: make all
+
+  batch-testing:
   
     runs-on: ubuntu-latest
 
@@ -19,17 +35,14 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Makefile tests
-      run: make all
-
     - name: Generate fuzz
-      run: python batch_test.py --debug --timeout=300 --max-procs=128 fuzz ami --num 128
+      run: python batch_test.py --debug --timeout=300 --max-procs=64 fuzz ami --num 128
 
     - name: Fuzz inputs
-      run: python batch_test.py --debug --timeout=1200 --max-procs=128 fuzz input --num 16
+      run: python batch_test.py --debug --timeout=1200 --max-procs=64 fuzz input --num 16
 
     - name: Build opts
-      run: python batch_test.py --debug --timeout=1800 --max-procs=128 opt --file="passes.opt" --keep-metadata
+      run: python batch_test.py --debug --timeout=1800 --max-procs=64 opt --file="passes.opt" --keep-metadata
 
     - name: Test opt correctness
-      run: python batch_test.py --debug --timeout=1200 --max-procs=128 run
+      run: python batch_test.py --debug --timeout=1200 --max-procs=64 run
