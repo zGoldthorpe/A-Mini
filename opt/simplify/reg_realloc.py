@@ -22,6 +22,7 @@ import ampy.types
 
 from opt.tools import Opt
 from opt.analysis.live import LiveAnalysis
+from opt.simplify.dce import DCE
 
 class RR(Opt):
     # forward declaration
@@ -59,12 +60,19 @@ class RR(RR):
         #
         # rig[var]: adjacent nodes in RIG to var
         # cp[var]: set of copy instructions
+        #
+        # Dead code elimination is run first to at least ensure
+        # that all registers are live coming out of their definition
+        # instructions
 
+        self.require(DCE).perform_opt()
         live = self.require(LiveAnalysis)
         self.RIG = {}
         self.cp = {}
         for block in self.CFG:
             for i, I in enumerate(block):
+                # it suffices to only check "live in" if there are
+                # no dead definitions
                 regs = live.live_in(block, i)
                 self.num_reg = max(self.num_reg, len(regs))
                 for u in regs:
@@ -192,6 +200,7 @@ class RR(RR):
                     elif isinstance(I, ampy.types.ReadInstruction):
                         I.target = "%_"
                     else: # dead variable, and not a read
+                        # (this should not be possible, though)
                         to_delete.append(i)
                         continue
 

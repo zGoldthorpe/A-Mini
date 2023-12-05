@@ -1,5 +1,6 @@
 # A-Mi
-![Testing](https://github.com/zGoldthorpe/A-Mini/actions/workflows/test.yml/badge.svg)
+[![Make Tests](https://github.com/zGoldthorpe/A-Mini/actions/workflows/make.yml/badge.svg)](https://github.com/zGoldthorpe/A-Mini/actions?query=workflow%3A%22Makefile+Tests%22)
+[![Opt Tests](https://github.com/zGoldthorpe/A-Mini/actions/workflows/opt.yml/badge.svg)](https://github.com/zGoldthorpe/A-Mini/actions?query=workflow%3A%22Opt+Tests%22)
 
 **A**ssembly-**Mi**nimal: a toy language for experimenting with concepts from the [middle-end](https://en.wikipedia.org/wiki/Compiler#Midle_end) (i.e., optimisations) in a compiler stack.
 

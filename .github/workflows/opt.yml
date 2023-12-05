@@ -1,4 +1,4 @@
-name: Testing
+name: Opt Tests
 
 on:
   push:
@@ -7,21 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  
-  Makefile:
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.10"
-
-    - name: Makefile tests
-      run: make all
 
   batch-testing:
   
@@ -36,22 +21,24 @@ jobs:
         python-version: "3.10"
 
     - name: Generate fuzz
-      run: python batch_test.py --debug --timeout=300 --max-procs=32 fuzz ami --num 32
+      run: python batch_test.py --debug --timeout=300 --max-procs=32 fuzz ami --num 64
 
     - name: Fuzz inputs
       run: python batch_test.py --debug --timeout=1200 --max-procs=32 fuzz input --num 8
-
-    - name: Prepare fuzz archive
-      run: zip fuzz.zip code/.fuzz -r
-
-    - name: Archive fuzz code
-      uses: actions/upload-artifact@v3
-      with:
-        name: fuzz.zip
-        path: fuzz.zip
 
     - name: Build opts
       run: python batch_test.py --debug --timeout=3600 --max-procs=32 opt --file="passes.opt"
 
     - name: Test opt correctness
       run: python batch_test.py --debug --timeout=1200 --max-procs=32 run
+
+    - name: Save state on failure
+      if: failure()
+      run: tar -czvf code.tar.gz code/
+
+    - name: Archive test suite on failure
+      if: failure()
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-suite
+        path: code.tar.gz
