@@ -1,4 +1,6 @@
 # A-Mi
+![Testing](https://github.com/zGoldthorpe/A-Mini/actions/workflows/test.yml/badge.svg)
+
 **A**ssembly-**Mi**nimal: a toy language for experimenting with concepts from the [middle-end](https://en.wikipedia.org/wiki/Compiler#Midle_end) (i.e., optimisations) in a compiler stack.
 
 Sample code can be found in the `code/` folder, which can be executed via the `ami.py` interpreter:

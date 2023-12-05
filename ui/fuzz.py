@@ -118,7 +118,7 @@ class FuzzUI:
 
         # now, decide on a stage
         block = self.weighted_choice([
-                    (self.exit_stage, len(self._cfg)),
+                    (self.exit_stage, len(self._cfg)**2),
                     (self.chain_stage, self._weights[0]),
                     (self.if_stage, self._weights[1]),
                     (self.loop_stage, self._weights[2]),

@@ -36,7 +36,7 @@ jobs:
         python-version: "3.10"
 
     - name: Generate fuzz
-      run: python batch_test.py --debug --timeout=300 --max-procs=32 fuzz ami --num 8
+      run: python batch_test.py --debug --timeout=300 --max-procs=32 fuzz ami --num 32
 
     - name: Fuzz inputs
       run: python batch_test.py --debug --timeout=1200 --max-procs=32 fuzz input --num 8

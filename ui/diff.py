@@ -84,19 +84,21 @@ class DiffUI:
         ri = 0
         while li < len(lmask) and ri < len(rmask):
             if lmask[li]:
-                while self._right[ri] != self._left[li]:
+                if self._right[ri] != self._left[li]:
                     mistakes.add(len(full_output))
                     lhs.append('')
                     rhs.append(ri)
                     full_output.append(((), self._right[ri]))
                     ri += 1
+                    continue
             if rmask[ri]:
-                while self._left[li] !=self._right[ri]:
+                if self._left[li] != self._right[ri]:
                     mistakes.add(len(full_output))
                     lhs.append(li)
                     rhs.append('')
                     full_output.append((self._left[li], ()))
                     li += 1
+                    continue
             # either both are true, or both are false
             if not lmask[li]:
                 mistakes.add(len(full_output))
@@ -184,7 +186,7 @@ class DiffUI:
         if lhs is None:
             utils.printing.phidden(':' + ' '*self._width + ':', end='')
         elif wrong:
-            lhs = f" {lhs: <{self._width}} "
+            lhs = f"!{lhs: <{self._width}}!"
             utils.printing.perror(lhs, end='')
         else:
             lhs = f" {lhs: <{self._width}} "
@@ -195,7 +197,7 @@ class DiffUI:
         if rhs is None:
             utils.printing.phidden(':' + ' '*self._width + ':', end='')
         elif wrong:
-            rhs = f" {rhs: <{self._width}} "
+            rhs = f"!{rhs: <{self._width}}!"
             utils.printing.perror(rhs, end='')
         else:
             rhs = f" {rhs: <{self._width}} "
@@ -221,6 +223,14 @@ class DiffUI:
                 if li == len(self._left) or ri == len(self._right):
                     table[li][ri] = 0
                     continue
+                if self._left[li] == self._right[ri]:
+                    # no reason *not* to match
+                    if table[li+1][ri+1] is None:
+                        stack.append((li, ri))
+                        stack.append((li+1, ri+1))
+                        continue
+                    table[li][ri] = table[li+1][ri+1] + 1
+                    continue
                 if table[li][ri+1] is None:
                     stack.append((li, ri))
                     stack.append((li, ri+1))
@@ -229,15 +239,10 @@ class DiffUI:
                     stack.append((li, ri))
                     stack.append((li+1, ri))
                     continue
-                if table[li+1][ri+1] is None:
-                    stack.append((li, ri))
-                    stack.append((li+1, ri+1))
-                    continue
                 table[li][ri] = max(
                         table[li][ri+1], # discard self._right char
                         table[li+1][ri], # discard self._left char
-                        table[li+1][ri+1] + int(self._left[li] == self._right[ri]))
-
+                        )
         # now that the best score is known, build the match
         score = table[0][0]
         rescore = 0
