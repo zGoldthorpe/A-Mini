@@ -21,16 +21,16 @@ jobs:
         python-version: "3.10"
 
     - name: Generate fuzz
-      run: python batch_test.py --timeout=300 --max-procs=32 fuzz ami --num 64
+      run: python batch_test.py --debug --timeout=300 --max-procs=32 fuzz ami --num 64
 
     - name: Fuzz inputs
-      run: python batch_test.py --timeout=1200 --max-procs=32 fuzz input --num 8
+      run: python batch_test.py --debug --timeout=1200 --max-procs=32 fuzz input --num 8
 
     - name: Build opts
-      run: python batch_test.py --timeout=3600 --max-procs=32 opt --file="passes.opt"
+      run: python batch_test.py --debug --timeout=3600 --max-procs=32 opt --file="passes.opt"
 
     - name: Test opt correctness
-      run: python batch_test.py --timeout=1200 --max-procs=32 run
+      run: python batch_test.py --debug --timeout=1200 --max-procs=32 run
 
     - name: Save state on failure
       if: failure()
