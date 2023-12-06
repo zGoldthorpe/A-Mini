@@ -84,6 +84,6 @@ Combine `--latex` with the [other flags](#improving-cfg-readability) to improve 
 For example (and reference), a nice pipeline for producing (relatively) readable pseudocode from A-Mi source is
 ```console
 python3 ami2dot.py code.ami --latex --nice \
-    | dot2tex --autosize -traw -ftikz --code > code.tex
+    | dot2tex --code > code.tex
 ```
 after which `code.tex` may be `\input` directly into a `tikzpicture` environment.

@@ -221,6 +221,7 @@ class DotUI:
         """
         rpo = self._rpo(cfg)
         print("digraph {")
+        print('d2toptions="-traw -ftikz --autosize"')
         print('node [shape=box style="rounded corners"]')
         for block in rpo:
             print(self.tex_node(block))

@@ -101,8 +101,16 @@ class RPO(RPO):
                         # we do not handle non-def instructions
                         continue
 
-                    if ((self._number == "expr")
-                            or isinstance(expr.op, (int, str))):
+                    if self._number == "expr":
+                        if expr.op == ampy.types.PhiInstruction:
+                            # the lookup table is almost completely unnecessary
+                            # except for phi nodes, since they carry metadata
+                            # (the target variable), so the lookup table just
+                            # tracks this information
+                            value = lookup.setdefault(expr, expr)
+                        else:
+                            value = expr
+                    elif isinstance(expr.op, (int, str)):
                         value = lookup.setdefault(expr, expr)
                     else:
                         value = lookup.setdefault(expr, Expr(I.target))
@@ -371,10 +379,13 @@ class SCC(SCC):
                 # otherwise, it is an unhandled definition class, or a read
                 # cannot be optimistic in those cases
                 expr = Expr(var)
-
-        if (self._number == "expr" or isinstance(expr.op, (int, str))):
-            # do not expand phi instructions as expressions
-            # or else you will face infinite loops
+        
+        if self._number == "expr":
+            if expr.op == ampy.types.PhiInstruction:
+                value = lookup.setdefault(expr, expr)
+            else:
+                value = expr
+        elif isinstance(expr.op, (int, str)):
             value = lookup.setdefault(expr, expr)
         else:
             value = lookup.setdefault(expr, Expr(var))
