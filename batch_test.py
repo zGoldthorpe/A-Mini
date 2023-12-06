@@ -9,6 +9,7 @@ optimisation passes.
 
 import argparse
 import multiprocessing
+import os
 
 import utils.printing
 
@@ -181,8 +182,11 @@ def batch_diff(tfmanager, multi):
     for test in tfmanager.tests:
         for opt in tfmanager.get_test_opts(test):
             for outf in tfmanager.get_test_output_files(test):
+                diff = tfmanager.get_test_opt_corresponding_diff_fpath(test, opt, outf)
+                if os.path.exists(diff):
+                    continue
                 multi.prepare_process(
-                        tfmanager.get_test_opt_corresponding_diff_fpath(test, opt, outf),
+                        diff,
                         target=run_diff,
                         args=(tfmanager.get_test_output_fpath(test, outf),
                                 tfmanager.get_test_opt_output_fpath(test, opt, outf)),

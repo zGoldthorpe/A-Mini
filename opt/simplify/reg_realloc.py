@@ -73,6 +73,13 @@ class RR(RR):
             for i, I in enumerate(block):
                 # it suffices to only check "live in" if there are
                 # no dead definitions
+                # however, "dead reads" cannot be eliminated by
+                # the DCE pass, so we need to be careful of them
+                if isinstance(I, ampy.types.ReadInstruction):
+                    if I.target not in live.live_out(block, i):
+                        self.debug(f"dead read detected at {block.label}:{i}")
+                        I.target = "%_"
+
                 regs = live.live_in(block, i)
                 self.num_reg = max(self.num_reg, len(regs))
                 for u in regs:
