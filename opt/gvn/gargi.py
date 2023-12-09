@@ -271,20 +271,16 @@ class GVN(GVN):
 
 
                         # scan for phi nodes in child
-                        dom = self.CFG[self._DJ.idom(child).label]
+                        dom = self._DJ.idom(child)
                         for idx, var in self._phivar.get((block, child), []):
                             predicate = self._predicate[block, child]
-                            self.debug("Collecting predicate arguments along path", child.label, "->", block.label, "->", dom.label, "in dominator tree")
-                            pred_supp = self._cond_support(block, dom) # collect predicate variables
-                            pred_supp |= self._pred_supp[block, child]
-                            expr = predicate.simplify(self._get_vn(var))
-                            pred_expr = predicate.expr(pred_supp)
+                            pred_expr = self._phi_pred(child, block, dom)
                             target = child[idx].target
                             if (block not in self._phi.setdefault(target, {})
                                     or pred_expr != self._phi[target][block][1]):
                                 # touch changed phi node and update input
                                 self.debug("Argument for phi node defining", target, "updated to", str(expr))
-                                self._phi[target][block] = (predicate, predicate.expr(pred_supp))
+                                self._phi[target][block] = (predicate, pred_expr)
                                 self._touch(child, idx)
 
         # Step 4. Eliminate unreachable blocks
@@ -367,28 +363,64 @@ class GVN(GVN):
         
         return set(cond.args)
 
-    @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock) >> [set, Expr])
-    def _cond_support(self, cur_block, dominator):
+    @(Syntax(object, ampy.types.BasicBlock, ampy.types.BasicBlock, ampy.types.BasicBlock) >> Expr)
+    def _phi_pred(self, child, block, dominator):
         """
-        Walk up to the dominator and collect the expression arguments used for
-        conditions for reachability.
-        Assumes dominator dominates cur_block
+        Construct the predicate for a phi node argument
         """
-        if cur_block == dominator:
-            return set()
-        rcur = self._reachable[cur_block.label]
-        parents = list(filter(lambda p: self._rpo_num[p] <= self._rpo_num[cur_block],
-            rcur.parents))
-        if len(parents) == 1:
-            parent = self.CFG[parents[0].label]
-            self.debug("-> parent", parent.label)
-            supp = self._cond_support(parent, dominator)
-            supp |= self._pred_supp[parent, cur_block]
-            return supp
+        self.debug(f"Computing phi predicate for the edge {block.label}->{child.label} (dominated by {dominator.label})")
+        stack = []
+        mem = {}
+        stack.append((child, block))
+        added = set()
+        while len(stack) > 0:
+            top = stack.pop()
+            if top in mem:
+                continue
+            if isinstance(top, tuple):
+                blk, pnt = top
+                if pnt not in mem:
+                    stack.append(top)
+                    cur = pnt
+                else:
+                    cond = mem[pnt]
+                    if len(self._reachable[pnt.label].children) > 1:
+                        BI = self.CFG[pnt.label].branch_instruction
+                        if cur.label == BI.iftrue:
+                            # conjunction with branch condition
+                            mem[blk, pnt] = Expr(ampy.types.AndInstruction, cond, self._get_vn(BI.cond))
+                        else:
+                            # conjunction with negation of branch condition
+                            mem[blk, pnt] = Expr(ampy.types.AndInstruction, cond,
+                                    Expr(ampy.types.XOrInstruction, Expr(-1), self._get_vn(BI.cond)))
+                    else:
+                        mem[blk, pnt] = cond
+                    self.debug(f"Partial predicate for edge {pnt.label}->{blk.label} is {mem[blk, pnt]}")
+            else:
+                cur = top
+            
+            if cur == dominator:
+                mem[cur] = Expr(-1)
+                continue
+            rcur = self._reachable[cur.label]
+            parents = list(filter(lambda p: self._rpo_num[p] < self._rpo_num[cur], rcur.parents))
+            doable = True
+            for parent in parents:
+                if (cur, parent) not in mem:
+                    if doable:
+                        doable = False
+                        stack.append(cur)
+                    if (cur, parent) not in added:
+                        stack.append((cur, parent))
+                        added.add((cur, parent))
+                    break
+            if not doable:
+                continue
+            
+            mem[cur] = Expr(ampy.types.OrInstruction, *(mem[cur, parent] for parent in parents))
+            self.debug(f"Partial predicate at block {cur.label} is {mem[cur]}")
 
-        idom = self.CFG[self._DJ.idom(rcur).label]
-        self.debug("-> immediate dominator", idom.label)
-        return self._cond_support(idom, dominator)
+        return mem[child, block]
 
     @(Syntax(object, ampy.types.BasicBlock)
       | Syntax(object, ampy.types.BasicBlock, int)

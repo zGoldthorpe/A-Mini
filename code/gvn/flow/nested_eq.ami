@@ -1,0 +1,26 @@
+@A:
+    read %a
+    read %b
+    read %c
+    %alpha = %a + 1
+    %beta = %b + 1
+    %gamma = %c + 1
+    %omega.0 = %c + 1
+    %cond.0 = %b == %c
+    branch %cond.0 ? @B : @D
+
+@B:
+    %omega.1 = %b + 1
+    %cond.1 = %a == %b
+    branch %cond.1 ? @C : @D
+
+@C:
+    %omega.2 = %a + 1
+    goto @D
+
+@D:
+    %omega = phi [ %omega.0, @A ], [ %omega.1, @B ], [ %omega.2, @C ]
+    write %alpha
+    write %beta
+    write %gamma
+    write %omega

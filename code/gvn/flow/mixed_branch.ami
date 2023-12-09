@@ -1,0 +1,25 @@
+@A:
+    read %a
+    read %b
+    read %c
+    read %cond.0
+    branch %cond.0 ? @B : @C
+
+@B:
+    %cond.1 = %a == %b
+    branch %cond.1 ? @D : @E
+
+@C:
+    %cond.2 = %b == %c
+    branch %cond.2 ? @D : @E
+
+@D:
+    goto @F
+
+@E:
+    goto @F
+
+@F:
+    %x = phi [ %b, @D ], [ %a, @E ]
+    %y = phi [ %a, @D ], [ %b, @E ]
+    write %x

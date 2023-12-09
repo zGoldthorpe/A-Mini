@@ -1,0 +1,36 @@
+@B0:
+    read %x
+    read %y
+    %cond.1 = %x < %y
+    branch %cond.1 ? @B1 : @B2
+
+@B1:
+    %p.1 = %x + 1
+    goto @B3
+
+@B2:
+    %p.2 = %y + 1
+    goto @B3
+
+@B3:
+    %p = phi [ %p.1, @B1 ], [ %p.2, @B2 ]
+    %cond.2 = %y <= %x
+    branch %cond.2 ? @B4 : @B5
+
+@B4:
+    %q.4 = %y + 1
+    goto @B6
+
+@B5:
+    %q.5 = %x + 1
+    read %cond.3
+    branch %cond.3 ? @B6 : @B7
+
+@B6:
+    %q = phi [ %q.4, @B4 ], [ %q.5, @B5 ]
+    write %p
+    write %q
+    exit
+
+@B7:
+    exit
