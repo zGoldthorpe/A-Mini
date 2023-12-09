@@ -23,3 +23,4 @@
     %x = phi [ %b, @D ], [ %a, @E ]
     %y = phi [ %a, @D ], [ %b, @E ]
     write %x
+    write %y
